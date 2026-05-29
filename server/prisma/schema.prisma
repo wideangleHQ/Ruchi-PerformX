@@ -1,0 +1,447 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model audit_logs {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String    @db.Uuid
+  action     String    @db.VarChar(255)
+  entity     String    @db.VarChar(100)
+  entity_id  String    @db.Uuid
+  old_value  String?
+  new_value  String?
+  ip_address String?   @db.VarChar(100)
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  users      users     @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_audit_user")
+
+  @@index([entity, entity_id], map: "idx_audit_entity")
+  @@index([user_id], map: "idx_audit_user")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model departments {
+  id                                                      String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                                                    String                  @unique @db.VarChar(100)
+  description                                             String?
+  is_active                                               Boolean                 @default(true)
+  created_at                                              DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at                                              DateTime                @default(now()) @db.Timestamptz(6)
+  registration_requests                                   registration_requests[]
+  task_transfers_task_transfers_from_dept_idTodepartments task_transfers[]        @relation("task_transfers_from_dept_idTodepartments")
+  task_transfers_task_transfers_to_dept_idTodepartments   task_transfers[]        @relation("task_transfers_to_dept_idTodepartments")
+  tasks                                                   tasks[]
+  users                                                   users[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model email_otps {
+  id          String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email       String           @db.VarChar(255)
+  otp_hash    String
+  purpose     otp_purpose_enum
+  expires_at  DateTime         @db.Timestamptz(6)
+  verified_at DateTime?        @db.Timestamptz(6)
+  created_at  DateTime?        @default(now()) @db.Timestamptz(6)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model incentives {
+  id                                     String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id                            String              @db.Uuid
+  approved_by_id                         String?             @db.Uuid
+  month                                  Int
+  year                                   Int
+  type                                   incentive_type_enum
+  description                            String?
+  amount                                 Decimal?            @db.Decimal(12, 2)
+  is_approved                            Boolean?            @default(false)
+  approved_at                            DateTime?           @db.Timestamptz(6)
+  created_at                             DateTime?           @default(now()) @db.Timestamptz(6)
+  users_incentives_approved_by_idTousers users?              @relation("incentives_approved_by_idTousers", fields: [approved_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_incentive_approver")
+  users_incentives_employee_idTousers    users               @relation("incentives_employee_idTousers", fields: [employee_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_incentive_employee")
+
+  @@index([employee_id], map: "idx_incentives_employee")
+  @@index([month, year], map: "idx_incentives_period")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model notifications {
+  id         String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String                 @db.Uuid
+  task_id    String?                @db.Uuid
+  type       notification_type_enum
+  title      String                 @db.VarChar(255)
+  message    String
+  is_read    Boolean?               @default(false)
+  metadata   String?
+  created_at DateTime?              @default(now()) @db.Timestamptz(6)
+  tasks      tasks?                 @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_notification_task")
+  users      users                  @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_notification_user")
+
+  @@index([is_read], map: "idx_notifications_read")
+  @@index([user_id], map: "idx_notifications_user")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model performance_scores {
+  id                         String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id                    String             @db.Uuid
+  month                      Int
+  year                       Int
+  self_productivity_score    Decimal?           @default(0) @db.Decimal(5, 2)
+  assigned_task_score        Decimal?           @default(0) @db.Decimal(5, 2)
+  final_score                Decimal?           @default(0) @db.Decimal(5, 2)
+  assigned_score_status      score_status_enum? @default(NEUTRAL)
+  self_actions_completed     Int?               @default(0)
+  self_actions_total         Int?               @default(0)
+  consistency_days           Int?               @default(0)
+  total_working_days         Int?               @default(0)
+  self_pending_rate          Decimal?           @default(0) @db.Decimal(5, 2)
+  assigned_tasks_completed   Int?               @default(0)
+  assigned_tasks_total       Int?               @default(0)
+  overdue_tasks_count        Int?               @default(0)
+  avg_completion_speed_score Decimal?           @default(0) @db.Decimal(5, 2)
+  superior_remarks_score     Decimal?           @default(0) @db.Decimal(5, 2)
+  is_finalized               Boolean?           @default(false)
+  created_at                 DateTime?          @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime?          @default(now()) @db.Timestamptz(6)
+  users                      users              @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_score_user")
+
+  @@unique([user_id, month, year], map: "uq_user_month_year")
+  @@index([year, month], map: "idx_scores_period")
+  @@index([user_id], map: "idx_scores_user")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model registration_requests {
+  id               String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  full_name        String                    @db.VarChar(255)
+  username         String                    @db.VarChar(50)
+  email            String                    @db.VarChar(255)
+  password_hash    String
+  department_id    String                    @db.Uuid
+  requested_role   role_enum?                @default(EMPLOYEE)
+  status           registration_status_enum? @default(PENDING)
+  reviewed_by_id   String?                   @db.Uuid
+  reviewed_at      DateTime?                 @db.Timestamptz(6)
+  rejection_reason String?
+  created_at       DateTime?                 @default(now()) @db.Timestamptz(6)
+  departments      departments               @relation(fields: [department_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_registration_department")
+  users            users?                    @relation(fields: [reviewed_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_registration_reviewer")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model self_actions {
+  id               String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id          String              @db.Uuid
+  title            String              @db.VarChar(255)
+  status           action_status_enum
+  remarks          String?
+  category         task_category_enum?
+  action_date      DateTime?           @default(dbgenerated("CURRENT_DATE")) @db.Date
+  created_at       DateTime?           @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime?           @default(now()) @db.Timestamptz(6)
+  users            users               @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  task_attachments task_attachments[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model task_attachments {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_id        String?        @db.Uuid
+  comment_id     String?        @db.Uuid
+  self_action_id String?        @db.Uuid
+  file_name      String         @db.VarChar(255)
+  file_url       String
+  file_type      String?        @db.VarChar(100)
+  file_size_kb   Int?
+  uploaded_by_id String         @db.Uuid
+  created_at     DateTime       @default(now()) @db.Timestamptz(6)
+  task_comments  task_comments? @relation(fields: [comment_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_attachment_comment")
+  self_actions   self_actions?  @relation(fields: [self_action_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_attachment_self_action")
+  tasks          tasks?         @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_attachment_task")
+  users          users          @relation(fields: [uploaded_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_attachment_user")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model task_comments {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_id          String             @db.Uuid
+  user_id          String             @db.Uuid
+  content          String
+  is_tagged        Boolean?           @default(false)
+  created_at       DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime           @default(now()) @db.Timestamptz(6)
+  task_attachments task_attachments[]
+  tasks            tasks              @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_comment_task")
+  users            users              @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_comment_user")
+
+  @@index([task_id], map: "idx_task_comments_task")
+  @@index([user_id], map: "idx_task_comments_user")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model task_escalations {
+  id               String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_id          String                @db.Uuid
+  escalation_level escalation_level_enum
+  escalated_to_id  String                @db.Uuid
+  is_resolved      Boolean?              @default(false)
+  resolved_at      DateTime?             @db.Timestamptz(6)
+  triggered_at     DateTime?             @default(now()) @db.Timestamptz(6)
+  tasks            tasks                 @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_escalation_task")
+  users            users                 @relation(fields: [escalated_to_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_escalation_user")
+
+  @@index([is_resolved], map: "idx_task_escalations_resolved")
+  @@index([task_id], map: "idx_task_escalations_task")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model task_requests {
+  id                                         String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title                                      String              @db.VarChar(255)
+  description                                String
+  type                                       request_type_enum
+  status                                     request_status_enum @default(PENDING)
+  rejection_reason                           String?
+  requested_by_id                            String              @db.Uuid
+  reviewed_by_id                             String?             @db.Uuid
+  reviewed_at                                DateTime?           @db.Timestamptz(6)
+  generated_task_id                          String?             @unique @db.Uuid
+  created_at                                 DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at                                 DateTime            @default(now()) @db.Timestamptz(6)
+  tasks                                      tasks?              @relation(fields: [generated_task_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_generated_task")
+  users_task_requests_reviewed_by_idTousers  users?              @relation("task_requests_reviewed_by_idTousers", fields: [reviewed_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_request_reviewer")
+  users_task_requests_requested_by_idTousers users               @relation("task_requests_requested_by_idTousers", fields: [requested_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_request_user")
+
+  @@index([status], map: "idx_task_requests_status")
+  @@index([requested_by_id], map: "idx_task_requests_user")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model task_status_logs {
+  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_id       String            @db.Uuid
+  from_status   task_status_enum?
+  to_status     task_status_enum
+  changed_by_id String            @db.Uuid
+  reason        String?
+  created_at    DateTime          @default(now()) @db.Timestamptz(6)
+  tasks         tasks             @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_status_log_task")
+  users         users             @relation(fields: [changed_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_status_log_user")
+
+  @@index([task_id], map: "idx_task_status_logs_task")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model task_transfers {
+  id                                                   String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_id                                              String               @db.Uuid
+  from_dept_id                                         String               @db.Uuid
+  to_dept_id                                           String               @db.Uuid
+  initiated_by_id                                      String               @db.Uuid
+  received_by_id                                       String?              @db.Uuid
+  status                                               transfer_status_enum @default(PENDING)
+  reason                                               String?
+  rejection_reason                                     String?
+  created_at                                           DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at                                           DateTime             @default(now()) @db.Timestamptz(6)
+  departments_task_transfers_from_dept_idTodepartments departments          @relation("task_transfers_from_dept_idTodepartments", fields: [from_dept_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_transfer_from_dept")
+  users_task_transfers_initiated_by_idTousers          users                @relation("task_transfers_initiated_by_idTousers", fields: [initiated_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_transfer_initiator")
+  users_task_transfers_received_by_idTousers           users?               @relation("task_transfers_received_by_idTousers", fields: [received_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_transfer_receiver")
+  tasks                                                tasks                @relation(fields: [task_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_transfer_task")
+  departments_task_transfers_to_dept_idTodepartments   departments          @relation("task_transfers_to_dept_idTodepartments", fields: [to_dept_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_transfer_to_dept")
+
+  @@index([status], map: "idx_task_transfers_status")
+  @@index([task_id], map: "idx_task_transfers_task")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tasks {
+  id                                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title                             String              @db.VarChar(255)
+  description                       String
+  status                            task_status_enum?   @default(CREATED)
+  priority                          task_priority_enum? @default(MEDIUM)
+  category                          task_category_enum?
+  due_date                          DateTime            @db.Timestamptz(6)
+  accepted_at                       DateTime?           @db.Timestamptz(6)
+  completed_at                      DateTime?           @db.Timestamptz(6)
+  reviewed_at                       DateTime?           @db.Timestamptz(6)
+  closed_at                         DateTime?           @db.Timestamptz(6)
+  assigned_to_id                    String?             @db.Uuid
+  assigned_by_id                    String              @db.Uuid
+  department_id                     String              @db.Uuid
+  parent_task_id                    String?             @db.Uuid
+  created_at                        DateTime?           @default(now()) @db.Timestamptz(6)
+  updated_at                        DateTime?           @default(now()) @db.Timestamptz(6)
+  notifications                     notifications[]
+  task_attachments                  task_attachments[]
+  task_comments                     task_comments[]
+  task_escalations                  task_escalations[]
+  task_requests                     task_requests?
+  task_status_logs                  task_status_logs[]
+  task_transfers                    task_transfers[]
+  users_tasks_assigned_by_idTousers users               @relation("tasks_assigned_by_idTousers", fields: [assigned_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_tasks_assigned_to_idTousers users?              @relation("tasks_assigned_to_idTousers", fields: [assigned_to_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  departments                       departments         @relation(fields: [department_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tasks                             tasks?              @relation("tasksTotasks", fields: [parent_task_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_tasks                       tasks[]             @relation("tasksTotasks")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model users {
+  id                                                   String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  username                                             String                  @unique @db.VarChar(50)
+  email                                                String                  @unique @db.VarChar(255)
+  password_hash                                        String
+  full_name                                            String                  @db.VarChar(255)
+  role                                                 role_enum
+  department_id                                        String?                 @db.Uuid
+  is_active                                            Boolean?                @default(true)
+  created_at                                           DateTime?               @default(now()) @db.Timestamptz(6)
+  updated_at                                           DateTime?               @default(now()) @db.Timestamptz(6)
+  deleted_at                                           DateTime?               @db.Timestamptz(6)
+  email_verified_at                                    DateTime?               @db.Timestamptz(6)
+  last_login_at                                        DateTime?               @db.Timestamptz(6)
+  must_change_password                                 Boolean?                @default(false)
+  audit_logs                                           audit_logs[]
+  incentives_incentives_approved_by_idTousers          incentives[]            @relation("incentives_approved_by_idTousers")
+  incentives_incentives_employee_idTousers             incentives[]            @relation("incentives_employee_idTousers")
+  notifications                                        notifications[]
+  performance_scores                                   performance_scores[]
+  registration_requests                                registration_requests[]
+  self_actions                                         self_actions[]
+  task_attachments                                     task_attachments[]
+  task_comments                                        task_comments[]
+  task_escalations                                     task_escalations[]
+  task_requests_task_requests_reviewed_by_idTousers    task_requests[]         @relation("task_requests_reviewed_by_idTousers")
+  task_requests_task_requests_requested_by_idTousers   task_requests[]         @relation("task_requests_requested_by_idTousers")
+  task_status_logs                                     task_status_logs[]
+  task_transfers_task_transfers_initiated_by_idTousers task_transfers[]        @relation("task_transfers_initiated_by_idTousers")
+  task_transfers_task_transfers_received_by_idTousers  task_transfers[]        @relation("task_transfers_received_by_idTousers")
+  tasks_tasks_assigned_by_idTousers                    tasks[]                 @relation("tasks_assigned_by_idTousers")
+  tasks_tasks_assigned_to_idTousers                    tasks[]                 @relation("tasks_assigned_to_idTousers")
+  departments                                          departments?            @relation(fields: [department_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_department")
+}
+
+enum action_status_enum {
+  COMPLETED
+  PENDING
+}
+
+enum escalation_level_enum {
+  EMPLOYEE_REMINDER
+  HOD_ALERT
+  MD_ALERT
+}
+
+enum incentive_type_enum {
+  MONETARY
+  EMPLOYEE_OF_MONTH
+  GIFT
+  APPRECIATION_BADGE
+  PROMOTION_FLAG
+  CONSISTENCY_AWARD
+  DEPARTMENT_RANKING
+}
+
+enum notification_type_enum {
+  TASK_ASSIGNED
+  TASK_ACCEPTED
+  TASK_REJECTED
+  TASK_COMPLETED
+  TASK_PENDING
+  TASK_OVERDUE
+  ESCALATION_HOD
+  ESCALATION_MD
+  REQUEST_ACCEPTED
+  REQUEST_REJECTED
+  REMARKS_ADDED
+  TASK_TAGGED
+  INCENTIVE_APPROVED
+  TRANSFER_REQUESTED
+  TRANSFER_ACCEPTED
+  TRANSFER_REJECTED
+  REVIEW_REQUESTED
+  PASSWORD_RESET
+}
+
+enum otp_purpose_enum {
+  SIGNUP
+  PASSWORD_RESET
+}
+
+enum registration_status_enum {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum request_status_enum {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum request_type_enum {
+  BUDGET_APPROVAL
+  TRANSPORT_SUPPORT
+  CROSS_DEPT_ASSISTANCE
+  RESOURCE_REQUEST
+  OTHER
+}
+
+enum role_enum {
+  MD
+  HOD
+  EMPLOYEE
+  ADMIN
+}
+
+enum score_status_enum {
+  NEUTRAL
+  CALCULATED
+}
+
+enum task_category_enum {
+  OPERATIONAL
+  SALES
+  MARKETING
+  PRODUCTION
+  HR
+  FINANCE
+  OTHER
+}
+
+enum task_priority_enum {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum task_status_enum {
+  CREATED
+  ASSIGNED
+  ACCEPTED
+  IN_PROGRESS
+  COMPLETED
+  REJECTED
+  PENDING
+  REVIEWED
+  CLOSED
+}
+
+enum transfer_status_enum {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
