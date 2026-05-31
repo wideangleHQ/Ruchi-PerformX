@@ -6,25 +6,40 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+
 import { AuthService } from './auth.service';
+
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { VerifyResetOtpDto } from './dto/verify-reset-otp.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { type JwtPayload } from '../../common/types/jwt-payload.type';
+
+import type { JwtPayload } from '../../common/types/jwt-payload.type';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) {
+    console.log('================================');
+    console.log('AuthService Injected:', authService);
+    console.log('================================');
+  }
 
   @Public()
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   register(@Body() dto: RegisterDto) {
+    console.log('================================');
+    console.log('Register Endpoint Hit');
+    console.log('DTO:', dto);
+    console.log('AuthService:', this.authService);
+    console.log('Register Method:', this.authService?.register);
+    console.log('================================');
+
     return this.authService.register(dto);
   }
 
@@ -66,7 +81,9 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   logout() {
-    return { message: 'Logged out successfully' };
+    return {
+      message: 'Logged out successfully',
+    };
   }
 
   @Get('me')
@@ -74,3 +91,10 @@ export class AuthController {
     return user;
   }
 }
+
+console.log(
+  Reflect.getMetadata(
+    'design:paramtypes',
+    AuthController,
+  ),
+);

@@ -1,20 +1,25 @@
-import { Injectable, type CanActivate, type ExecutionContext, ForbiddenException } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { role_enum } from '../../../generated/prisma/client';
+import {
+  Injectable,
+  ForbiddenException,
+} from '@nestjs/common';
+import type {
+  CanActivate,
+  ExecutionContext,
+} from '@nestjs/common';
+import { role_enum } from '@prisma/client';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import { type JwtPayload } from '../types/jwt-payload.type';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
-  constructor(private readonly reflector: Reflector) {}
-
   canActivate(ctx: ExecutionContext): boolean {
-    const requiredRoles = this.reflector.getAllAndOverride<role_enum[]>(ROLES_KEY, [
-      ctx.getHandler(),
-      ctx.getClass(),
-    ]);
+    const requiredRoles =
+      Reflect.getMetadata(ROLES_KEY, ctx.getHandler()) ||
+      Reflect.getMetadata(ROLES_KEY, ctx.getClass());
 
-    if (!requiredRoles || requiredRoles.length === 0) return true;
+    if (!requiredRoles?.length) {
+      return true;
+    }
 
     const request = ctx.switchToHttp().getRequest();
     const user: JwtPayload = request.user;

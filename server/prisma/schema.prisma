@@ -1,6 +1,5 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -37,34 +36,6 @@ model departments {
   task_transfers_task_transfers_to_dept_idTodepartments   task_transfers[]        @relation("task_transfers_to_dept_idTodepartments")
   tasks                                                   tasks[]
   users                                                   users[]
-}
-
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-enum OtpType {
-  REGISTRATION
-  PASSWORD_RESET
-}
-
-model OtpVerification {
-  id        String   @id @default(uuid())
-
-  email     String
-
-  otpHash   String
-
-  type      OtpType
-
-  expiresAt DateTime
-
-  isUsed    Boolean  @default(false)
-
-  createdAt DateTime @default(now())
-
-  @@index([email])
-  @@index([expiresAt])
-  @@index([email, type])
-
-  @@map("otp_verifications")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -280,6 +251,21 @@ model task_transfers {
   @@index([task_id], map: "idx_task_transfers_task")
 }
 
+model OtpVerification {
+  id        String   @id @default(uuid())
+  email     String
+  otpHash   String
+  type      OtpType
+  expiresAt DateTime
+  isUsed    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([expiresAt])
+  @@index([email, type])
+  @@map("otp_verifications")
+}
+
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model tasks {
   id                                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -329,6 +315,8 @@ model users {
   email_verified_at                                    DateTime?               @db.Timestamptz(6)
   last_login_at                                        DateTime?               @db.Timestamptz(6)
   must_change_password                                 Boolean?                @default(false)
+  is_email_verified                                    Boolean?                @default(false)
+  pending_approval                                     Boolean?                @default(false)
   audit_logs                                           audit_logs[]
   incentives_incentives_approved_by_idTousers          incentives[]            @relation("incentives_approved_by_idTousers")
   incentives_incentives_employee_idTousers             incentives[]            @relation("incentives_employee_idTousers")
@@ -461,4 +449,9 @@ enum transfer_status_enum {
   PENDING
   ACCEPTED
   REJECTED
+}
+
+enum OtpType {
+  REGISTRATION
+  PASSWORD_RESET
 }

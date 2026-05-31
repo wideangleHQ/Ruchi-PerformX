@@ -1,55 +1,136 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { Resend } from 'resend';
-import dotenv from 'dotenv';
-dotenv.config();
 
 @Injectable()
 export class EmailService {
-  private readonly resend: Resend;
   private readonly logger = new Logger(EmailService.name);
-  private readonly fromEmail = process.env.RESEND_FROM_EMAIL ?? 'ruchifoodline.connect@gmail.com';
+  private readonly resend: Resend;
+  private readonly fromEmail: string;
 
   constructor() {
-    this.resend = new Resend(process.env.RESEND_API_KEY);
+    const apiKey = process.env.RESEND_API_KEY;
+
+    if (!apiKey) {
+      throw new Error('RESEND_API_KEY is missing');
+    }
+
+    this.resend = new Resend(apiKey);
+
+    this.fromEmail =
+      process.env.RESEND_FROM_EMAIL ??
+      'onboarding@resend.dev';
+
+    this.logger.log(
+      `EmailService initialized. From Email: ${this.fromEmail}`,
+    );
   }
 
-  async sendOtpEmail(email: string, otp: string, type: 'REGISTRATION' | 'PASSWORD_RESET'): Promise<void> {
-    const subject = type === 'REGISTRATION'
-      ? 'RUCHI PerformX — Verify Your Email'
-      : 'RUCHI PerformX — Password Reset OTP';
+  async sendOtpEmail(
+    email: string,
+    otp: string,
+    type: 'REGISTRATION' | 'PASSWORD_RESET',
+  ): Promise<void> {
+    const subject =
+      type === 'REGISTRATION'
+        ? 'RUCHI PerformX - Verify Your Email'
+        : 'RUCHI PerformX - Password Reset OTP';
 
-    const heading = type === 'REGISTRATION'
-      ? 'Email Verification'
-      : 'Password Reset';
+    const heading =
+      type === 'REGISTRATION'
+        ? 'Email Verification'
+        : 'Password Reset';
 
-    const message = type === 'REGISTRATION'
-      ? 'Use the OTP below to verify your email and complete registration.'
-      : 'Use the OTP below to reset your password.';
+    const message =
+      type === 'REGISTRATION'
+        ? 'Use the OTP below to verify your email and complete registration.'
+        : 'Use the OTP below to reset your password.';
 
     try {
-      await this.resend.emails.send({
+      this.logger.log(`Sending ${type} OTP email to ${email}`);
+
+      const response = await this.resend.emails.send({
         from: this.fromEmail,
-        to: email,
+        to: [email],
         subject,
-        html: this.buildOtpTemplate(heading, message, otp),
+        html: this.buildOtpTemplate(
+          heading,
+          message,
+          otp,
+        ),
       });
-    } catch (error) {
-      this.logger.error(`Failed to send ${type} email to ${email}`, error);
-      throw new InternalServerErrorException('Failed to send email. Please try again.');
+
+      this.logger.log(
+        `Email API Response: ${JSON.stringify(response, null, 2)}`,
+      );
+
+      if ('error' in response && response.error) {
+        this.logger.error(
+          `Resend Error: ${JSON.stringify(response.error)}`,
+        );
+
+        throw new InternalServerErrorException(
+          response.error.message,
+        );
+      }
+
+      this.logger.log(
+        `OTP Email Sent Successfully to ${email}`,
+      );
+    } catch (error: unknown) {
+      const stack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error(
+        `Failed sending OTP email to ${email}`,
+        stack,
+      );
+
+      console.error('FULL EMAIL ERROR =>', error);
+
+      throw new InternalServerErrorException(
+        'Failed to send email',
+      );
     }
   }
 
-  private buildOtpTemplate(heading: string, message: string, otp: string): string {
+  private buildOtpTemplate(
+    heading: string,
+    message: string,
+    otp: string,
+  ): string {
     return `
-      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#0a1628;color:#e8eef8;border-radius:12px;">
-        <h2 style="color:#e8502a;margin-bottom:8px;">RUCHI PerformX</h2>
-        <h3 style="margin-bottom:16px;">${heading}</h3>
-        <p style="color:#8ba4c8;margin-bottom:24px;">${message}</p>
-        <div style="background:#1a3460;border-radius:8px;padding:24px;text-align:center;letter-spacing:8px;font-size:32px;font-weight:800;color:#f0a500;">
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:24px;">
+        <h1 style="color:#e8502a;">RUCHI PerformX</h1>
+
+        <h2>${heading}</h2>
+
+        <p>${message}</p>
+
+        <div style="
+          background:#f4f4f4;
+          padding:20px;
+          text-align:center;
+          font-size:32px;
+          font-weight:bold;
+          letter-spacing:8px;
+          border-radius:8px;
+          margin:24px 0;
+        ">
           ${otp}
         </div>
-        <p style="color:#8ba4c8;margin-top:24px;font-size:12px;">This OTP expires in <strong>10 minutes</strong>. Do not share it with anyone.</p>
-        <p style="color:#8ba4c8;font-size:12px;">If you did not request this, please ignore this email.</p>
+
+        <p>
+          This OTP is valid for
+          <strong>10 minutes</strong>.
+        </p>
+
+        <p>
+          If you did not request this email,
+          please ignore it.
+        </p>
       </div>
     `;
   }

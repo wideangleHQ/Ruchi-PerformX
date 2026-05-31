@@ -1,6 +1,6 @@
 // src/common/types/jwt-payload.type.ts
 
-import { role_enum } from '../../../generated/prisma/client';
+import { role_enum } from '@prisma/client';
 
 export interface JwtPayload {
   sub: string;          

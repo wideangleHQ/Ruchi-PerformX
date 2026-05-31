@@ -14,8 +14,15 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { VerifyResetOtpDto } from './dto/verify-reset-otp.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
-import { role_enum } from '../../../generated/prisma/client';
+import { role_enum } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+
+const OTP_TYPE = {
+  REGISTRATION: 'REGISTRATION',
+  PASSWORD_RESET: 'PASSWORD_RESET',
+} as const;
+
+type OtpTypeName = keyof typeof OTP_TYPE;
 
 @Injectable()
 export class AuthService {
@@ -37,36 +44,36 @@ export class AuthService {
       select: {
         id: true,
         username: true,
-        passwordHash: true,
+        password_hash: true,
         role: true,
-        fullName: true,
-        departmentId: true,
-        isActive: true,
-        isEmailVerified: true,
-        pendingApproval: true,
+        full_name: true,
+        department_id: true,
+        is_active: true,
+        is_email_verified: true,
+        pending_approval: true,
       },
     });
 
     if (!user) throw new UnauthorizedException('Invalid credentials');
 
-    const passwordMatch = await bcrypt.compare(dto.password, user.passwordHash);
+    const passwordMatch = await bcrypt.compare(dto.password, user.password_hash);
     if (!passwordMatch) throw new UnauthorizedException('Invalid credentials');
 
-    if (!user.isEmailVerified)
+    if (!user.is_email_verified)
       throw new UnauthorizedException('Email not verified. Please verify your OTP first.');
 
-    if (user.pendingApproval)
+    if (user.pending_approval)
       throw new UnauthorizedException('Account pending HOD approval.');
 
-    if (!user.isActive)
+    if (!user.is_active)
       throw new UnauthorizedException('Account is inactive. Contact administrator.');
 
     const payload = {
       sub: user.id,
       username: user.username,
       role: user.role,
-      departmentId: user.departmentId,
-      fullName: user.fullName,
+      departmentId: user.department_id,
+      fullName: user.full_name,
     };
 
     return {
@@ -94,18 +101,18 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(dto.password, this.BCRYPT_ROUNDS);
 
     await this.prisma.users.create({
-      data: {
-        username: dto.username,
-        email: dto.email,
-        full_name: dto.fullName,
-        password_hash: passwordHash,
-        role: dto.role,
-        departmentId: dto.departmentId ?? null,
-        isActive: false,
-        isEmailVerified: false,
-        pendingApproval: false,
-      },
-    });
+  data: {
+    username: dto.username,
+    email: dto.email,
+    full_name: dto.fullName,
+    password_hash: passwordHash,
+    role: dto.role,
+    department_id: dto.departmentId ?? null,
+    is_active: false,
+    is_email_verified: false,
+    pending_approval: false,
+  },
+});
 
     await this.sendOtp(dto.email, 'REGISTRATION');
 
@@ -131,8 +138,8 @@ export class AuthService {
       where: { id: user.id },
       data: {
         email_verified_at: new Date(),
-        pendingApproval: requiresHodApproval,
-        isActive: !requiresHodApproval,
+        pending_approval: requiresHodApproval,
+        is_active: !requiresHodApproval,
       },
     });
 
@@ -191,7 +198,7 @@ export class AuthService {
     const verifiedOtp = await this.prisma.otpVerification.findFirst({
       where: {
         email: dto.email,
-        type: 'PASSWORD_RESET',
+        type: OTP_TYPE.PASSWORD_RESET,
         isUsed: true,
         expiresAt: { gt: new Date() },
       },
@@ -217,10 +224,12 @@ export class AuthService {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
-  private async sendOtp(email: string, type: 'REGISTRATION' | 'PASSWORD_RESET'): Promise<void> {
+  private async sendOtp(email: string, type: OtpTypeName): Promise<void> {
+    const numericType = OTP_TYPE[type];
+
     // Invalidate any existing unused OTPs for this email + type
     await this.prisma.otpVerification.updateMany({
-      where: { email, type, isUsed: false },
+      where: { email, type: numericType, isUsed: false },
       data: { isUsed: true },
     });
 
@@ -229,17 +238,19 @@ export class AuthService {
     const expiresAt = new Date(Date.now() + this.OTP_EXPIRY_MINUTES * 60 * 1000);
 
     await this.prisma.otpVerification.create({
-      data: { email, otpHash, type, expiresAt },
+      data: { email, otpHash, type: numericType, expiresAt },
     });
 
     await this.emailService.sendOtpEmail(email, otp, type);
   }
 
-  private async getValidOtpRecord(email: string, type: 'REGISTRATION' | 'PASSWORD_RESET') {
+  private async getValidOtpRecord(email: string, type: OtpTypeName) {
+    const numericType = OTP_TYPE[type];
+
     const record = await this.prisma.otpVerification.findFirst({
       where: {
         email,
-        type,
+        type: numericType,
         isUsed: false,
         expiresAt: { gt: new Date() },
       },
