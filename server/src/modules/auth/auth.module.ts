@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { EmailModule } from '../email/email.module';
+import { JwtAuthGuard } from '../../common/gaurds/jwt-auth.guard';
 
 const jwtSecret = process.env.JWT_SECRET;
 if (!jwtSecret) {
@@ -25,7 +26,15 @@ if (!jwtSecret) {
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
-  exports: [JwtModule, PassportModule],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    JwtAuthGuard,
+  ],
+  exports: [
+    JwtModule,
+    PassportModule,
+    JwtAuthGuard,
+  ],
 })
 export class AuthModule {}
