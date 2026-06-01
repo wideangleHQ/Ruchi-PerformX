@@ -7,6 +7,7 @@ import { EmailModule } from './modules/email/email.module';
 import { JwtAuthGuard } from './common/gaurds/jwt-auth.guard';
 import { RolesGuard } from './common/gaurds/roles.guard';
 import { DepartmentsModule } from './modules/departments/departments.module';
+import { UsersModule } from './modules/users/users.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { DepartmentsModule } from './modules/departments/departments.module';
     DepartmentsModule,
     AuthModule,
     EmailModule,
+    UsersModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET!,
     }),
@@ -28,6 +30,6 @@ import { DepartmentsModule } from './modules/departments/departments.module';
       useClass: RolesGuard,
     },
   ]
-  
+
 })
 export class AppModule {}
