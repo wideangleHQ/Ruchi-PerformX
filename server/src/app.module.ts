@@ -8,6 +8,9 @@ import { JwtAuthGuard } from './common/gaurds/jwt-auth.guard';
 import { RolesGuard } from './common/gaurds/roles.guard';
 import { DepartmentsModule } from './modules/departments/departments.module';
 import { UsersModule } from './modules/users/users.module';
+import { NotificationsModule } from './modules/notifications/notifications.module'
+import { CommentsModule } from './modules/comments/comments.module'
+import { AttachmentsModule } from './modules/attachments/attachments.module';
 
 @Module({
   imports: [
@@ -16,6 +19,9 @@ import { UsersModule } from './modules/users/users.module';
     AuthModule,
     EmailModule,
     UsersModule,
+    NotificationsModule,
+    CommentsModule,
+    AttachmentsModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET!,
     }),
