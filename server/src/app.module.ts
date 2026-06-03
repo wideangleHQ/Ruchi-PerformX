@@ -11,6 +11,9 @@ import { UsersModule } from './modules/users/users.module';
 import { NotificationsModule } from './modules/notifications/notifications.module'
 import { CommentsModule } from './modules/comments/comments.module'
 import { AttachmentsModule } from './modules/attachments/attachments.module';
+import { TransfersModule } from './modules/transfers/transfers.module'
+import { SelfActionsModule } from './modules/self-actions/self-actions.module'
+import { ScoringModule } from './modules/scoring/scoring.module'
 
 @Module({
   imports: [
@@ -22,6 +25,9 @@ import { AttachmentsModule } from './modules/attachments/attachments.module';
     NotificationsModule,
     CommentsModule,
     AttachmentsModule,
+    TransfersModule,
+    SelfActionsModule,
+    ScoringModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET!,
     }),
