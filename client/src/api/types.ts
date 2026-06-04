@@ -1,0 +1,221 @@
+// ─── Enums ────────────────────────────────────────────────────────────────────
+export type Role = 'MD' | 'HOD' | 'EMPLOYEE' | 'ADMIN';
+
+export type TaskStatus =
+  | 'CREATED'
+  | 'ASSIGNED'
+  | 'ACCEPTED'
+  | 'IN_PROGRESS'
+  | 'COMPLETED'
+  | 'REJECTED'
+  | 'PENDING'
+  | 'REVIEWED'
+  | 'CLOSED';
+
+export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
+export type TaskCategory =
+  | 'OPERATIONAL'
+  | 'SALES'
+  | 'MARKETING'
+  | 'PRODUCTION'
+  | 'HR'
+  | 'FINANCE'
+  | 'OTHER';
+
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+
+/** Shape returned by POST /auth/login */
+export interface LoginResponse {
+  accessToken: string;
+  userId: string;
+  username: string;
+  role: Role;
+}
+
+/** Shape returned by GET /auth/me (JWT payload) */
+export interface JwtUser {
+  sub: string;
+  username: string;
+  role: Role;
+  departmentId: string | null;
+  fullName: string;
+}
+
+/** Normalised User used throughout the app */
+export interface User {
+  id: string;
+  username: string;
+  fullName: string;
+  email?: string;
+  role: Role;
+  departmentId?: string | null;
+}
+
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface RegisterRequest {
+  username: string;
+  email: string;
+  fullName: string;
+  password: string;
+  role: 'MD' | 'HOD' | 'EMPLOYEE';
+  departmentId?: string;
+}
+
+export interface VerifyOtpRequest {
+  email: string;
+  otp: string;
+}
+
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface VerifyResetOtpRequest {
+  email: string;
+  otp: string;
+}
+
+export interface ResetPasswordRequest {
+  email: string;
+  newPassword: string;
+}
+
+export interface MessageResponse {
+  message: string;
+}
+
+// ─── Task ─────────────────────────────────────────────────────────────────────
+export interface Task {
+  id: string;
+  title: string;
+  description: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  category?: TaskCategory;
+  dueDate: string;
+  completedAt?: string;
+  acceptedAt?: string;
+  reviewedAt?: string;
+  closedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  assignedToId?: string;
+  assignedById: string;
+  departmentId: string;
+  assignedTo?: User;
+  assignedBy?: User;
+}
+
+export interface Comment {
+  id: string;
+  content: string;
+  userId: string;
+  user?: User;
+  taskId: string;
+  isTagged: boolean;
+  createdAt: string;
+}
+
+// ─── Pagination ───────────────────────────────────────────────────────────────
+export interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+export type NotificationType =
+  | 'TASK_ASSIGNED'
+  | 'TASK_ACCEPTED'
+  | 'TASK_REJECTED'
+  | 'TASK_COMPLETED'
+  | 'TASK_OVERDUE'
+  | 'ESCALATION_HOD'
+  | 'ESCALATION_MD'
+  | 'REQUEST_ACCEPTED'
+  | 'REQUEST_REJECTED'
+  | 'REMARKS_ADDED'
+  | 'INCENTIVE_APPROVED'
+  | 'TRANSFER_REQUESTED'
+  | 'PASSWORD_RESET';
+
+export interface Notification {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  isRead: boolean;
+  taskId?: string;
+  createdAt: string;
+}
+
+// ─── Scoring ──────────────────────────────────────────────────────────────────
+export interface PerformanceScore {
+  id: string;
+  userId: string;
+  month: number;
+  year: number;
+  selfProductivityScore: number;
+  assignedTaskScore: number;
+  finalScore: number;
+  selfActionsCompleted: number;
+  selfActionsTotal: number;
+  consistencyDays: number;
+  totalWorkingDays: number;
+  assignedTasksCompleted: number;
+  assignedTasksTotal: number;
+  overdueTasksCount: number;
+  isFinalized: boolean;
+  user?: User;
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+export interface MDDashboardData {
+  totalTasks: number;
+  completedTasks: number;
+  pendingTasks: number;
+  overdueTasks: number;
+  completionRate: number;
+  departmentBreakdown: Array<{ deptId: string; name: string; completionRate: number; taskCount: number }>;
+  topPerformers: Array<{ userId: string; name: string; score: number; dept: string }>;
+  criticalPendingTasks: Task[];
+  escalationAlerts: any[];
+}
+
+export interface HODDashboardData {
+  deptStats: { active: number; completed: number; pending: number };
+  employeeScores: Array<{ userId: string; name: string; selfScore: number; assignedScore: number; finalScore: number }>;
+  pendingEscalations: any[];
+  transferRequests: any[];
+  productivityTrend: Array<{ week: string; completionRate: number }>;
+}
+
+export interface EmployeeDashboardData {
+  todaysActions: any[];
+  assignedTasks: Task[];
+  pendingTasks: Task[];
+  completionPercent: number;
+  monthlyScore?: PerformanceScore;
+  unreadNotifications: number;
+}
+
+export interface AdminDashboardData {
+  totalUsers: number;
+  totalDepartments: number;
+  recentAuditLogs: any[];
+}
+
+// ─── API Error ────────────────────────────────────────────────────────────────
+export interface ApiError {
+  statusCode: number;
+  message: string;
+  error?: string;
+}

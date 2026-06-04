@@ -6,12 +6,14 @@ import {
   NotFoundException,
   BadRequestException,
   Logger,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { role_enum } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { JwtPayload } from '../../common/types/jwt-payload.type';
 
 const SALT_ROUNDS = 12;
 
@@ -166,4 +168,59 @@ export class UsersService {
     this.logger.log(`Password reset for user: ${id}`);
     return { message: 'Password reset successful' };
   }
+
+  async activate(id: string, user: JwtPayload) {
+  const target = await this.prisma.users.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      pendingApproval: true,
+      departmentId: true,
+      role: true,
+    },
+  });
+
+  if (!target) throw new NotFoundException('User not found');
+
+  if (!target.pendingApproval)
+    throw new BadRequestException('User is not pending approval');
+
+  // HOD can only activate users in their department
+  if (
+    user.role === role_enum.HOD &&
+    target.departmentId !== user.departmentId
+  ) {
+    throw new ForbiddenException('Not authorized to activate this user');
+  }
+
+  await this.prisma.users.update({
+    where: { id },
+    data: {
+      is_active: true,
+      pendingApproval: false,
+    },
+  });
+
+  return { message: 'User account activated successfully' };
+}
+async findPendingApprovals(user: JwtPayload) {
+  const where: any = { pendingApproval: true };
+
+  if (user.role === role_enum.HOD) {
+    where.departmentId = user.departmentId;
+  }
+
+  return this.prisma.users.findMany({
+    where,
+    select: {
+      id: true,
+      fullName: true,
+      username: true,
+      email: true,
+      role: true,
+      department: { select: { id: true, name: true } },
+      createdAt: true,
+    },
+  });
+}
 }

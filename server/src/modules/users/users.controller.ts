@@ -16,6 +16,9 @@ import { JwtAuthGuard } from '../../common/gaurds/jwt-auth.guard';
 import { RolesGuard } from '../../common/gaurds/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { role_enum } from '@prisma/client';
+import { JwtPayload } from '../../common/types/jwt-payload.type';
+import { Role } from '../departments/departments.controller';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 class ResetPasswordDto {
   newPassword!: string;
@@ -54,6 +57,12 @@ export class UsersController {
   @Roles(role_enum.ADMIN)
   update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
     return this.usersService.update(id, dto);
+  }
+
+  @Patch(':id/activate')
+  @Roles(role_enum.HOD, role_enum.MD)
+  activate(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.usersService.activate(id, user);
   }
 
   @Patch(':id/reset-password')
