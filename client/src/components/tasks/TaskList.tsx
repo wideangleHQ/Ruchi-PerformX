@@ -61,7 +61,9 @@ export function TaskList({ tasks, isLoading }: TaskListProps) {
           {tasks.map((task) => {
             const assignedTo = task.users_tasks_assigned_to_idTousers;
             const assignedBy = task.users_tasks_assigned_by_idTousers;
-            const dept = task.departments;
+            const departments = task.task_departments?.length
+              ? task.task_departments.map((item: any) => item.departments?.name).filter(Boolean).join(', ')
+              : task.departments?.name;
 
             return (
               <tr key={task.id} className="hover:bg-gray-50 transition-colors">
@@ -72,7 +74,7 @@ export function TaskList({ tasks, isLoading }: TaskListProps) {
                 </td>
 
                 <td className="px-4 py-3 text-gray-600">
-                  {dept?.name ?? '—'}
+                  {departments ?? '—'}
                 </td>
 
                 <td className="px-4 py-3 text-gray-600">

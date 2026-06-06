@@ -15,6 +15,7 @@ import { AttachmentsModule } from './modules/attachments/attachments.module';
 import { TransfersModule } from './modules/transfers/transfers.module'
 import { SelfActionsModule } from './modules/self-actions/self-actions.module'
 import { ScoringModule } from './modules/scoring/scoring.module'
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { ScoringModule } from './modules/scoring/scoring.module'
     TransfersModule,
     SelfActionsModule,
     ScoringModule,
+    DashboardModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET!,
     }),

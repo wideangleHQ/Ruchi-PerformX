@@ -20,12 +20,26 @@ import {
 import {
   signupSchema,
   SignupFormData,
-  DEPARTMENTS,
 } from '@/lib/validation';
 
 import { authApi } from '@/api/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+
+const DEPARTMENT_MAP: Record<string, string> = {
+  "IT": "24a53abb-4a19-4805-81e8-5dce729d1630",
+  "Accounts": "30a7879e-2ec8-4d48-8516-2eda6d0c04a6",
+  "HR": "b1b41df3-f25a-479d-841a-5caa5acf28bd",
+  "Marketing": "ae196955-f2cb-477b-9104-570123188bc1",
+  "Operations": "ef4bfcc6-f403-43e1-90ff-71955403e741",
+  "Production": "54e60de7-4c95-4f56-9261-8cfd7ec10e5e",
+  "Sales": "48beac91-420c-488d-993e-9adf29a2e3ae"
+};
+
+// Reversing the map for checkHodExistsByName logic
+const DEPT_NAME_BY_ID = Object.fromEntries(
+  Object.entries(DEPARTMENT_MAP).map(([name, id]) => [id, name])
+);
 
 export default function SignupPage() {
   const router = useRouter();
@@ -54,7 +68,7 @@ export default function SignupPage() {
   });
 
   const selectedRole = form.watch('role');
-  const selectedDept = form.watch('departments')?.[0];
+  const selectedDepts = form.watch('departments') || [];
 
   // Load MD existence once on mount
   useEffect(() => {
@@ -64,33 +78,42 @@ export default function SignupPage() {
       .finally(() => setConstraintsLoading(false));
   }, []);
 
-  // Check HOD for selected department
+  // Check HOD for selected departments
   useEffect(() => {
-    if (selectedRole !== 'HOD' || !selectedDept) return;
-    if (hodTakenDepts.has(selectedDept)) return;
+    if (selectedRole !== 'HOD') return;
+    selectedDepts.forEach((deptId) => {
+      if (hodTakenDepts.has(deptId)) return;
+      const deptName = DEPT_NAME_BY_ID[deptId];
+      if (!deptName) return;
+      authApi.checkHodExistsByName(deptName).then((exists) => {
+        if (exists) {
+          setHodTakenDepts((prev) => new Set(prev).add(deptId));
+        }
+      }).catch(() => {});
+    });
+  }, [selectedDepts, selectedRole, hodTakenDepts]);
 
-    authApi.checkHodExistsByName(selectedDept).then((exists) => {
-      if (exists) {
-        setHodTakenDepts((prev) => new Set(prev).add(selectedDept));
-      }
-    }).catch(() => {});
-  }, [selectedDept, selectedRole]);
-
-  const hodBlocked = selectedRole === 'HOD' && !!selectedDept && hodTakenDepts.has(selectedDept);
+  const anyHodBlocked = selectedRole === 'HOD' && selectedDepts.some(deptId => hodTakenDepts.has(deptId));
 
   const onSubmit = async (data: SignupFormData) => {
     try {
       setError(null);
       setIsLoading(true);
 
-      await authApi.register({
+      const payload = {
         username: data.username,
         email: data.email,
         fullName: data.name,
         password: data.password,
         role: data.role,
         departmentId: data.role === 'MD' ? undefined : data.departments[0] || undefined,
-      });
+        departmentIds: data.role === 'HOD' ? data.departments : undefined,
+      };
+
+      console.log('Selected Departments:', data.departments);
+      console.log('DepartmentIds Payload:', payload.departmentIds);
+
+      await authApi.register(payload);
 
       router.push('/register-success');
     } catch (err: any) {
@@ -219,33 +242,57 @@ export default function SignupPage() {
                 )}
               </div>
 
-              {/* Department */}
-              {selectedRole !== 'MD' && (
+              {/* Department selection */}
+              {selectedRole !== 'MD' && selectedRole && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Department</label>
-                  <div className="relative mt-2">
-                    <Building2 className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                    <select
-                      value={form.watch('departments')[0] ?? ''}
-                      onChange={(e) =>
-                        form.setValue('departments', e.target.value ? [e.target.value] : [], { shouldValidate: true })
-                      }
-                      disabled={isLoading}
-                      className="w-full rounded-md border border-gray-300 bg-white py-2 pl-10 pr-3 text-gray-900"
-                    >
-                      <option value="">Select Department</option>
-                      {DEPARTMENTS.map((dept) => {
-                        const isTaken = selectedRole === 'HOD' && hodTakenDepts.has(dept);
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Department(s)</label>
+                  {selectedRole === 'HOD' ? (
+                    <div className="grid grid-cols-2 gap-3 p-4 rounded-lg border border-gray-200 bg-white/50">
+                      {Object.entries(DEPARTMENT_MAP).map(([name, id]) => {
+                        const isTaken = hodTakenDepts.has(id);
+                        const isChecked = selectedDepts.includes(id);
                         return (
-                          <option key={dept} value={dept} disabled={isTaken}>
-                            {dept}{isTaken ? ' (HOD position filled)' : ''}
-                          </option>
+                          <label key={id} className={`flex items-center gap-2 text-sm cursor-pointer ${isTaken ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              disabled={isLoading || isTaken}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  form.setValue('departments', [...selectedDepts, id], { shouldValidate: true });
+                                } else {
+                                  form.setValue('departments', selectedDepts.filter((d) => d !== id), { shouldValidate: true });
+                                }
+                              }}
+                              className="rounded border-gray-300 text-green-700 focus:ring-green-500"
+                            />
+                            <span>{name}{isTaken ? ' (Filled)' : ''}</span>
+                          </label>
                         );
                       })}
-                    </select>
-                  </div>
-                  {hodBlocked && (
-                    <p className="mt-1 text-sm text-red-600">HOD already exists for this department.</p>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <Building2 className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                      <select
+                        value={selectedDepts[0] ?? ''}
+                        onChange={(e) =>
+                          form.setValue('departments', e.target.value ? [e.target.value] : [], { shouldValidate: true })
+                        }
+                        disabled={isLoading}
+                        className="w-full rounded-md border border-gray-300 bg-white py-2 pl-10 pr-3 text-gray-900"
+                      >
+                        <option value="">Select Department</option>
+                        {Object.entries(DEPARTMENT_MAP).map(([name, id]) => (
+                          <option key={id} value={id}>
+                            {name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  {anyHodBlocked && (
+                    <p className="mt-1 text-sm text-red-600">One or more selected departments already have an HOD assigned.</p>
                   )}
                 </div>
               )}
@@ -288,7 +335,7 @@ export default function SignupPage() {
 
               <Button
                 type="submit"
-                disabled={isLoading || constraintsLoading || (selectedRole === 'MD' && mdExists) || hodBlocked}
+                disabled={isLoading || constraintsLoading || (selectedRole === 'MD' && mdExists) || anyHodBlocked}
                 className="h-12 w-full bg-green-700 hover:bg-green-800"
               >
                 {isLoading ? 'Creating Account...' : 'Create Account'}

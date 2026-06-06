@@ -31,17 +31,17 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
       description: '',
       priority: 'MEDIUM',
       dueDate: '',
-      // HOD: department is derived from their JWT; MD: they pick it
-      departmentId: isHOD ? (user?.departmentId ?? '') : '',
+      departmentId: '',
+      departmentIds: [],
     },
   });
 
-  // MD: fetch all departments for the dropdown
   const { data: departments = [] } = useQuery<Department[]>({
     queryKey: ['departments'],
     queryFn: () => usersApi.getDepartments(),
-    enabled: isMD,
+    enabled: isMD || isHOD,
   });
+  const selectedDepartmentIds = form.watch('departmentIds') ?? [];
 
   const createTaskMutation = useMutation({
     mutationFn: (data: CreateTaskFormData) =>
@@ -51,6 +51,7 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
         priority: data.priority,
         dueDate: data.dueDate,
         departmentId: data.departmentId,
+        departmentIds: data.departmentIds,
       }),
     onSuccess: (task) => {
       onSuccess?.();
@@ -74,7 +75,6 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
         </div>
       )}
 
-      {/* Title */}
       <div>
         <label className="block text-sm font-medium text-gray-700">Task Title</label>
         <Input {...form.register('title')} placeholder="Enter task title" className="mt-1" />
@@ -83,7 +83,6 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
         )}
       </div>
 
-      {/* Description */}
       <div>
         <label className="block text-sm font-medium text-gray-700">Description</label>
         <textarea
@@ -97,7 +96,6 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
         )}
       </div>
 
-      {/* Priority and Due Date */}
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700">Priority</label>
@@ -120,7 +118,6 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
         </div>
       </div>
 
-      {/* MD: Department picker */}
       {isMD && (
         <div>
           <label className="block text-sm font-medium text-gray-700">Department</label>
@@ -139,17 +136,36 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
         </div>
       )}
 
-      {/* HOD: show their department as read-only context */}
       {isHOD && (
         <div>
-          <label className="block text-sm font-medium text-gray-700">Department</label>
-          <p className="mt-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-            Your department (auto-assigned)
-          </p>
+          <label className="block text-sm font-medium text-gray-700">Department Selection</label>
+          <div className="mt-2 grid gap-2 rounded-lg border border-gray-200 p-3">
+            {departments.map((department) => (
+              <label key={department.id} className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={selectedDepartmentIds.includes(department.id)}
+                  onChange={(event) => {
+                    form.setValue(
+                      'departmentIds',
+                      event.target.checked
+                        ? [...selectedDepartmentIds, department.id]
+                        : selectedDepartmentIds.filter((id) => id !== department.id),
+                      { shouldValidate: true },
+                    );
+                  }}
+                  className="h-4 w-4 rounded border-gray-300 text-green-600"
+                />
+                {department.name}
+              </label>
+            ))}
+          </div>
+          {form.formState.errors.departmentIds && (
+            <p className="mt-1 text-sm text-red-600">{form.formState.errors.departmentIds.message}</p>
+          )}
         </div>
       )}
 
-      {/* Submit */}
       <div className="flex gap-4">
         <Button
           type="submit"

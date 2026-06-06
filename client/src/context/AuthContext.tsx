@@ -34,18 +34,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const initAuth = async () => {
       try {
         setIsLoading(true);
+        const token = localStorage.getItem('accessToken');
+        
+        if (!token) {
+          // No token, not authenticated
+          setUser(null);
+          setIsLoading(false);
+          return;
+        }
+
         // Check if user is already authenticated
         const currentUser = await authApi.getCurrentUser();
         setUser(jwtToUser(currentUser));
         setError(null);
 
         // Initialize Socket.IO if authenticated
-        const token = localStorage.getItem('accessToken');
-        if (token) {
-          initializeSocket(token);
-        }
+        initializeSocket(token);
       } catch (err: any) {
-        // User not authenticated
+        // User not authenticated or token invalid
+        localStorage.removeItem('accessToken');
         setUser(null);
         setError(null); // Not an error, just not logged in
       } finally {

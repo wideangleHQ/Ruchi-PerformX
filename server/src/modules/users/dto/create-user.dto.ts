@@ -7,6 +7,7 @@ import {
   IsUUID,
   IsEnum,
   IsEmail,
+  IsArray,
   MinLength,
   MaxLength,
 } from 'class-validator';
@@ -44,4 +45,9 @@ export class CreateUserDto {
   @IsUUID()
   @IsOptional()
   departmentId?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('all', { each: true })
+  departmentIds?: string[];
 }

@@ -15,6 +15,8 @@ import { UpdateDepartmentDto } from './dto/update-department-dto';
 import { JwtAuthGuard } from '../../common/gaurds/jwt-auth.guard';
 import { RolesGuard } from '../../common/gaurds/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { JwtPayload } from '../../common/types/jwt-payload.type';
 export enum Role {
   MD = 'MD',
   HOD = 'HOD',
@@ -28,8 +30,8 @@ export class DepartmentsController {
 
   @Get()
   @Roles(Role.MD, Role.HOD, Role.ADMIN)
-  findAll() {
-    return this.departmentsService.findAll();
+  findAll(@CurrentUser() user: JwtPayload) {
+    return this.departmentsService.findAll(user);
   }
 
   @Get(':id')

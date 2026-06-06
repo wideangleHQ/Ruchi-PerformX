@@ -9,6 +9,8 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateDepartmentDto } from './dto/create-department-dto';
 import { UpdateDepartmentDto } from './dto/update-department-dto';
+import { JwtPayload } from '../../common/types/jwt-payload.type';
+import { role_enum } from '@prisma/client';
 
 @Injectable()
 export class DepartmentsService {
@@ -16,9 +18,14 @@ export class DepartmentsService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll() {
+  async findAll(user?: JwtPayload) {
     return this.prisma.departments.findMany({
-      where: { is_active: true },
+      where: {
+        is_active: true,
+        ...(user?.role === role_enum.HOD
+          ? { hod_departments: { some: { hod_id: user.sub } } }
+          : {}),
+      },
       orderBy: { name: 'asc' },
       select: {
         id: true,

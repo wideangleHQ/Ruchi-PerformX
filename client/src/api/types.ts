@@ -41,6 +41,7 @@ export interface JwtUser {
   username: string;
   role: Role;
   departmentId: string | null;
+  departmentIds: string[];
   fullName: string;
 }
 
@@ -53,6 +54,7 @@ export interface User {
   role: Role;
   status?: UserStatus;
   departmentId?: string | null;
+  departmentIds?: string[];
 }
 
 export interface LoginRequest {
@@ -67,6 +69,7 @@ export interface RegisterRequest {
   password: string;
   role: 'MD' | 'HOD' | 'EMPLOYEE';
   departmentId?: string;
+  departmentIds?: string[];
 }
 
 export interface VerifyOtpRequest {
@@ -110,8 +113,10 @@ export interface Task {
   assignedToId?: string;
   assignedById: string;
   departmentId: string;
+  departmentIds?: string[];
   assignedTo?: User;
   assignedBy?: User;
+  task_departments?: Array<{ departments: { id: string; name: string } }>;
 }
 
 export interface Comment {
@@ -214,6 +219,24 @@ export interface AdminDashboardData {
   totalUsers: number;
   totalDepartments: number;
   recentAuditLogs: any[];
+}
+
+export interface DashboardData {
+  activeTasks: number;
+  pendingRequests: number;
+  completionRate: number;
+  incentives: number;
+  pendingApprovals: number;
+  transferRequests: number;
+  escalatedTasks: number;
+  overdueTasks: number;
+  chartData: Array<{ label: string; value: number }>;
+  departmentSummary: Array<{
+    department: string;
+    tasks: number;
+    completion: string;
+    status: string;
+  }>;
 }
 
 // ─── API Error ────────────────────────────────────────────────────────────────

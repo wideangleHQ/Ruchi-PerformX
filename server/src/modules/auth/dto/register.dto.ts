@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, IsArray, IsUUID, MinLength, ArrayMinSize } from 'class-validator';
 import { role_enum } from '@prisma/client';
 
 export class RegisterDto {
@@ -26,4 +26,9 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   departmentId?: string;
-}
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('all', { each: true })
+  departmentIds?: string[];
+}

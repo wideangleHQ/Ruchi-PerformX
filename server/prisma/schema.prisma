@@ -36,6 +36,22 @@ model departments {
   task_transfers_task_transfers_to_dept_idTodepartments   task_transfers[]        @relation("task_transfers_to_dept_idTodepartments")
   tasks                                                   tasks[]
   users                                                   users[]
+  hod_departments                                         hod_departments[]
+  task_departments                                        task_departments[]
+}
+
+model hod_departments {
+  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hod_id        String      @db.Uuid
+  department_id String      @db.Uuid
+  created_at    DateTime    @default(now()) @db.Timestamptz(6)
+  users         users       @relation(fields: [hod_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  departments   departments @relation(fields: [department_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([hod_id, department_id])
+  @@index([hod_id])
+  @@index([department_id])
+  @@map("hod_departments")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -251,6 +267,20 @@ model task_transfers {
   @@index([task_id], map: "idx_task_transfers_task")
 }
 
+model task_departments {
+  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_id       String      @db.Uuid
+  department_id String      @db.Uuid
+  created_at    DateTime    @default(now()) @db.Timestamptz(6)
+  tasks         tasks       @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  departments   departments @relation(fields: [department_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([task_id, department_id])
+  @@index([task_id])
+  @@index([department_id])
+  @@map("task_departments")
+}
+
 model OtpVerification {
   id        String   @id @default(uuid())
   email     String
@@ -292,6 +322,7 @@ model tasks {
   task_requests                     task_requests?
   task_status_logs                  task_status_logs[]
   task_transfers                    task_transfers[]
+  task_departments                  task_departments[]
   users_tasks_assigned_by_idTousers users               @relation("tasks_assigned_by_idTousers", fields: [assigned_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   users_tasks_assigned_to_idTousers users?              @relation("tasks_assigned_to_idTousers", fields: [assigned_to_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   departments                       departments         @relation(fields: [department_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -336,6 +367,7 @@ model users {
   tasks_tasks_assigned_to_idTousers                    tasks[]                 @relation("tasks_assigned_to_idTousers")
   departments                                          departments?            @relation(fields: [department_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_department")
   password_reset_requests                              PasswordResetRequest[]
+  hod_departments                                      hod_departments[]
 }
 
 enum action_status_enum {

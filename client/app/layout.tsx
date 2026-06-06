@@ -4,6 +4,7 @@ import './globals.css'
 import { QueryProvider } from '@/components/providers/QueryProvider'
 import { AuthProvider } from '@/context/AuthContext'
 import { SocketProvider } from '@/components/providers/SocketProvider'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 
 export const metadata: Metadata = {
   title: 'RUCHI PerformX',
@@ -36,13 +37,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="font-sans antialiased">
-        <QueryProvider>
-          <AuthProvider>
-            <SocketProvider>
-              {children}
-            </SocketProvider>
-          </AuthProvider>
-        </QueryProvider>
+        <ErrorBoundary>
+          <QueryProvider>
+            <AuthProvider>
+              <SocketProvider>
+                {children}
+              </SocketProvider>
+            </AuthProvider>
+          </QueryProvider>
+        </ErrorBoundary>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

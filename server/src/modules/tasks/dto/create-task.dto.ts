@@ -1,4 +1,4 @@
-import { IsDateString, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import { ArrayNotEmpty, ArrayUnique, IsArray, IsDateString, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 import { task_priority_enum } from '@prisma/client';
 
 export class CreateTaskDto {
@@ -22,9 +22,16 @@ export class CreateTaskDto {
   @IsUUID()
   assignedToId?: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsUUID()
-  departmentId!: string;
+  departmentId?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayUnique()
+  @IsUUID(undefined, { each: true })
+  departmentIds?: string[];
 
   @IsOptional()
   @IsUUID()

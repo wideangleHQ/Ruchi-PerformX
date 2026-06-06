@@ -9,12 +9,15 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   return (
-    <div className="min-h-screen bg-background text-on-surface">
+    <div className="flex h-screen w-full overflow-hidden bg-[#f4f7f4] font-sans text-slate-900">
       <Sidebar />
-
-      <div className="ml-64 min-h-screen p-margin-mobile md:p-margin-desktop">
+      <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
         <Header />
-        <main>{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 custom-scrollbar">
+          <div className="mx-auto max-w-7xl">
+            {children}
+          </div>
+        </main>
       </div>
     </div>
   );

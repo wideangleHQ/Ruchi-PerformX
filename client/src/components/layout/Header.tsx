@@ -1,6 +1,7 @@
 'use client';
 
 import { useAuth } from '@/context/AuthContext';
+import { Search, Bell, Settings } from 'lucide-react';
 
 export function Header() {
   const { user } = useAuth();
@@ -12,24 +13,24 @@ export function Header() {
   }).format(new Date());
 
   return (
-    <header className="mb-8 flex items-center justify-between">
-      <div>
-        <h2 className="font-headline-lg text-headline-lg text-on-surface">
+    <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 md:px-6 lg:px-8">
+      <div className="hidden sm:block">
+        <h2 className="text-lg font-semibold text-slate-900">
           Welcome, {user?.fullName || 'Michael'}
         </h2>
-        <p className="font-body-md text-body-md text-on-surface-variant">{formattedDate}</p>
+        <p className="text-sm text-slate-500">{formattedDate}</p>
       </div>
 
-      <div className="flex items-center gap-4">
-        <button className="flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-high">
-          <span className="material-symbols-outlined">search</span>
+      <div className="flex flex-1 items-center justify-end gap-2 sm:gap-4 sm:flex-none">
+        <button className="flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100">
+          <Search size={20} />
         </button>
-        <button className="relative flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-high">
-          <span className="material-symbols-outlined">notifications</span>
-          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-primary" />
+        <button className="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100">
+          <Bell size={20} />
+          <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full border-2 border-white bg-green-600" />
         </button>
-        <button className="flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-high">
-          <span className="material-symbols-outlined">settings</span>
+        <button className="flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100">
+          <Settings size={20} />
         </button>
       </div>
     </header>

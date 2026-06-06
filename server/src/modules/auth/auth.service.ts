@@ -1,14 +1,12 @@
 import {
   Injectable,
   UnauthorizedException,
-  ConflictException,
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
-import { RegisterDto } from './dto/register.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { role_enum } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -40,9 +38,9 @@ export class AuthService {
     const count = await this.prisma.users.count({
       where: {
         role: role_enum.HOD,
-        department_id: departmentId,
         deleted_at: null,
         OR: [{ is_active: true }, { pending_approval: true }],
+        hod_departments: { some: { department_id: departmentId } },
       },
     });
     return count > 0;
@@ -91,11 +89,24 @@ export class AuthService {
       });
     }
 
+    // Resolve departmentIds: HOD uses junction table; others use department_id
+    let departmentIds: string[] = [];
+    if (user.role === role_enum.HOD) {
+      const hodDepts = await this.prisma.hod_departments.findMany({
+        where: { hod_id: user.id },
+        select: { department_id: true },
+      });
+      departmentIds = hodDepts.map((d) => d.department_id);
+    } else if (user.department_id) {
+      departmentIds = [user.department_id];
+    }
+
     const payload = {
       sub: user.id,
       username: user.username,
       role: user.role,
       departmentId: user.department_id,
+      departmentIds,
       fullName: user.full_name,
     };
 
@@ -111,20 +122,31 @@ export class AuthService {
   // ─── REGISTER ────────────────────────────────────────────────────────────────
 
   async register(dto: CreateUserDto) {
-  const passwordHash = await bcrypt.hash(dto.password, 12);
+    const passwordHash = await bcrypt.hash(dto.password, 12);
 
-  const user = await this.prisma.users.create({
-  data: {
-    username: dto.username,
-    email: dto.email,
-    full_name: dto.fullName,
-    role: dto.role,
-    password_hash: passwordHash,
-  },
-});
+    const user = await this.prisma.users.create({
+      data: {
+        username: dto.username,
+        email: dto.email,
+        full_name: dto.fullName,
+        role: dto.role,
+        password_hash: passwordHash,
+      },
+    });
 
-  return user;
-}
+    // HOD: create hod_departments junction rows for each selected department
+    if (dto.role === role_enum.HOD && dto.departmentIds && dto.departmentIds.length > 0) {
+      await this.prisma.hod_departments.createMany({
+        data: dto.departmentIds.map((department_id) => ({
+          hod_id: user.id,
+          department_id,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    return user;
+  }
 
   // ─── FORGOT PASSWORD REQUEST ──────────────────────────────────────────────────
 
@@ -139,7 +161,6 @@ export class AuthService {
     if (!user.is_active || user.pending_approval)
       throw new BadRequestException('Account is not active.');
 
-    // Check if pending request already exists
     const existing = await this.prisma.passwordResetRequest.findFirst({
       where: { user_id: user.id, status: 'PENDING' },
     });
@@ -154,7 +175,7 @@ export class AuthService {
     return { message: 'Password reset request submitted. Contact your HOD.' };
   }
 
-  // ─── CHANGE PASSWORD (after temp password login) ─────────────────────────────
+  // ─── CHANGE PASSWORD ─────────────────────────────────────────────────────────
 
   async changePassword(userId: string, newPassword: string) {
     const passwordHash = await bcrypt.hash(newPassword, this.BCRYPT_ROUNDS);
@@ -165,27 +186,6 @@ export class AuthService {
     });
 
     return { message: 'Password changed successfully.' };
-  }
-
-  private async resolveDepartmentId(
-    department: string | undefined,
-    role: role_enum,
-  ) {
-    if (role === role_enum.MD) return null;
-
-    if (!department) {
-      throw new BadRequestException('Department is required for this role');
-    }
-
-    const existingDepartment = this.isUuid(department)
-      ? await this.prisma.departments.findUnique({ where: { id: department } })
-      : await this.prisma.departments.findUnique({ where: { name: department } });
-
-    if (!existingDepartment || !existingDepartment.is_active) {
-      throw new NotFoundException('Department not found or inactive');
-    }
-
-    return existingDepartment.id;
   }
 
   private isUuid(value: string) {
