@@ -1,5 +1,6 @@
 // ─── Enums ────────────────────────────────────────────────────────────────────
 export type Role = 'MD' | 'HOD' | 'EMPLOYEE' | 'ADMIN';
+export type UserStatus = 'PENDING' | 'ACTIVE' | 'REJECTED' | 'SUSPENDED';
 
 export type TaskStatus =
   | 'CREATED'
@@ -31,6 +32,7 @@ export interface LoginResponse {
   userId: string;
   username: string;
   role: Role;
+  status?: UserStatus;
 }
 
 /** Shape returned by GET /auth/me (JWT payload) */
@@ -49,6 +51,7 @@ export interface User {
   fullName: string;
   email?: string;
   role: Role;
+  status?: UserStatus;
   departmentId?: string | null;
 }
 

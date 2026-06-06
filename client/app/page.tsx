@@ -1,24 +1,28 @@
 'use client';
 
-import { redirect } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function Page() {
   const { isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
 
-  if (isLoading) {
-    return (
-      <main className="flex min-h-screen items-center justify-center">
-        <div className="text-center">
-          <p className="text-lg text-gray-600">Loading...</p>
-        </div>
-      </main>
-    );
-  }
+  useEffect(() => {
+    if (!isLoading) {
+      if (isAuthenticated) {
+        router.replace('/dashboard');
+      } else {
+        router.replace('/login');
+      }
+    }
+  }, [isAuthenticated, isLoading, router]);
 
-  if (isAuthenticated) {
-    redirect('/dashboard');
-  } else {
-    redirect('/login');
-  }
+  return (
+    <main className="flex min-h-screen items-center justify-center">
+      <div className="text-center">
+        <p className="text-lg text-gray-600">Loading...</p>
+      </div>
+    </main>
+  );
 }

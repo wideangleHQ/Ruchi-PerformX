@@ -5,6 +5,7 @@ export const tasksApi = {
   getTasks: async (filters?: {
     status?: string;
     priority?: string;
+    title?: string;
     assigneeId?: string;
     page?: number;
     limit?: number;
@@ -23,7 +24,7 @@ export const tasksApi = {
     description: string;
     priority: string;
     dueDate: string;
-    assigneeId: string;
+    departmentId: string;
   }): Promise<Task> => {
     const response = await axiosClient.post<Task>('/tasks', data);
     return response.data;

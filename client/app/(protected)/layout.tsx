@@ -2,7 +2,8 @@
 
 import { useAuth } from '@/context/AuthContext';
 import { AppShell } from '@/components/layout/AppShell';
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,11 +13,13 @@ export default function ProtectedLayout({
   children: React.ReactNode;
 }) {
   const { isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
 
-  // Redirect to login if not authenticated
-  // if (!isLoading && !isAuthenticated) {
-  //   redirect('/login');
-  // }
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [isAuthenticated, isLoading, router]);
 
   if (isLoading) {
     return (
@@ -24,6 +27,10 @@ export default function ProtectedLayout({
         <p className="text-lg text-gray-600">Loading...</p>
       </div>
     );
+  }
+
+  if (!isAuthenticated) {
+    return null;
   }
 
   return <AppShell>{children}</AppShell>;

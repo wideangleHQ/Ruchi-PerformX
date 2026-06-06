@@ -37,11 +37,11 @@ export class TasksService {
         description: dto.description,
         priority: dto.priority,
         due_date: new Date(dto.dueDate),
-        assigned_to_id: dto.assignedToId,
+        assigned_to_id: dto.assignedToId ?? null,
         assigned_by_id: user.sub,
         department_id: dto.departmentId,
         parent_task_id: dto.parentTaskId ?? null,
-        status: task_status_enum.ASSIGNED,
+        status: dto.assignedToId ? task_status_enum.ASSIGNED : task_status_enum.CREATED,
       },
     });
 
@@ -49,7 +49,7 @@ export class TasksService {
       data: {
         task_id: task.id,
         from_status: null,
-        to_status: task_status_enum.ASSIGNED,
+        to_status: dto.assignedToId ? task_status_enum.ASSIGNED : task_status_enum.CREATED,
         changed_by_id: user.sub,
       },
     });
@@ -69,20 +69,42 @@ export class TasksService {
   // ─── List (role-scoped) ────────────────────────────────────────
 
   async findAll(filters: TaskFilterDto, user: JwtPayload) {
-    const where: any = { ...this.buildWhereFromFilters(filters) };
+    const baseWhere = this.buildWhereFromFilters(filters);
 
-    if (user.role === role_enum.HOD) {
-      where.department_id = user.departmentId;
-    } else if (user.role === role_enum.EMPLOYEE) {
-      where.assigned_to_id = user.sub;
+    let where: any;
+
+    if (user.role === role_enum.MD) {
+      // MD sees all tasks
+      where = baseWhere;
+    } else if (user.role === role_enum.HOD) {
+      // HOD sees:
+      // 1. Tasks they assigned (to anyone)
+      // 2. Tasks assigned TO them (by MD)
+      // 3. Tasks they assigned to employees in their department
+      where = {
+        ...baseWhere,
+        OR: [
+          { assigned_by_id: user.sub },
+          { assigned_to_id: user.sub },
+          {
+            department_id: user.departmentId,
+            assigned_by_id: user.sub,
+          },
+        ],
+      };
+    } else {
+      // EMPLOYEE sees only tasks assigned to them
+      where = {
+        ...baseWhere,
+        assigned_to_id: user.sub,
+      };
     }
-    // MD sees all — no extra filter
 
     return this.prisma.tasks.findMany({
       where,
       include: {
-        users_tasks_assigned_to_idTousers: { select: { id: true, full_name: true } },
-        users_tasks_assigned_by_idTousers: { select: { id: true, full_name: true } },
+        users_tasks_assigned_to_idTousers: { select: { id: true, full_name: true, role: true } },
+        users_tasks_assigned_by_idTousers: { select: { id: true, full_name: true, role: true } },
         departments: { select: { id: true, name: true } },
       },
       orderBy: { due_date: 'asc' },
@@ -261,6 +283,7 @@ export class TasksService {
     const where: any = {};
     if (filters.status) where.status = filters.status;
     if (filters.priority) where.priority = filters.priority;
+    if (filters.title) where.title = { contains: filters.title, mode: 'insensitive' };
     if (filters.assignedToId) where.assigned_to_id = filters.assignedToId;
     if (filters.departmentId) where.department_id = filters.departmentId;
     if (filters.dueBefore || filters.dueAfter) {

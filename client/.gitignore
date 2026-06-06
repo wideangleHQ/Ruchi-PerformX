@@ -21,7 +21,7 @@ out/
 # Snowflake
 .snowflake/
 
-# OS
+# OS 
 .DS_Store
 Thumbs.db
 

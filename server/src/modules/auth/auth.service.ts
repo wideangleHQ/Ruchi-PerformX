@@ -1,42 +1,61 @@
 import {
   Injectable,
   UnauthorizedException,
-  BadRequestException,
   ConflictException,
+  BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
-import { EmailService } from '../email/email.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
-import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
-import { VerifyResetOtpDto } from './dto/verify-reset-otp.dto';
-import { ResetPasswordDto } from './dto/reset-password.dto';
 import { role_enum } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
-
-const OTP_TYPE = {
-  REGISTRATION: 'REGISTRATION',
-  PASSWORD_RESET: 'PASSWORD_RESET',
-} as const;
-
-type OtpTypeName = keyof typeof OTP_TYPE;
+import { CreateUserDto } from '../users/dto/create-user.dto';
 
 @Injectable()
 export class AuthService {
-  private readonly OTP_EXPIRY_MINUTES = 10;
-  private readonly MAX_OTP_ATTEMPTS = 5;
   private readonly BCRYPT_ROUNDS = 12;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
-    private readonly emailService: EmailService,
   ) {}
 
   // ─── LOGIN ───────────────────────────────────────────────────────────────────
+
+  async checkMdExists(): Promise<boolean> {
+    const count = await this.prisma.users.count({
+      where: {
+        role: role_enum.MD,
+        deleted_at: null,
+        OR: [{ is_active: true }, { pending_approval: true }],
+      },
+    });
+    return count > 0;
+  }
+
+  async checkHodExists(departmentId: string): Promise<boolean> {
+    const count = await this.prisma.users.count({
+      where: {
+        role: role_enum.HOD,
+        department_id: departmentId,
+        deleted_at: null,
+        OR: [{ is_active: true }, { pending_approval: true }],
+      },
+    });
+    return count > 0;
+  }
+
+  async checkHodExistsByName(departmentName: string): Promise<boolean> {
+    const dept = await this.prisma.departments.findUnique({
+      where: { name: departmentName },
+      select: { id: true },
+    });
+    if (!dept) return false;
+    return this.checkHodExists(dept.id);
+  }
 
   async login(dto: LoginDto) {
     const user = await this.prisma.users.findUnique({
@@ -49,7 +68,6 @@ export class AuthService {
         full_name: true,
         department_id: true,
         is_active: true,
-        is_email_verified: true,
         pending_approval: true,
       },
     });
@@ -59,14 +77,19 @@ export class AuthService {
     const passwordMatch = await bcrypt.compare(dto.password, user.password_hash);
     if (!passwordMatch) throw new UnauthorizedException('Invalid credentials');
 
-    if (!user.is_email_verified)
-      throw new UnauthorizedException('Email not verified. Please verify your OTP first.');
+    if (user.pending_approval) {
+      throw new UnauthorizedException({
+        message: 'Your account is awaiting HOD approval.',
+        status: 'PENDING',
+      });
+    }
 
-    if (user.pending_approval)
-      throw new UnauthorizedException('Account pending HOD approval.');
-
-    if (!user.is_active)
-      throw new UnauthorizedException('Account is inactive. Contact administrator.');
+    if (!user.is_active) {
+      throw new UnauthorizedException({
+        message: 'Your registration request has been rejected.',
+        status: 'REJECTED',
+      });
+    }
 
     const payload = {
       sub: user.id,
@@ -81,200 +104,91 @@ export class AuthService {
       userId: user.id,
       username: user.username,
       role: user.role,
+      status: 'ACTIVE',
     };
   }
 
   // ─── REGISTER ────────────────────────────────────────────────────────────────
 
-  async register(dto: RegisterDto) {
-    const existing = await this.prisma.users.findFirst({
-      where: {
-        OR: [{ username: dto.username }, { email: dto.email }],
-      },
-    });
+  async register(dto: CreateUserDto) {
+  const passwordHash = await bcrypt.hash(dto.password, 12);
 
-    if (existing) throw new ConflictException('Username or email already exists');
-
-    if (dto.role === role_enum.ADMIN)
-      throw new BadRequestException('Cannot self-register as ADMIN');
-
-    const passwordHash = await bcrypt.hash(dto.password, this.BCRYPT_ROUNDS);
-
-    await this.prisma.users.create({
+  const user = await this.prisma.users.create({
   data: {
     username: dto.username,
     email: dto.email,
     full_name: dto.fullName,
-    password_hash: passwordHash,
     role: dto.role,
-    department_id: dto.departmentId ?? null,
-    is_active: false,
-    is_email_verified: false,
-    pending_approval: false,
+    password_hash: passwordHash,
   },
 });
 
-    await this.sendOtp(dto.email, 'REGISTRATION');
+  return user;
+}
 
-    return { message: 'Registration successful. Please verify your email with the OTP sent.' };
-  }
-
- 
-  async verifyOtp(dto: VerifyOtpDto) {
-    const record = await this.getValidOtpRecord(dto.email, 'REGISTRATION');
-
-    await this.validateOtpAttempt(record, dto.otp);
-
-    const user = await this.prisma.users.findUnique({
-      where: { email: dto.email },
-      select: { id: true, role: true },
-    });
-
-    if (!user) throw new NotFoundException('User not found');
-
-    const requiresHodApproval = user.role === role_enum.EMPLOYEE;
-
-    await this.prisma.users.update({
-      where: { id: user.id },
-      data: {
-        email_verified_at: new Date(),
-        pending_approval: requiresHodApproval,
-        is_active: !requiresHodApproval,
-      },
-    });
-
-    await this.prisma.otpVerification.update({
-      where: { id: record.id },
-      data: { isUsed: true },
-    });
-
-    return requiresHodApproval
-      ? { message: 'Email verified. Your account is pending HOD approval.' }
-      : { message: 'Email verified. You can now login.' };
-  }
-
-  // ─── FORGOT PASSWORD ──────────────────────────────────────────────────────────
+  // ─── FORGOT PASSWORD REQUEST ──────────────────────────────────────────────────
 
   async forgotPassword(dto: ForgotPasswordDto) {
     const user = await this.prisma.users.findUnique({
       where: { email: dto.email },
-      select: { id: true },
+      select: { id: true, is_active: true, pending_approval: true },
     });
 
-    // Always return same message — prevents email enumeration
-    if (!user) return { message: 'If this email exists, an OTP has been sent.' };
+    if (!user) return { message: 'Password reset request submitted.' };
 
-    await this.sendOtp(dto.email, 'PASSWORD_RESET');
+    if (!user.is_active || user.pending_approval)
+      throw new BadRequestException('Account is not active.');
 
-    return { message: 'If this email exists, an OTP has been sent.' };
+    // Check if pending request already exists
+    const existing = await this.prisma.passwordResetRequest.findFirst({
+      where: { user_id: user.id, status: 'PENDING' },
+    });
+
+    if (existing)
+      return { message: 'A reset request is already pending HOD review.' };
+
+    await this.prisma.passwordResetRequest.create({
+      data: { users: { connect: { id: user.id } } },
+    });
+
+    return { message: 'Password reset request submitted. Contact your HOD.' };
   }
 
-  // ─── VERIFY RESET OTP ────────────────────────────────────────────────────────
+  // ─── CHANGE PASSWORD (after temp password login) ─────────────────────────────
 
-  async verifyResetOtp(dto: VerifyResetOtpDto) {
-    const record = await this.getValidOtpRecord(dto.email, 'PASSWORD_RESET');
-
-    await this.validateOtpAttempt(record, dto.otp);
-
-    await this.prisma.otpVerification.update({
-      where: { id: record.id },
-      data: { isUsed: true },
-    });
-
-    return { message: 'OTP verified. You may now reset your password.' };
-  }
-
-  // ─── RESET PASSWORD ───────────────────────────────────────────────────────────
-
-  async resetPassword(dto: ResetPasswordDto) {
-    const user = await this.prisma.users.findUnique({
-      where: { email: dto.email },
-      select: { id: true },
-    });
-
-    if (!user) throw new NotFoundException('User not found');
-
-    // Ensure reset OTP was verified
-    const verifiedOtp = await this.prisma.otpVerification.findFirst({
-      where: {
-        email: dto.email,
-        type: OTP_TYPE.PASSWORD_RESET,
-        isUsed: true,
-        expiresAt: { gt: new Date() },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    if (!verifiedOtp)
-      throw new BadRequestException('OTP not verified. Please verify your OTP first.');
-
-    const passwordHash = await bcrypt.hash(dto.newPassword, this.BCRYPT_ROUNDS);
+  async changePassword(userId: string, newPassword: string) {
+    const passwordHash = await bcrypt.hash(newPassword, this.BCRYPT_ROUNDS);
 
     await this.prisma.users.update({
-      where: { id: user.id },
+      where: { id: userId },
       data: { password_hash: passwordHash },
     });
 
-    return { message: 'Password reset successful. You can now login.' };
+    return { message: 'Password changed successfully.' };
   }
 
-  // ─── PRIVATE HELPERS ─────────────────────────────────────────────────────────
+  private async resolveDepartmentId(
+    department: string | undefined,
+    role: role_enum,
+  ) {
+    if (role === role_enum.MD) return null;
 
-  private generateOtp(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  }
-
-  private async sendOtp(email: string, type: OtpTypeName): Promise<void> {
-    const numericType = OTP_TYPE[type];
-
-    // Invalidate any existing unused OTPs for this email + type
-    await this.prisma.otpVerification.updateMany({
-      where: { email, type: numericType, isUsed: false },
-      data: { isUsed: true },
-    });
-
-    const otp = this.generateOtp();
-    const otpHash = await bcrypt.hash(otp, this.BCRYPT_ROUNDS);
-    const expiresAt = new Date(Date.now() + this.OTP_EXPIRY_MINUTES * 60 * 1000);
-
-    await this.prisma.otpVerification.create({
-      data: { email, otpHash, type: numericType, expiresAt },
-    });
-
-    await this.emailService.sendOtpEmail(email, otp, type);
-  }
-
-  private async getValidOtpRecord(email: string, type: OtpTypeName) {
-    const numericType = OTP_TYPE[type];
-
-    const record = await this.prisma.otpVerification.findFirst({
-      where: {
-        email,
-        type: numericType,
-        isUsed: false,
-        expiresAt: { gt: new Date() },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    if (!record) throw new BadRequestException('OTP is invalid or has expired.');
-
-    return record;
-  }
-
-  private async validateOtpAttempt(record: any, submittedOtp: string): Promise<void> {
-    if (record.attempts >= this.MAX_OTP_ATTEMPTS) {
-      throw new BadRequestException('Maximum OTP attempts exceeded. Please request a new OTP.');
+    if (!department) {
+      throw new BadRequestException('Department is required for this role');
     }
 
-    const isMatch = await bcrypt.compare(submittedOtp, record.otpHash);
+    const existingDepartment = this.isUuid(department)
+      ? await this.prisma.departments.findUnique({ where: { id: department } })
+      : await this.prisma.departments.findUnique({ where: { name: department } });
 
-    if (!isMatch) {
-      await this.prisma.otpVerification.update({
-        where: { id: record.id },
-        data: { attempts: { increment: 1 } },
-      });
-      throw new BadRequestException('Invalid OTP.');
+    if (!existingDepartment || !existingDepartment.is_active) {
+      throw new NotFoundException('Department not found or inactive');
     }
+
+    return existingDepartment.id;
+  }
+
+  private isUuid(value: string) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
   }
 }

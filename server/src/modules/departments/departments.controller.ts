@@ -27,7 +27,7 @@ export class DepartmentsController {
   constructor(private readonly departmentsService: DepartmentsService) {}
 
   @Get()
-  @Roles(Role.MD, Role.ADMIN)
+  @Roles(Role.MD, Role.HOD, Role.ADMIN)
   findAll() {
     return this.departmentsService.findAll();
   }

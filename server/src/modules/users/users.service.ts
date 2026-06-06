@@ -1,50 +1,98 @@
-// src/modules/users/users.service.ts
-
 import {
-  Injectable,
-  ConflictException,
-  NotFoundException,
   BadRequestException,
-  Logger,
+  ConflictException,
   ForbiddenException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { JwtPayload } from '../../common/types/jwt-payload.type';
 import { role_enum } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
-import { JwtPayload } from '../../common/types/jwt-payload.type';
-
-const SALT_ROUNDS = 12;
 
 const USER_SELECT = {
   id: true,
   username: true,
   full_name: true,
+  email: true,
   role: true,
   is_active: true,
+  pending_approval: true,
   department_id: true,
+  departments: { select: { id: true, name: true } },
   created_at: true,
-  departments: {
-    select: {
-      id: true,
-      name: true,
-    },
-  },
+};
+
+type SelectedUser = {
+  id: string;
+  username: string;
+  full_name: string;
+  email: string;
+  role: role_enum;
+  is_active: boolean | null;
+  pending_approval: boolean | null;
+  department_id: string | null;
+  departments: { id: string; name: string } | null;
+  created_at: Date | null;
 };
 
 @Injectable()
 export class UsersService {
-  private readonly logger = new Logger(UsersService.name);
+  private readonly BCRYPT_ROUNDS = 12;
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll() {
-    return this.prisma.users.findMany({
-      where: { is_active: true },
-      orderBy: { full_name: 'asc' },
-      select: USER_SELECT,
+  // ─── ROLE CONSTRAINT CHECKS ───────────────────────────────────────────────────
+
+  async checkMdExists(): Promise<boolean> {
+    const count = await this.prisma.users.count({
+      where: {
+        role: role_enum.MD,
+        deleted_at: null,
+        OR: [{ is_active: true }, { pending_approval: true }],
+      },
     });
+    return count > 0;
+  }
+
+  async checkHodExists(departmentId: string): Promise<boolean> {
+    const count = await this.prisma.users.count({
+      where: {
+        role: role_enum.HOD,
+        department_id: departmentId,
+        deleted_at: null,
+        OR: [{ is_active: true }, { pending_approval: true }],
+      },
+    });
+    return count > 0;
+  }
+
+  private async validateRoleConstraints(role: role_enum, departmentId?: string | null) {
+    if (role === role_enum.MD) {
+      const mdExists = await this.checkMdExists();
+      if (mdExists) {
+        throw new ConflictException('Managing Director already exists.');
+      }
+    }
+
+    if (role === role_enum.HOD && departmentId) {
+      const hodExists = await this.checkHodExists(departmentId);
+      if (hodExists) {
+        throw new ConflictException('HOD already exists for this department.');
+      }
+    }
+  }
+
+  async findAll() {
+    const users = await this.prisma.users.findMany({
+      where: { deleted_at: null },
+      select: USER_SELECT,
+      orderBy: { created_at: 'desc' },
+    });
+
+    return users.map((user) => this.toUserResponse(user));
   }
 
   async findOne(id: string) {
@@ -53,174 +101,304 @@ export class UsersService {
       select: USER_SELECT,
     });
 
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    return user;
+    if (!user) throw new NotFoundException('User not found');
+    return this.toUserResponse(user);
   }
 
   async findByDepartment(departmentId: string) {
-    return this.prisma.users.findMany({
-      where: { department_id: departmentId, is_active: true },
-      orderBy: { full_name: 'asc' },
+    const users = await this.prisma.users.findMany({
+      where: { department_id: departmentId, deleted_at: null },
       select: USER_SELECT,
     });
+
+    return users.map((user) => this.toUserResponse(user));
+  }
+
+  async findAssignable(caller: JwtPayload, departmentId?: string, role?: role_enum) {
+    const where: Record<string, any> = {
+      is_active: true,
+      deleted_at: null,
+      pending_approval: false,
+    };
+
+    if (caller.role === role_enum.HOD) {
+      // HOD: only employees in their own department
+      where.department_id = caller.departmentId;
+      where.role = role_enum.EMPLOYEE;
+    } else {
+      // MD: filter by department and/or role if provided
+      if (departmentId) where.department_id = departmentId;
+      if (role) where.role = role;
+    }
+
+    const users = await this.prisma.users.findMany({
+      where,
+      select: USER_SELECT,
+      orderBy: { full_name: 'asc' },
+    });
+
+    return users.map((u) => this.toUserResponse(u));
   }
 
   async create(dto: CreateUserDto) {
-    // Validate department requirement
-    if (
-      (dto.role === role_enum.HOD || dto.role === role_enum.EMPLOYEE) &&
-      !dto.departmentId
-    ) {
-      throw new BadRequestException(
-        'Department is required for HOD and EMPLOYEE roles',
-      );
-    }
+  const existing = await this.prisma.users.findUnique({
+    where: { username: dto.username },
+  });
+  if (existing) throw new ConflictException('Username already exists');
 
-    // Check username uniqueness
-    const existing = await this.prisma.users.findUnique({
-      where: { username: dto.username },
-    });
+  await this.validateRoleConstraints(dto.role, dto.departmentId);
 
-    if (existing) {
-      throw new ConflictException('Username already exists');
-    }
+  const passwordHash = await bcrypt.hash(dto.password, 12);
 
-    // Check email uniqueness
-    const existingEmail = await this.prisma.users.findUnique({
-      where: { email: dto.email },
-    });
+  return this.prisma.users.create({
+    data: {
+      full_name: dto.fullName,
+      username: dto.username,
+      email: dto.email ?? null,
+      password_hash: passwordHash,
+      role: dto.role,
+      department_id: dto.departmentId ?? null,
+      is_active: dto.role === role_enum.MD || dto.role === role_enum.HOD,
+    },
+  });
+}
 
-    if (existingEmail) {
-      throw new ConflictException('Email already exists');
-    }
+  async update(id: string, dto: UpdateUserDto) {
+    await this.ensureExists(id);
+    const departmentId =
+      dto.departmentId !== undefined
+        ? await this.resolveDepartmentId(dto.departmentId)
+        : undefined;
 
-    // Validate department exists
-    if (dto.departmentId) {
-      const department = await this.prisma.departments.findUnique({
-        where: { id: dto.departmentId },
-      });
-
-      if (!department || !department.is_active) {
-        throw new NotFoundException('Department not found or inactive');
-      }
-    }
-
-    const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
-
-    const user = await this.prisma.users.create({
+    const user = await this.prisma.users.update({
+      where: { id },
       data: {
-        username: dto.username,
-        email: dto.email,
-        full_name: dto.fullName,
-        password_hash: passwordHash,
-        role: dto.role,
-        department_id: dto.departmentId ?? null,
+        ...(dto.fullName !== undefined ? { full_name: dto.fullName } : {}),
+        ...(dto.role !== undefined ? { role: dto.role } : {}),
+        ...(dto.departmentId !== undefined
+          ? departmentId
+            ? { departments: { connect: { id: departmentId } } }
+            : { departments: { disconnect: true } }
+          : {}),
+        ...(dto.isActive !== undefined ? { is_active: dto.isActive } : {}),
       },
       select: USER_SELECT,
     });
 
-    this.logger.log(`User created: ${user.username} [${user.role}]`);
-    return user;
+    return this.toUserResponse(user);
   }
 
-  async update(id: string, dto: UpdateUserDto) {
-    await this.findOne(id);
+  async remove(id: string) {
+    await this.ensureExists(id);
 
-    if (dto.departmentId) {
-      const department = await this.prisma.departments.findUnique({
-        where: { id: dto.departmentId },
-      });
-
-      if (!department || !department.is_active) {
-        throw new NotFoundException('Department not found or inactive');
-      }
-    }
-
-    const updateData: Record<string, unknown> = {
-      ...(dto.fullName !== undefined ? { full_name: dto.fullName } : {}),
-      ...(dto.departmentId !== undefined ? { department_id: dto.departmentId } : {}),
-      ...(dto.isActive !== undefined ? { is_active: dto.isActive } : {}),
-    };
-
-    const updated = await this.prisma.users.update({
+    await this.prisma.users.update({
       where: { id },
-      data: updateData,
-      select: USER_SELECT,
+      data: { deleted_at: new Date() },
     });
 
-    this.logger.log(`User updated: ${updated.username}`);
-    return updated;
+    return { message: 'User deleted successfully' };
   }
 
-  async resetPassword(id: string, newPassword: string) {
-    await this.findOne(id);
+  async findPending(user: JwtPayload) {
+    const where: { pending_approval: boolean; deleted_at: null; department_id?: string | null } = {
+      pending_approval: true,
+      deleted_at: null,
+    };
 
-    const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    if (user.role === role_enum.HOD) {
+      where.department_id = user.departmentId;
+    }
+
+    const users = await this.prisma.users.findMany({
+      where,
+      select: USER_SELECT,
+      orderBy: { created_at: 'asc' },
+    });
+
+    return users.map((pendingUser) => this.toUserResponse(pendingUser));
+  }
+
+  async activate(id: string, user: JwtPayload) {
+    return this.approve(id, user);
+  }
+
+  async approve(id: string, user: JwtPayload) {
+    const target = await this.ensureExists(id);
+
+    if (!target.pending_approval) {
+      throw new BadRequestException('User is not pending approval');
+    }
+
+    if (user.role === role_enum.HOD && target.department_id !== user.departmentId) {
+      throw new ForbiddenException('Not authorized to approve this user');
+    }
+
+    await this.validateRoleConstraints(target.role, target.department_id);
+
+    await this.prisma.users.update({
+      where: { id },
+      data: { is_active: true, pending_approval: false },
+    });
+
+    return { message: 'User approved successfully' };
+  }
+
+  async reject(id: string, user: JwtPayload) {
+    const target = await this.ensureExists(id);
+
+    if (!target.pending_approval) {
+      throw new BadRequestException('User is not pending approval');
+    }
+
+    if (user.role === role_enum.HOD && target.department_id !== user.departmentId) {
+      throw new ForbiddenException('Not authorized to reject this user');
+    }
+
+    await this.prisma.users.update({
+      where: { id },
+      data: { is_active: false, pending_approval: false },
+    });
+
+    return { message: 'User rejected successfully' };
+  }
+
+  async findPasswordResetRequests(user: JwtPayload) {
+    const where: {
+      status: string;
+      users?: { department_id: string | null };
+    } = { status: 'PENDING' };
+
+    if (user.role === role_enum.HOD) {
+      where.users = { department_id: user.departmentId };
+    }
+
+    return this.prisma.passwordResetRequest.findMany({
+      where,
+      select: {
+        id: true,
+        status: true,
+        created_at: true,
+        users: {
+          select: {
+            id: true,
+            full_name: true,
+            username: true,
+            departments: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: { created_at: 'asc' },
+    });
+  }
+
+  async resetPassword(id: string, userOrNewPassword: JwtPayload | string) {
+    if (typeof userOrNewPassword === 'string') {
+      return this.adminResetPassword(id, userOrNewPassword);
+    }
+
+    const target = await this.ensureExists(id);
+
+    if (
+      userOrNewPassword.role === role_enum.HOD &&
+      target.department_id !== userOrNewPassword.departmentId
+    ) {
+      throw new ForbiddenException('Not authorized to reset this user password');
+    }
+
+    const tempPassword = this.generateTempPassword();
+    const passwordHash = await bcrypt.hash(tempPassword, this.BCRYPT_ROUNDS);
+
+    await this.prisma.$transaction([
+      this.prisma.users.update({
+        where: { id },
+        data: { password_hash: passwordHash },
+      }),
+      this.prisma.passwordResetRequest.updateMany({
+        where: { user_id: id, status: 'PENDING' },
+        data: { status: 'RESOLVED', temp_password: passwordHash },
+      }),
+    ]);
+
+    return {
+      message: 'Temporary password generated. Share with user securely.',
+      tempPassword,
+    };
+  }
+
+  async adminResetPassword(id: string, newPassword: string) {
+    await this.ensureExists(id);
+
+    const passwordHash = await bcrypt.hash(newPassword, this.BCRYPT_ROUNDS);
 
     await this.prisma.users.update({
       where: { id },
       data: { password_hash: passwordHash },
     });
 
-    this.logger.log(`Password reset for user: ${id}`);
-    return { message: 'Password reset successful' };
+    return { message: 'Password reset successfully' };
   }
 
-  async activate(id: string, user: JwtPayload) {
-  const target = await this.prisma.users.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      pendingApproval: true,
-      departmentId: true,
-      role: true,
-    },
-  });
+  private async ensureExists(id: string) {
+    const user = await this.prisma.users.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        role: true,
+        department_id: true,
+        is_active: true,
+        pending_approval: true,
+        deleted_at: true,
+      },
+    });
 
-  if (!target) throw new NotFoundException('User not found');
-
-  if (!target.pendingApproval)
-    throw new BadRequestException('User is not pending approval');
-
-  // HOD can only activate users in their department
-  if (
-    user.role === role_enum.HOD &&
-    target.departmentId !== user.departmentId
-  ) {
-    throw new ForbiddenException('Not authorized to activate this user');
+    if (!user || user.deleted_at) throw new NotFoundException('User not found');
+    return user;
   }
 
-  await this.prisma.users.update({
-    where: { id },
-    data: {
-      is_active: true,
-      pendingApproval: false,
-    },
-  });
-
-  return { message: 'User account activated successfully' };
-}
-async findPendingApprovals(user: JwtPayload) {
-  const where: any = { pendingApproval: true };
-
-  if (user.role === role_enum.HOD) {
-    where.departmentId = user.departmentId;
+  private toUserResponse(user: SelectedUser) {
+    return {
+      id: user.id,
+      username: user.username,
+      fullName: user.full_name,
+      email: user.email,
+      role: user.role,
+      status: this.getUserStatus(user),
+      isActive: user.is_active,
+      pendingApproval: user.pending_approval,
+      departmentId: user.department_id,
+      department: user.departments,
+      createdAt: user.created_at,
+    };
   }
 
-  return this.prisma.users.findMany({
-    where,
-    select: {
-      id: true,
-      fullName: true,
-      username: true,
-      email: true,
-      role: true,
-      department: { select: { id: true, name: true } },
-      createdAt: true,
-    },
-  });
-}
+  private getUserStatus(user: Pick<SelectedUser, 'is_active' | 'pending_approval'>) {
+    if (user.pending_approval) return 'PENDING';
+    if (user.is_active) return 'ACTIVE';
+    return 'REJECTED';
+  }
+
+  private async resolveDepartmentId(department: string | undefined) {
+    if (!department) return null;
+
+    const existingDepartment = this.isUuid(department)
+      ? await this.prisma.departments.findUnique({ where: { id: department } })
+      : await this.prisma.departments.findUnique({ where: { name: department } });
+
+    if (!existingDepartment || !existingDepartment.is_active) {
+      throw new NotFoundException('Department not found or inactive');
+    }
+
+    return existingDepartment.id;
+  }
+
+  private isUuid(value: string) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  }
+
+  private generateTempPassword(): string {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$';
+    return Array.from({ length: 10 }, () =>
+      chars.charAt(Math.floor(Math.random() * chars.length)),
+    ).join('');
+  }
 }

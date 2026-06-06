@@ -12,19 +12,19 @@ import type {
 } from './types';
 
 export const authApi = {
-  /** POST /auth/register — sends OTP to email */
+  /** POST /auth/register */
   register: async (data: RegisterRequest): Promise<MessageResponse> => {
     const response = await axiosClient.post<MessageResponse>('/auth/register', data);
     return response.data;
   },
 
-  /** POST /auth/verify-otp — verifies OTP, sets pending_approval for EMPLOYEE */
+  /** Inactive while OTP is disabled. Keep for future use. */
   verifyOtp: async (data: VerifyOtpRequest): Promise<MessageResponse> => {
     const response = await axiosClient.post<MessageResponse>('/auth/verify-otp', data);
     return response.data;
   },
 
-  /** POST /auth/login — returns accessToken in body */
+  /** POST /auth/login */
   login: async (credentials: LoginRequest): Promise<LoginResponse> => {
     const response = await axiosClient.post<LoginResponse>('/auth/login', credentials);
     return response.data;
@@ -36,13 +36,13 @@ export const authApi = {
     return response.data;
   },
 
-  /** POST /auth/verify-reset-otp */
+  /** Inactive while OTP is disabled. Keep for future use. */
   verifyResetOtp: async (data: VerifyResetOtpRequest): Promise<MessageResponse> => {
     const response = await axiosClient.post<MessageResponse>('/auth/verify-reset-otp', data);
     return response.data;
   },
 
-  /** POST /auth/reset-password */
+  /** Inactive in public forgot-password flow while OTP is disabled. */
   resetPassword: async (data: ResetPasswordRequest): Promise<MessageResponse> => {
     const response = await axiosClient.post<MessageResponse>('/auth/reset-password', data);
     return response.data;
@@ -53,9 +53,27 @@ export const authApi = {
     await axiosClient.post('/auth/logout');
   },
 
-  /** GET /auth/me — returns JWT payload */
+  /** GET /auth/me */
   getCurrentUser: async (): Promise<JwtUser> => {
     const response = await axiosClient.get<JwtUser>('/auth/me');
     return response.data;
+  },
+
+  /** GET /auth/check-md */
+  checkMdExists: async (): Promise<boolean> => {
+    const response = await axiosClient.get<{ exists: boolean }>('/auth/check-md');
+    return response.data.exists;
+  },
+
+  /** GET /auth/check-hod/:departmentId */
+  checkHodExists: async (departmentId: string): Promise<boolean> => {
+    const response = await axiosClient.get<{ exists: boolean }>(`/auth/check-hod/${departmentId}`);
+    return response.data.exists;
+  },
+
+  /** GET /auth/check-hod-name/:departmentName */
+  checkHodExistsByName: async (departmentName: string): Promise<boolean> => {
+    const response = await axiosClient.get<{ exists: boolean }>(`/auth/check-hod-name/${encodeURIComponent(departmentName)}`);
+    return response.data.exists;
   },
 };

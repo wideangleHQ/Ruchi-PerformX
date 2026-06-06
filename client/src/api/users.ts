@@ -1,5 +1,12 @@
 import axiosClient from './client';
-import { User, PaginatedResponse } from './types';
+import { User, PaginatedResponse, Role } from './types';
+
+export interface Department {
+  id: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+}
 
 export const usersApi = {
   getUsers: async (params?: {
@@ -26,5 +33,20 @@ export const usersApi = {
 
   deleteUser: async (id: string): Promise<void> => {
     await axiosClient.delete(`/users/${id}`);
+  },
+
+  /** GET /users/assignable?departmentId=&role= */
+  getAssignable: async (params?: {
+    departmentId?: string;
+    role?: Role;
+  }): Promise<User[]> => {
+    const response = await axiosClient.get<User[]>('/users/assignable', { params });
+    return response.data;
+  },
+
+  /** GET /departments */
+  getDepartments: async (): Promise<Department[]> => {
+    const response = await axiosClient.get<Department[]>('/departments');
+    return response.data;
   },
 };

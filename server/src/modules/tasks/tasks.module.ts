@@ -3,9 +3,10 @@ import { TasksService } from './tasks.service';
 import { TasksController } from './tasks.controller';
 import { TaskLifecycleService } from './task-lifecycle.service';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, AuthModule],
   controllers: [TasksController],
   providers: [TasksService, TaskLifecycleService],
   exports: [TasksService],

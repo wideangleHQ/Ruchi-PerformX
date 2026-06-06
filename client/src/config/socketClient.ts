@@ -1,6 +1,11 @@
 import { io, Socket } from 'socket.io-client';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const SOCKET_URL =
+  process.env.NEXT_PUBLIC_SOCKET_URL ||
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/v\d+\/?$/, '') ||
+  'http://localhost:3001';
+
+const SOCKET_NAMESPACE = '/performx';
 
 let socket: Socket | null = null;
 
@@ -9,13 +14,13 @@ export const initializeSocket = (token: string): Socket => {
     return socket;
   }
 
-  socket = io(BACKEND_URL, {
+  socket = io(`${SOCKET_URL.replace(/\/$/, '')}${SOCKET_NAMESPACE}`, {
     auth: { token },
     reconnection: true,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
     reconnectionAttempts: 5,
-    transports: ['websocket', 'polling'],
+    transports: ['websocket'],
   });
 
   socket.on('connect', () => {

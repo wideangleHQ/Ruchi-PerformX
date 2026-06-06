@@ -5,7 +5,7 @@ export const createTaskSchema = z.object({
   description: z.string().min(1, 'Description is required').max(2000),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
   dueDate: z.string().min(1, 'Due date is required'),
-  assigneeId: z.string().min(1, 'Assignee is required'),
+  departmentId: z.string().min(1, 'Department is required'),
 });
 
 export type CreateTaskFormData = z.infer<typeof createTaskSchema>;

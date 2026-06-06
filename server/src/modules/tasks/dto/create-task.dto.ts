@@ -18,9 +18,9 @@ export class CreateTaskDto {
   @IsDateString()
   dueDate!: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsUUID()
-  assignedToId!: string;
+  assignedToId?: string;
 
   @IsNotEmpty()
   @IsUUID()

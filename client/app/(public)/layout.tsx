@@ -1,7 +1,8 @@
 'use client';
 
 import { useAuth } from '@/context/AuthContext';
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function PublicLayout({
   children,
@@ -9,11 +10,13 @@ export default function PublicLayout({
   children: React.ReactNode;
 }) {
   const { isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
 
-  // Redirect to dashboard if already logged in
-  if (isAuthenticated && !isLoading) {
-    redirect('/dashboard');
-  }
+  useEffect(() => {
+    if (isAuthenticated && !isLoading) {
+      router.replace('/dashboard');
+    }
+  }, [isAuthenticated, isLoading, router]);
 
   return <>{children}</>;
 }

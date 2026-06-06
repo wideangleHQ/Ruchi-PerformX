@@ -8,6 +8,7 @@ import { JwtAuthGuard } from './common/gaurds/jwt-auth.guard';
 import { RolesGuard } from './common/gaurds/roles.guard';
 import { DepartmentsModule } from './modules/departments/departments.module';
 import { UsersModule } from './modules/users/users.module';
+import { TasksModule } from './modules/tasks/tasks.module';
 import { NotificationsModule } from './modules/notifications/notifications.module'
 import { CommentsModule } from './modules/comments/comments.module'
 import { AttachmentsModule } from './modules/attachments/attachments.module';
@@ -22,6 +23,7 @@ import { ScoringModule } from './modules/scoring/scoring.module'
     AuthModule,
     EmailModule,
     UsersModule,
+    TasksModule,
     NotificationsModule,
     CommentsModule,
     AttachmentsModule,

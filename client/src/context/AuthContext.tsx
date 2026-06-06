@@ -2,6 +2,8 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, LoginRequest, JwtUser } from '@/api/types';
+import { authApi } from '@/api/auth';
+import { initializeSocket, disconnectSocket } from '@/config/socketClient';
 
 const jwtToUser = (jwt: JwtUser): User => ({
   id: jwt.sub,
@@ -10,14 +12,12 @@ const jwtToUser = (jwt: JwtUser): User => ({
   role: jwt.role,
   departmentId: jwt.departmentId,
 });
-import { authApi } from '@/api/auth';
-import { initializeSocket, disconnectSocket } from '@/config/socketClient';
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (credentials: LoginRequest) => Promise<void>;
+  login: (credentials: LoginRequest) => Promise<User>;
   logout: () => Promise<void>;
   error: string | null;
 }
@@ -56,20 +56,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     initAuth();
   }, []);
 
-  const login = async (credentials: LoginRequest) => {
+  const login = async (credentials: LoginRequest): Promise<User> => {
     try {
       setIsLoading(true);
       setError(null);
       const res = await authApi.login(credentials);
       localStorage.setItem('accessToken', res.accessToken);
       const me = await authApi.getCurrentUser();
-      setUser(jwtToUser(me));
+      const user = jwtToUser(me);
+      setUser(user);
 
-      // Get token from cookie and initialize Socket.IO
+      // Initialize Socket.IO after login
       const token = localStorage.getItem('accessToken');
       if (token) {
         initializeSocket(token);
       }
+
+      return user;
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || 'Login failed';
       setError(errorMessage);

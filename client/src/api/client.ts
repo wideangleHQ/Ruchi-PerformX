@@ -1,6 +1,8 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_URL = process.env.NEXT_PUBLIC_API_URL ;
+console.log('API_URL =', API_URL);
+
 
 const axiosClient: AxiosInstance = axios.create({
   baseURL: API_URL,
@@ -31,7 +33,7 @@ axiosClient.interceptors.response.use(
         localStorage.removeItem('accessToken');
         localStorage.removeItem('user');
         // Only redirect if not already on a public page
-        const isPublic = ['/login', '/signup', '/verify-otp', '/forgot-password', '/reset-password'].some(
+        const isPublic = ['/login', '/signup', '/register-success', '/forgot-password', '/forgot-password-success'].some(
           (p) => window.location.pathname.startsWith(p)
         );
         if (!isPublic) {

@@ -5,7 +5,9 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
+  Query,
   Body,
   UseGuards,
 } from '@nestjs/common';
@@ -15,24 +17,47 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from '../../common/gaurds/jwt-auth.guard';
 import { RolesGuard } from '../../common/gaurds/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { role_enum } from '@prisma/client';
-import { JwtPayload } from '../../common/types/jwt-payload.type';
-import { Role } from '../departments/departments.controller';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-
-class ResetPasswordDto {
-  newPassword!: string;
-}
+import { JwtPayload } from '../../common/types/jwt-payload.type';
+import { role_enum } from '@prisma/client';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  // ─── ROLE CONSTRAINT CHECKS ──────────────────────────────────────────────────
+
+  @Get('check-md')
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.ADMIN)
+  async checkMd() {
+    const exists = await this.usersService.checkMdExists();
+    return { exists };
+  }
+
+  @Get('check-hod/:departmentId')
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.ADMIN)
+  async checkHod(@Param('departmentId') departmentId: string) {
+    const exists = await this.usersService.checkHodExists(departmentId);
+    return { exists };
+  }
+
+  // ─── CRUD ─────────────────────────────────────────────────────────────────────
+
   @Get()
   @Roles(role_enum.MD, role_enum.ADMIN)
   findAll() {
     return this.usersService.findAll();
+  }
+
+  @Get('assignable')
+  @Roles(role_enum.MD, role_enum.HOD)
+  findAssignable(
+    @CurrentUser() user: JwtPayload,
+    @Query('departmentId') departmentId?: string,
+    @Query('role') role?: role_enum,
+  ) {
+    return this.usersService.findAssignable(user, departmentId, role);
   }
 
   @Get('department/:departmentId')
@@ -59,15 +84,52 @@ export class UsersController {
     return this.usersService.update(id, dto);
   }
 
-  @Patch(':id/activate')
-  @Roles(role_enum.HOD, role_enum.MD)
-  activate(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
-    return this.usersService.activate(id, user);
+  @Delete(':id')
+  @Roles(role_enum.ADMIN)
+  remove(@Param('id') id: string) {
+    return this.usersService.remove(id);
+  }
+
+  // ─── APPROVAL WORKFLOW ────────────────────────────────────────────────────────
+
+  @Get('pending')
+  @Roles(role_enum.MD, role_enum.HOD)
+  findPending(@CurrentUser() user: JwtPayload) {
+    return this.usersService.findPending(user);
+  }
+
+  @Patch(':id/approve')
+  @Roles(role_enum.MD, role_enum.HOD)
+  approve(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.usersService.approve(id, user);
+  }
+
+  @Patch(':id/reject')
+  @Roles(role_enum.MD, role_enum.HOD)
+  reject(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.usersService.reject(id, user);
+  }
+
+  // ─── PASSWORD RESET WORKFLOW ──────────────────────────────────────────────────
+
+  @Get('password-reset-requests')
+  @Roles(role_enum.MD, role_enum.HOD)
+  findPasswordResetRequests(@CurrentUser() user: JwtPayload) {
+    return this.usersService.findPasswordResetRequests(user);
   }
 
   @Patch(':id/reset-password')
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.ADMIN)
+  resetPassword(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.usersService.resetPassword(id, user);
+  }
+
+  @Patch(':id/admin-reset-password')
   @Roles(role_enum.ADMIN)
-  resetPassword(@Param('id') id: string, @Body() dto: ResetPasswordDto) {
-    return this.usersService.resetPassword(id, dto.newPassword);
+  adminResetPassword(
+    @Param('id') id: string,
+    @Body('newPassword') newPassword: string,
+  ) {
+    return this.usersService.adminResetPassword(id, newPassword);
   }
 }

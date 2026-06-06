@@ -21,6 +21,7 @@ export const useDashboard = () => {
 export const useTasks = (filters?: {
   status?: string;
   priority?: string;
+  title?: string;
   assigneeId?: string;
   page?: number;
   limit?: number;
