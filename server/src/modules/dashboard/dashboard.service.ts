@@ -13,6 +13,19 @@ import { JwtPayload } from '../../common/types/jwt-payload.type';
 export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private readonly terminalStatuses = [
+    task_status_enum.COMPLETED,
+    task_status_enum.REVIEWED,
+    task_status_enum.CLOSED,
+    task_status_enum.REJECTED,
+  ];
+
+  private readonly completedStatuses = [
+    task_status_enum.COMPLETED,
+    task_status_enum.REVIEWED,
+    task_status_enum.CLOSED,
+  ];
+
   async getDashboard(user: JwtPayload) {
     const now = new Date();
     const weekStart = new Date(now);
@@ -20,14 +33,8 @@ export class DashboardService {
     weekStart.setHours(0, 0, 0, 0);
 
     const taskWhere = this.taskScope(user);
-    const activeTaskWhere = {
-      ...taskWhere,
-      status: { notIn: this.terminalStatuses() },
-    };
-    const completedTaskWhere = {
-      ...taskWhere,
-      status: { in: this.completedStatuses() },
-    };
+    const activeTaskWhere = { ...taskWhere, status: { notIn: this.terminalStatuses } };
+    const completedTaskWhere = { ...taskWhere, status: { in: this.completedStatuses } };
 
     const [
       activeTasks,
@@ -57,34 +64,19 @@ export class DashboardService {
         },
       }),
       this.prisma.task_requests.count({
-        where: {
-          ...this.requestScope(user),
-          status: request_status_enum.PENDING,
-        },
+        where: { ...this.requestScope(user), status: request_status_enum.PENDING },
       }),
       this.prisma.task_transfers.count({
-        where: {
-          ...this.transferScope(user),
-          status: transfer_status_enum.PENDING,
-        },
+        where: { ...this.transferScope(user), status: transfer_status_enum.PENDING },
       }),
       this.prisma.task_escalations.count({
-        where: {
-          ...this.escalationScope(user),
-          is_resolved: false,
-        },
+        where: { ...this.escalationScope(user), is_resolved: false },
       }),
       this.prisma.tasks.count({
-        where: {
-          ...activeTaskWhere,
-          due_date: { lt: now },
-        },
+        where: { ...activeTaskWhere, due_date: { lt: now } },
       }),
       this.prisma.tasks.findMany({
-        where: {
-          ...completedTaskWhere,
-          completed_at: { gte: weekStart },
-        },
+        where: { ...completedTaskWhere, completed_at: { gte: weekStart } },
         select: { completed_at: true },
       }),
       this.prisma.tasks.groupBy({
@@ -99,21 +91,13 @@ export class DashboardService {
       }),
     ]);
 
-    const departmentIds = departmentGroups.map((group) => group.department_id);
     const departments = await this.prisma.departments.findMany({
-      where: { id: { in: departmentIds } },
+      where: { id: { in: departmentGroups.map((g) => g.department_id) } },
       select: { id: true, name: true },
     });
 
-    const completedByDepartment = new Map(
-      completedDepartmentGroups.map((group) => [
-        group.department_id,
-        group._count.id,
-      ]),
-    );
-    const departmentNames = new Map(
-      departments.map((department) => [department.id, department.name]),
-    );
+    const completedByDepartment = new Map(completedDepartmentGroups.map((g) => [g.department_id, g._count.id]));
+    const departmentNames = new Map(departments.map((d) => [d.id, d.name]));
 
     return {
       activeTasks,
@@ -128,7 +112,6 @@ export class DashboardService {
       departmentSummary: departmentGroups.map((group) => {
         const completed = completedByDepartment.get(group.department_id) ?? 0;
         const completionRate = this.percent(completed, group._count.id);
-
         return {
           department: departmentNames.get(group.department_id) ?? 'Unassigned',
           tasks: group._count.id,
@@ -140,11 +123,7 @@ export class DashboardService {
   }
 
   private hodDeptIds(user: JwtPayload): string[] {
-    return user.departmentIds?.length
-      ? user.departmentIds
-      : user.departmentId
-        ? [user.departmentId]
-        : [];
+    return user.departmentIds?.length ? user.departmentIds : user.departmentId ? [user.departmentId] : [];
   }
 
   private taskScope(user: JwtPayload): Prisma.tasksWhereInput {
@@ -161,13 +140,9 @@ export class DashboardService {
     if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return base;
     if (user.role === role_enum.HOD) {
       const deptIds = this.hodDeptIds(user);
-      if (!deptIds.length) return { id: { in: [] } };
-      return {
-        ...base,
-        users_task_requests_requested_by_idTousers: {
-          department_id: { in: deptIds },
-        },
-      };
+      return deptIds.length
+        ? { ...base, users_task_requests_requested_by_idTousers: { department_id: { in: deptIds } } }
+        : { id: { in: [] } };
     }
     return { ...base, requested_by_id: user.sub };
   }
@@ -176,13 +151,7 @@ export class DashboardService {
     if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return {};
     if (user.role === role_enum.HOD) {
       const deptIds = this.hodDeptIds(user);
-      if (!deptIds.length) return { id: { in: [] } };
-      return {
-        OR: [
-          { from_dept_id: { in: deptIds } },
-          { to_dept_id: { in: deptIds } },
-        ],
-      };
+      return deptIds.length ? { OR: [{ from_dept_id: { in: deptIds } }, { to_dept_id: { in: deptIds } }] } : { id: { in: [] } };
     }
     return { initiated_by_id: user.sub };
   }
@@ -191,15 +160,16 @@ export class DashboardService {
     if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return {};
     if (user.role === role_enum.HOD) {
       const deptIds = this.hodDeptIds(user);
-      if (!deptIds.length) return { id: { in: [] } };
-      return {
-        tasks: {
-          OR: [
-            { department_id: { in: deptIds } },
-            { task_departments: { some: { department_id: { in: deptIds } } } },
-          ],
-        },
-      };
+      return deptIds.length
+        ? {
+            tasks: {
+              OR: [
+                { department_id: { in: deptIds } },
+                { task_departments: { some: { department_id: { in: deptIds } } } },
+              ],
+            },
+          }
+        : { id: { in: [] } };
     }
     return { escalated_to_id: user.sub };
   }
@@ -208,36 +178,15 @@ export class DashboardService {
     if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return {};
     if (user.role === role_enum.HOD) {
       const deptIds = this.hodDeptIds(user);
-      if (!deptIds.length) return { id: { in: [] } };
-      return {
-        users_incentives_employee_idTousers: {
-          department_id: { in: deptIds },
-        },
-      };
+      return deptIds.length
+        ? { users_incentives_employee_idTousers: { department_id: { in: deptIds } } }
+        : { id: { in: [] } };
     }
     return { employee_id: user.sub };
   }
 
-  private terminalStatuses() {
-    return [
-      task_status_enum.COMPLETED,
-      task_status_enum.REVIEWED,
-      task_status_enum.CLOSED,
-      task_status_enum.REJECTED,
-    ];
-  }
-
-  private completedStatuses() {
-    return [
-      task_status_enum.COMPLETED,
-      task_status_enum.REVIEWED,
-      task_status_enum.CLOSED,
-    ];
-  }
-
   private percent(value: number, total: number) {
-    if (!total) return 0;
-    return Math.round((value / total) * 1000) / 10;
+    return total ? Math.round((value / total) * 1000) / 10 : 0;
   }
 
   private departmentVisibility(departmentIds: string[]): Prisma.tasksWhereInput {
@@ -253,13 +202,10 @@ export class DashboardService {
     return Array.from({ length: 7 }, (_, index) => {
       const date = new Date(weekStart);
       date.setDate(weekStart.getDate() + index);
-      const label = date.toLocaleDateString('en-US', { weekday: 'short' });
-      const value = tasks.filter((task) => {
-        if (!task.completed_at) return false;
-        return task.completed_at.toDateString() === date.toDateString();
-      }).length;
-
-      return { label, value };
+      return {
+        label: date.toLocaleDateString('en-US', { weekday: 'short' }),
+        value: tasks.filter((t) => t.completed_at && t.completed_at.toDateString() === date.toDateString()).length,
+      };
     });
   }
 }
