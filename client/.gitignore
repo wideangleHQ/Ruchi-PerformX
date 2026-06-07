@@ -1,33 +1,3 @@
-# Dependencies
+.next
 node_modules/
-.pnp
-.pnp.js
-
-# Next.js
-.next/
-out/
-
-# Environment
 .env
-.env.local
-.env*.local
-
-# Vercel
-.vercel/
-
-# v0
-.v0-trash/
-
-# Snowflake
-.snowflake/
-
-# OS 
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-
-# Build
-dist/
-build/
