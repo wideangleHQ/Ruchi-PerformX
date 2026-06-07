@@ -13,7 +13,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 export class AttachmentsService {
   private readonly supabase: SupabaseClient;
   private readonly bucket = 'task-attachments';
-  private readonly MAX_FILE_SIZE_KB = 5120; // 5MB
+  private readonly MAX_FILE_SIZE_KB = 5120;
   private readonly ALLOWED_MIME_TYPES = [
     'image/jpeg',
     'image/png',
@@ -25,25 +25,18 @@ export class AttachmentsService {
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   ];
 
-constructor(private readonly prisma: PrismaService) {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+  constructor(private readonly prisma: PrismaService) {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error('Supabase environment variables are missing');
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase environment variables are missing');
+    }
+
+    this.supabase = createClient(supabaseUrl, supabaseKey);
   }
 
-  this.supabase = createClient(
-    supabaseUrl,
-    supabaseKey,
-  );
-}
-
-  async upload(
-    taskId: string,
-    file: Express.Multer.File,
-    user: JwtPayload,
-  ) {
+  async upload(taskId: string, file: Express.Multer.File, user: JwtPayload) {
     await this.ensureTaskExists(taskId);
     this.validateFile(file);
 
@@ -70,16 +63,16 @@ constructor(private readonly prisma: PrismaService) {
         file_name: file.originalname,
         file_url: urlData.publicUrl,
         file_type: file.mimetype,
-        fileSizeKb,
+        file_size_kb: fileSizeKb,
         uploaded_by_id: user.sub,
       },
       select: {
         id: true,
-        fileName: true,
-        fileUrl: true,
-        fileType: true,
-        fileSizeKb: true,
-        createdAt: true,
+        file_name: true,
+        file_url: true,
+        file_type: true,
+        file_size_kb: true,
+        created_at: true,
       },
     });
   }
@@ -113,7 +106,6 @@ constructor(private readonly prisma: PrismaService) {
       throw new ForbiddenException('Not authorized to delete this attachment');
     }
 
-    // Extract storage path from URL
     const url = new URL(attachment.file_url);
     const storagePath = url.pathname.split(`/${this.bucket}/`)[1];
 
@@ -122,7 +114,6 @@ constructor(private readonly prisma: PrismaService) {
     }
 
     await this.prisma.task_attachments.delete({ where: { id } });
-
     return { message: 'Attachment deleted successfully' };
   }
 

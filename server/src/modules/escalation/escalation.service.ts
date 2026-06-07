@@ -1,9 +1,7 @@
-// src/modules/escalation/escalation.service.ts
-
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { task_status_enum } from '@prisma/client';
+import { task_status_enum, role_enum } from '@prisma/client';
 
 @Injectable()
 export class EscalationService {
@@ -13,14 +11,6 @@ export class EscalationService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
   ) {}
-
-  private async createNotification(payload: {
-    userId: number | string;
-    title: string;
-    message: string;
-  }): Promise<any> {
-    return (this.notifications as any).create(payload);
-  }
 
   async runEscalationCheck(): Promise<void> {
     const now = new Date();
@@ -34,24 +24,18 @@ export class EscalationService {
             task_status_enum.REJECTED,
           ],
         },
-        dueDate: { lt: now },
+        due_date: { lt: now },
       },
       select: {
         id: true,
         title: true,
-        dueDate: true,
-        assignedToId: true,
-        departmentId: true,
-        assignedTo: {
-          select: {
-            id: true,
-            departmentId: true,
-          },
-        },
-        department: {
+        due_date: true,
+        assigned_to_id: true,
+        department_id: true,
+        departments: {
           select: {
             users: {
-              where: { role: 'HOD', isActive: true },
+              where: { role: role_enum.HOD, is_active: true },
               select: { id: true },
             },
           },
@@ -60,20 +44,20 @@ export class EscalationService {
     });
 
     const mdUsers = await this.prisma.users.findMany({
-      where: { role: 'MD', isActive: true },
+      where: { role: role_enum.MD, is_active: true },
       select: { id: true },
     });
 
     for (const task of overdueTasks) {
       const daysOverdue = Math.floor(
-        (now.getTime() - new Date(task.dueDate).getTime()) /
-          (1000 * 60 * 60 * 24),
+        (now.getTime() - new Date(task.due_date).getTime()) / (1000 * 60 * 60 * 24),
       );
 
       if (daysOverdue >= 5) {
         for (const md of mdUsers) {
-          await this.createNotification({
-            userId: md.id,
+          await this.notifications.createNotification({
+            recipientId: md.id,
+            type: 'ESCALATION_MD',
             title: 'Critical Escalation',
             message: `Task "${task.title}" is ${daysOverdue} days overdue`,
           });
@@ -83,11 +67,12 @@ export class EscalationService {
       }
 
       if (daysOverdue >= 3) {
-        const hodUsers = ((task.department as any)?.users ?? []) as Array<{ id: number | string }>;
+        const hodUsers = task.departments?.users ?? [];
 
         for (const hod of hodUsers) {
-          await this.createNotification({
-            userId: hod.id,
+          await this.notifications.createNotification({
+            recipientId: hod.id,
+            type: 'ESCALATION_HOD',
             title: 'HOD Escalation',
             message: `Task "${task.title}" is ${daysOverdue} days overdue`,
           });
@@ -96,9 +81,10 @@ export class EscalationService {
         continue;
       }
 
-      if (daysOverdue >= 1) {
-        await this.createNotification({
-          userId: task.assignedToId,
+      if (daysOverdue >= 1 && task.assigned_to_id) {
+        await this.notifications.createNotification({
+          recipientId: task.assigned_to_id,
+          type: 'TASK_OVERDUE',
           title: 'Task Overdue',
           message: `Your task "${task.title}" is ${daysOverdue} day(s) overdue`,
         });

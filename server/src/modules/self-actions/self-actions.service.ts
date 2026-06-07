@@ -1,5 +1,3 @@
-// src/modules/self-actions/self-actions.service.ts
-
 import {
   Injectable,
   NotFoundException,
@@ -16,16 +14,18 @@ import { role_enum } from '@prisma/client';
 const SELECT = {
   id: true,
   title: true,
-  description: true,
-  actionDate: true,
-  createdAt: true,
-  updatedAt: true,
-  user: {
+  status: true,
+  remarks: true,
+  category: true,
+  action_date: true,
+  created_at: true,
+  updated_at: true,
+  users: {
     select: {
       id: true,
-      fullName: true,
+      full_name: true,
       role: true,
-      departmentId: true,
+      department_id: true,
     },
   },
 };
@@ -40,9 +40,9 @@ export class SelfActionsService {
     const action = await this.prisma.self_actions.create({
       data: {
         title: dto.title,
-        ...(dto.description ? ({ description: dto.description } as any) : {}),
-        actionDate: dto.actionDate ? new Date(dto.actionDate) : new Date(),
-        userId: user.sub,
+        status: (dto as any).status ?? 'PENDING',
+        action_date: dto.actionDate ? new Date(dto.actionDate) : new Date(),
+        user_id: user.sub,
       },
       select: SELECT,
     });
@@ -55,21 +55,21 @@ export class SelfActionsService {
     const where: any = {};
 
     if (user.role === role_enum.EMPLOYEE) {
-      where.userId = user.sub;
+      where.user_id = user.sub;
     } else if (user.role === role_enum.HOD) {
-      where.user = { departmentId: user.departmentId };
-      if (filter.userId) where.userId = filter.userId;
+      where.users = { department_id: user.departmentId };
+      if (filter.userId) where.user_id = filter.userId;
     } else if (user.role === role_enum.MD || user.role === role_enum.ADMIN) {
-      if (filter.userId) where.userId = filter.userId;
+      if (filter.userId) where.user_id = filter.userId;
       if (filter.departmentId) {
-        where.user = { departmentId: filter.departmentId };
+        where.users = { department_id: filter.departmentId };
       }
     }
 
     if (filter.dateFrom || filter.dateTo) {
-      where.actionDate = {};
-      if (filter.dateFrom) where.actionDate.gte = new Date(filter.dateFrom);
-      if (filter.dateTo) where.actionDate.lte = new Date(filter.dateTo);
+      where.action_date = {};
+      if (filter.dateFrom) where.action_date.gte = new Date(filter.dateFrom);
+      if (filter.dateTo) where.action_date.lte = new Date(filter.dateTo);
     }
 
     return this.prisma.self_actions.findMany({
@@ -86,21 +86,19 @@ export class SelfActionsService {
     });
 
     if (!action) throw new NotFoundException('Self action not found');
-
     this.checkReadAccess(action, user);
-
     return action;
   }
 
   async update(id: string, dto: UpdateSelfActionDto, user: JwtPayload) {
     const action = await this.prisma.self_actions.findUnique({
       where: { id },
-      select: { id: true, userId: true },
+      select: { id: true, user_id: true },
     });
 
     if (!action) throw new NotFoundException('Self action not found');
 
-    if (action.userId !== user.sub && user.role !== role_enum.ADMIN) {
+    if (action.user_id !== user.sub && user.role !== role_enum.ADMIN) {
       throw new ForbiddenException('Not authorized to edit this action');
     }
 
@@ -108,7 +106,7 @@ export class SelfActionsService {
       where: { id },
       data: {
         ...(dto as any),
-        actionDate: dto.actionDate ? new Date(dto.actionDate) : undefined,
+        action_date: (dto as any).actionDate ? new Date((dto as any).actionDate) : undefined,
       },
       select: SELECT,
     });
@@ -117,12 +115,12 @@ export class SelfActionsService {
   async remove(id: string, user: JwtPayload) {
     const action = await this.prisma.self_actions.findUnique({
       where: { id },
-      select: { id: true, userId: true },
+      select: { id: true, user_id: true },
     });
 
     if (!action) throw new NotFoundException('Self action not found');
 
-    if (action.userId !== user.sub && user.role !== role_enum.ADMIN) {
+    if (action.user_id !== user.sub && user.role !== role_enum.ADMIN) {
       throw new ForbiddenException('Not authorized to delete this action');
     }
 
@@ -134,13 +132,13 @@ export class SelfActionsService {
     if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return;
 
     if (user.role === role_enum.HOD) {
-      if (action.user.departmentId !== user.departmentId) {
+      if (action.users?.department_id !== user.departmentId) {
         throw new ForbiddenException('Access denied');
       }
       return;
     }
 
-    if (action.user.id !== user.sub) {
+    if (action.users?.id !== user.sub) {
       throw new ForbiddenException('Access denied');
     }
   }

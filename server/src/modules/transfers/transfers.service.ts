@@ -17,31 +17,28 @@ export class TransfersService {
   async create(dto: CreateTransferDto, user: JwtPayload) {
     const task = await this.prisma.tasks.findUnique({
       where: { id: dto.taskId },
-      select: { id: true, departmentId: true },
+      select: { id: true, department_id: true },
     });
 
     if (!task) throw new NotFoundException('Task not found');
 
-    if (task.departmentId === dto.toDepartmentId)
+    if (task.department_id === dto.toDepartmentId)
       throw new BadRequestException('Task already belongs to this department');
 
     const pending = await this.prisma.task_transfers.findFirst({
-      where: { taskId: dto.taskId, status: TransferStatus.PENDING },
+      where: { task_id: dto.taskId, status: TransferStatus.PENDING },
     });
 
     if (pending)
       throw new BadRequestException('A pending transfer already exists for this task');
 
-    const reason = dto.reason ?? null;
-    const fromDeptId = task.departmentId as string;
-
     return this.prisma.task_transfers.create({
       data: {
         task_id: dto.taskId,
-        from_dept_id: fromDeptId,
+        from_dept_id: task.department_id,
         to_dept_id: dto.toDepartmentId,
         initiated_by_id: user.sub,
-        reason,
+        reason: dto.reason ?? null,
       },
       select: this.transferSelect(),
     });
@@ -75,8 +72,8 @@ export class TransfersService {
 
     if (
       user.role !== Role.MD &&
-      transfer.fromDeptId !== user.departmentId &&
-      transfer.toDeptId !== user.departmentId
+      transfer.from_dept_id !== user.departmentId &&
+      transfer.to_dept_id !== user.departmentId
     ) {
       throw new ForbiddenException('Not authorized to view this transfer');
     }
@@ -94,12 +91,12 @@ export class TransfersService {
         where: { id },
         data: {
           status: TransferStatus.ACCEPTED,
-          receivedById: user.sub,
+          received_by_id: user.sub,
         },
       }),
       this.prisma.tasks.update({
-        where: { id: transfer.taskId },
-        data: { department_id: transfer.toDeptId },
+        where: { id: transfer.task_id },
+        data: { department_id: transfer.to_dept_id },
       }),
     ]);
 
@@ -115,8 +112,8 @@ export class TransfersService {
       where: { id },
       data: {
         status: TransferStatus.REJECTED,
-        receivedById: user.sub,
-        rejectionReason: dto.reason,
+        received_by_id: user.sub,
+        rejection_reason: dto.reason ?? null,
       },
     });
 
@@ -128,11 +125,11 @@ export class TransfersService {
       where: { id },
       select: {
         id: true,
-        taskId: true,
-        fromDeptId: true,
-        toDeptId: true,
+        task_id: true,
+        from_dept_id: true,
+        to_dept_id: true,
         status: true,
-        initiatedById: true,
+        initiated_by_id: true,
       },
     });
 
@@ -143,11 +140,8 @@ export class TransfersService {
     return transfer;
   }
 
-  private ensureApprovalAuthority(transfer: any, user: JwtPayload) {
-    if (
-      user.role !== Role.MD &&
-      transfer.toDeptId !== user.departmentId
-    ) {
+  private ensureApprovalAuthority(transfer: { to_dept_id: string }, user: JwtPayload) {
+    if (user.role !== Role.MD && transfer.to_dept_id !== user.departmentId) {
       throw new ForbiddenException('Not authorized to action this transfer');
     }
   }
@@ -155,16 +149,16 @@ export class TransfersService {
   private transferSelect() {
     return {
       id: true,
-      taskId: true,
-      fromDeptId: true,
-      toDeptId: true,
-      initiatedById: true,
-      receivedById: true,
+      task_id: true,
+      from_dept_id: true,
+      to_dept_id: true,
+      initiated_by_id: true,
+      received_by_id: true,
       status: true,
       reason: true,
-      rejectionReason: true,
-      createdAt: true,
-      updatedAt: true,
+      rejection_reason: true,
+      created_at: true,
+      updated_at: true,
     };
   }
 }

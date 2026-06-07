@@ -9,7 +9,7 @@ import { CreateRequestDto } from './dto/create-request.dto';
 import { UpdateRequestStatusDto } from './dto/update-request-status.dto';
 import { RequestFilterDto } from './dto/request-filter.dto';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
-import { request_status_enum , role_enum } from '@prisma/client';
+import { request_status_enum, role_enum } from '@prisma/client';
 
 @Injectable()
 export class RequestsService {
@@ -17,8 +17,6 @@ export class RequestsService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
   ) {}
-
-  // ─── Create ────────────────────────────────────────────────────
 
   async create(dto: CreateRequestDto, user: JwtPayload) {
     const request = await this.prisma.task_requests.create({
@@ -31,12 +29,11 @@ export class RequestsService {
       },
     });
 
-    // Notify HOD of new request
     const hod = await this.prisma.users.findFirst({
       where: {
         department_id: user.departmentId,
         role: role_enum.HOD,
-        isActive: true,
+        is_active: true,
       },
     });
 
@@ -52,8 +49,6 @@ export class RequestsService {
     return request;
   }
 
-  // ─── List (role-scoped) ────────────────────────────────────────
-
   async findAll(filters: RequestFilterDto, user: JwtPayload) {
     const where: any = {};
 
@@ -63,9 +58,8 @@ export class RequestsService {
     if (user.role === role_enum.EMPLOYEE) {
       where.requested_by_id = user.sub;
     } else if (user.role === role_enum.HOD) {
-      where.requested_by = { departmentId: user.departmentId };
+      where.users_task_requests_requested_by_idTousers = { department_id: user.departmentId };
     }
-    // MD sees all — no extra filter
 
     return this.prisma.task_requests.findMany({
       where,
@@ -77,8 +71,6 @@ export class RequestsService {
     });
   }
 
-  // ─── Find One ──────────────────────────────────────────────────
-
   async findOne(id: string, user: JwtPayload) {
     const request = await this.prisma.task_requests.findUnique({
       where: { id },
@@ -89,25 +81,20 @@ export class RequestsService {
     });
 
     if (!request) throw new NotFoundException('Request not found');
-
     this.assertAccess(request, user);
-
     return request;
   }
 
-  // ─── Approve ───────────────────────────────────────────────────
-
   async approve(id: string, user: JwtPayload) {
     const request = await this.getRequestOrFail(id);
-
     this.assertReviewAccess(request, user);
 
     const updated = await this.prisma.task_requests.update({
       where: { id },
       data: {
         status: request_status_enum.ACCEPTED,
-        reviewedById: user.sub,
-        reviewedAt: new Date(),
+        reviewed_by_id: user.sub,
+        reviewed_at: new Date(),
       },
     });
 
@@ -121,20 +108,17 @@ export class RequestsService {
     return updated;
   }
 
-  // ─── Reject ────────────────────────────────────────────────────
-
   async reject(id: string, dto: UpdateRequestStatusDto, user: JwtPayload) {
     const request = await this.getRequestOrFail(id);
-
     this.assertReviewAccess(request, user);
 
     const updated = await this.prisma.task_requests.update({
       where: { id },
       data: {
         status: request_status_enum.REJECTED,
-        reviewedById: user.sub,
-        reviewedAt: new Date(),
-        rejectionReason: dto.rejectionReason ?? null,
+        reviewed_by_id: user.sub,
+        reviewed_at: new Date(),
+        rejection_reason: dto.rejectionReason ?? null,
       },
     });
 
@@ -147,8 +131,6 @@ export class RequestsService {
 
     return updated;
   }
-
-  // ─── Helpers ───────────────────────────────────────────────────
 
   private async getRequestOrFail(id: string) {
     const request = await this.prisma.task_requests.findUnique({ where: { id } });

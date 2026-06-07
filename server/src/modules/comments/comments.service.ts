@@ -85,10 +85,10 @@ export class CommentsService {
       task_id: true,
       created_at: true,
       updated_at: true,
-      user: {
+      users: {
         select: {
           id: true,
-          fullName: true,
+          full_name: true,
           role: true,
         },
       },
