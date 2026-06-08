@@ -13,39 +13,39 @@ const TRANSITIONS: Transition[] = [
   {
     from: [task_status_enum.CREATED],
     to: task_status_enum.ASSIGNED,
-    allowedRoles: [role_enum.MD, role_enum.HOD],
+    allowedRoles: [role_enum.MD],
   },
   {
     from: [task_status_enum.ASSIGNED],
     to: task_status_enum.ACCEPTED,
-    allowedRoles: [role_enum.EMPLOYEE, role_enum.HOD],
+    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE],
   },
   {
     from: [task_status_enum.ASSIGNED],
     to: task_status_enum.REJECTED,
-    allowedRoles: [role_enum.EMPLOYEE, role_enum.HOD],
+    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE],
     requiresReason: true,
   },
   {
     from: [task_status_enum.ACCEPTED],
     to: task_status_enum.IN_PROGRESS,
-    allowedRoles: [role_enum.EMPLOYEE, role_enum.HOD],
+    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE],
   },
   {
     from: [task_status_enum.IN_PROGRESS],
     to: task_status_enum.COMPLETED,
-    allowedRoles: [role_enum.EMPLOYEE],
+    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE],
   },
   {
     from: [task_status_enum.IN_PROGRESS],
     to: task_status_enum.PENDING,
-    allowedRoles: [role_enum.EMPLOYEE, role_enum.HOD],
+    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE],
     requiresReason: true,
   },
   {
     from: [task_status_enum.PENDING],
     to: task_status_enum.IN_PROGRESS,
-    allowedRoles: [role_enum.EMPLOYEE],
+    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE],
   },
   {
     from: [task_status_enum.COMPLETED],

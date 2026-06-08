@@ -103,19 +103,32 @@ export interface Task {
   status: TaskStatus;
   priority: TaskPriority;
   category?: TaskCategory;
-  dueDate: string;
+  dueDate?: string;
+  due_date?: string;
   completedAt?: string;
+  completed_at?: string;
   acceptedAt?: string;
+  accepted_at?: string;
   reviewedAt?: string;
+  reviewed_at?: string;
   closedAt?: string;
-  createdAt: string;
-  updatedAt: string;
+  closed_at?: string;
+  createdAt?: string;
+  created_at?: string;
+  updatedAt?: string;
+  updated_at?: string;
   assignedToId?: string;
-  assignedById: string;
-  departmentId: string;
+  assigned_to_id?: string;
+  assignedById?: string;
+  assigned_by_id?: string;
+  departmentId?: string;
+  department_id?: string;
   departmentIds?: string[];
   assignedTo?: User;
   assignedBy?: User;
+  users_tasks_assigned_to_idTousers?: { id: string; full_name: string; role: Role };
+  users_tasks_assigned_by_idTousers?: { id: string; full_name: string; role: Role };
+  departments?: { id: string; name: string };
   task_departments?: Array<{ departments: { id: string; name: string } }>;
 }
 

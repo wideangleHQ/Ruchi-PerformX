@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { tasksApi } from '@/api/tasks';
-import { usersApi, Department } from '@/api/users';
+import { tasksApi, TaskDepartment } from '@/api/tasks';
+import { User } from '@/api/types';
 import { useAuth } from '@/context/AuthContext';
 import { createTaskSchema, CreateTaskFormData } from '@/lib/taskValidation';
 import { Button } from '@/components/ui/button';
@@ -31,17 +31,30 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
       description: '',
       priority: 'MEDIUM',
       dueDate: '',
+      assignedToId: '',
       departmentId: '',
       departmentIds: [],
     },
   });
 
-  const { data: departments = [] } = useQuery<Department[]>({
-    queryKey: ['departments'],
-    queryFn: () => usersApi.getDepartments(),
+  const { data: departments = [] } = useQuery<TaskDepartment[]>({
+    queryKey: ['task-departments'],
+    queryFn: () => tasksApi.getDepartments(),
     enabled: isMD || isHOD,
   });
   const selectedDepartmentIds = form.watch('departmentIds') ?? [];
+  const selectedDepartmentId = form.watch('departmentId');
+  const assigneeDepartmentIds = isHOD
+    ? selectedDepartmentIds
+    : selectedDepartmentId
+      ? [selectedDepartmentId]
+      : [];
+
+  const { data: assignees = [] } = useQuery<User[]>({
+    queryKey: ['task-assignees', assigneeDepartmentIds],
+    queryFn: () => tasksApi.getAssignees(assigneeDepartmentIds),
+    enabled: (isMD || isHOD) && assigneeDepartmentIds.length > 0,
+  });
 
   const createTaskMutation = useMutation({
     mutationFn: (data: CreateTaskFormData) =>
@@ -50,8 +63,9 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
         description: data.description,
         priority: data.priority,
         dueDate: data.dueDate,
-        departmentId: data.departmentId,
-        departmentIds: data.departmentIds,
+        assignedToId: data.assignedToId || undefined,
+        departmentId: data.departmentId || undefined,
+        departmentIds: data.departmentIds?.length ? data.departmentIds : undefined,
       }),
     onSuccess: (task) => {
       onSuccess?.();
@@ -123,6 +137,10 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
           <label className="block text-sm font-medium text-gray-700">Department</label>
           <select
             {...form.register('departmentId')}
+            onChange={(event) => {
+              form.setValue('departmentId', event.target.value, { shouldValidate: true });
+              form.setValue('assignedToId', '');
+            }}
             className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
           >
             <option value="">Select department</option>
@@ -153,6 +171,7 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
                         : selectedDepartmentIds.filter((id) => id !== department.id),
                       { shouldValidate: true },
                     );
+                    form.setValue('assignedToId', '');
                   }}
                   className="h-4 w-4 rounded border-gray-300 text-green-600"
                 />
@@ -165,6 +184,22 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
           )}
         </div>
       )}
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Assigned Employee</label>
+        <select
+          {...form.register('assignedToId')}
+          disabled={!assigneeDepartmentIds.length}
+          className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 disabled:bg-gray-50 disabled:text-gray-400"
+        >
+          <option value="">Unassigned</option>
+          {assignees.map((assignee) => (
+            <option key={assignee.id} value={assignee.id}>
+              {assignee.fullName}
+            </option>
+          ))}
+        </select>
+      </div>
 
       <div className="flex gap-4">
         <Button

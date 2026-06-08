@@ -57,6 +57,21 @@ export class TasksController {
     return this.tasksService.getOverdue(user);
   }
 
+  @Get('meta/departments')
+  @Roles(role_enum.MD, role_enum.HOD)
+  getDepartments(@CurrentUser() user: JwtPayload) {
+    return this.tasksService.getDepartments(user);
+  }
+
+  @Get('meta/assignees')
+  @Roles(role_enum.MD, role_enum.HOD)
+  getAssignees(
+    @Query('departmentIds') departmentIds: string | string[] | undefined,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.tasksService.getAssignees(departmentIds, user);
+  }
+
   // ─── Find One ──────────────────────────────────────────────────
 
   @Get(':id')
@@ -88,13 +103,13 @@ export class TasksController {
   // ─── State Transitions ─────────────────────────────────────────
 
   @Patch(':id/accept')
-  @Roles(role_enum.EMPLOYEE, role_enum.HOD)
+  @Roles(role_enum.MD, role_enum.EMPLOYEE)
   accept(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.tasksService.transition(id, task_status_enum.ACCEPTED, user);
   }
 
   @Patch(':id/reject')
-  @Roles(role_enum.EMPLOYEE, role_enum.HOD)
+  @Roles(role_enum.MD, role_enum.EMPLOYEE)
   reject(
     @Param('id') id: string,
     @Body('reason') reason: string,
@@ -104,13 +119,13 @@ export class TasksController {
   }
 
   @Patch(':id/progress')
-  @Roles(role_enum.EMPLOYEE)
+  @Roles(role_enum.MD, role_enum.EMPLOYEE)
   markInProgress(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.tasksService.transition(id, task_status_enum.IN_PROGRESS, user);
   }
 
   @Patch(':id/complete')
-  @Roles(role_enum.EMPLOYEE)
+  @Roles(role_enum.MD, role_enum.EMPLOYEE)
   complete(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.tasksService.transition(id, task_status_enum.COMPLETED, user);
   }

@@ -1,5 +1,12 @@
 import axiosClient from './client';
-import { Task, Comment, PaginatedResponse } from './types';
+import { Task, Comment, PaginatedResponse, User } from './types';
+
+export interface TaskDepartment {
+  id: string;
+  name: string;
+  description?: string;
+  is_active?: boolean;
+}
 
 export const tasksApi = {
   getTasks: async (filters?: {
@@ -19,11 +26,24 @@ export const tasksApi = {
     return response.data;
   },
 
+  getDepartments: async (): Promise<TaskDepartment[]> => {
+    const response = await axiosClient.get<TaskDepartment[]>('/tasks/meta/departments');
+    return response.data;
+  },
+
+  getAssignees: async (departmentIds: string[]): Promise<User[]> => {
+    const response = await axiosClient.get<User[]>('/tasks/meta/assignees', {
+      params: { departmentIds: departmentIds.join(',') },
+    });
+    return response.data;
+  },
+
   createTask: async (data: {
     title: string;
     description: string;
     priority: string;
     dueDate: string;
+    assignedToId?: string;
     departmentId?: string;
     departmentIds?: string[];
   }): Promise<Task> => {
@@ -41,12 +61,42 @@ export const tasksApi = {
       dueDate: string;
     }>
   ): Promise<Task> => {
-    const response = await axiosClient.put<Task>(`/tasks/${id}`, data);
+    const response = await axiosClient.patch<Task>(`/tasks/${id}`, data);
     return response.data;
   },
 
   deleteTask: async (id: string): Promise<void> => {
     await axiosClient.delete(`/tasks/${id}`);
+  },
+
+  acceptTask: async (id: string): Promise<Task> => {
+    const response = await axiosClient.patch<Task>(`/tasks/${id}/accept`);
+    return response.data;
+  },
+
+  rejectTask: async (id: string, reason: string): Promise<Task> => {
+    const response = await axiosClient.patch<Task>(`/tasks/${id}/reject`, { reason });
+    return response.data;
+  },
+
+  markInProgress: async (id: string): Promise<Task> => {
+    const response = await axiosClient.patch<Task>(`/tasks/${id}/progress`);
+    return response.data;
+  },
+
+  completeTask: async (id: string): Promise<Task> => {
+    const response = await axiosClient.patch<Task>(`/tasks/${id}/complete`);
+    return response.data;
+  },
+
+  reviewTask: async (id: string): Promise<Task> => {
+    const response = await axiosClient.patch<Task>(`/tasks/${id}/review`);
+    return response.data;
+  },
+
+  closeTask: async (id: string): Promise<Task> => {
+    const response = await axiosClient.patch<Task>(`/tasks/${id}/close`);
+    return response.data;
   },
 
   // Comments

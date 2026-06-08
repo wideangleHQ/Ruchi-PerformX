@@ -84,6 +84,7 @@ export class TasksService {
     } else {
       where = {
         ...baseWhere,
+        assigned_to_id: user.sub,
         ...this.departmentVisibility(user.departmentId ? [user.departmentId] : []),
       };
     }
@@ -127,10 +128,16 @@ export class TasksService {
       updateData.due_date = new Date(dto.dueDate);
       delete updateData.dueDate;
     }
+    if (dto.assignedToId !== undefined) {
+      await this.assertAssigneeAccess(dto.assignedToId, this.taskDepartmentIds(task));
+      updateData.assigned_to_id = dto.assignedToId;
+      delete updateData.assignedToId;
+    }
 
     return this.prisma.tasks.update({
       where: { id },
       data: updateData,
+      include: this.taskInclude(),
     });
   }
 
@@ -161,6 +168,10 @@ export class TasksService {
       !this.hasDepartmentAccess(task, user.departmentId ? [user.departmentId] : [])
     ) {
       throw new ForbiddenException('You can only update tasks in your department');
+    }
+
+    if (user.role === role_enum.EMPLOYEE && task.assigned_to_id !== user.sub) {
+      throw new ForbiddenException('You can only update your own task status');
     }
 
     this.lifecycle.validate(task.status ?? task_status_enum.CREATED, toStatus, user, reason);
@@ -194,6 +205,7 @@ export class TasksService {
       Object.assign(where, this.departmentVisibility(this.hodDepts(user)));
     } else if (user.role === role_enum.EMPLOYEE) {
       Object.assign(where, this.departmentVisibility(user.departmentId ? [user.departmentId] : []));
+      where.assigned_to_id = user.sub;
     }
 
     return this.prisma.tasks.findMany({
@@ -225,6 +237,56 @@ export class TasksService {
       include: this.taskInclude(),
       orderBy: { due_date: 'asc' },
     });
+  }
+
+  async getDepartments(user: JwtPayload) {
+    return this.prisma.departments.findMany({
+      where: {
+        is_active: true,
+        ...(user.role === role_enum.HOD
+          ? { hod_departments: { some: { hod_id: user.sub } } }
+          : {}),
+      },
+      select: { id: true, name: true, description: true, is_active: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  async getAssignees(departmentIdsParam: string | string[] | undefined, user: JwtPayload) {
+    const departmentIds = this.resolveQueryDepartmentIds(departmentIdsParam);
+    if (!departmentIds.length) return [];
+
+    await this.assertCreateAccess(departmentIds, undefined, user);
+
+    const users = await this.prisma.users.findMany({
+      where: {
+        role: role_enum.EMPLOYEE,
+        is_active: true,
+        deleted_at: null,
+        pending_approval: false,
+        department_id: { in: departmentIds },
+      },
+      select: {
+        id: true,
+        username: true,
+        full_name: true,
+        email: true,
+        role: true,
+        department_id: true,
+        departments: { select: { id: true, name: true } },
+      },
+      orderBy: { full_name: 'asc' },
+    });
+
+    return users.map((assignee) => ({
+      id: assignee.id,
+      username: assignee.username,
+      fullName: assignee.full_name,
+      email: assignee.email,
+      role: assignee.role,
+      departmentId: assignee.department_id,
+      department: assignee.departments,
+    }));
   }
 
   private async getTaskOrFail(id: string) {
@@ -311,19 +373,24 @@ export class TasksService {
     }
 
     if (assignedToId) {
-      const employee = await this.prisma.users.findFirst({
-        where: {
-          id: assignedToId,
-          role: role_enum.EMPLOYEE,
-          is_active: true,
-          deleted_at: null,
-          department_id: { in: departmentIds },
-        },
-      });
+      await this.assertAssigneeAccess(assignedToId, departmentIds);
+    }
+  }
 
-      if (!employee) {
-        throw new ForbiddenException('Assignee must belong to a selected department');
-      }
+  private async assertAssigneeAccess(assignedToId: string, departmentIds: string[]) {
+    const employee = await this.prisma.users.findFirst({
+      where: {
+        id: assignedToId,
+        role: role_enum.EMPLOYEE,
+        is_active: true,
+        deleted_at: null,
+        pending_approval: false,
+        department_id: { in: departmentIds },
+      },
+    });
+
+    if (!employee) {
+      throw new ForbiddenException('Assignee must belong to a selected department');
     }
   }
 
@@ -338,8 +405,17 @@ export class TasksService {
   }
 
   private hasDepartmentAccess(task: any, departmentIds: string[]) {
+    return this.taskDepartmentIds(task).some((departmentId) => departmentIds.includes(departmentId));
+  }
+
+  private taskDepartmentIds(task: any) {
     const taskDepartmentIds = task.task_departments?.map((item: { department_id: string }) => item.department_id) ?? [];
-    return [task.department_id, ...taskDepartmentIds].some((departmentId) => departmentIds.includes(departmentId));
+    return [...new Set([task.department_id, ...taskDepartmentIds].filter(Boolean))];
+  }
+
+  private resolveQueryDepartmentIds(value: string | string[] | undefined) {
+    const raw = Array.isArray(value) ? value : value ? value.split(',') : [];
+    return [...new Set(raw.map((id) => id.trim()).filter(Boolean))];
   }
 
   private taskInclude() {

@@ -5,6 +5,7 @@ export const createTaskSchema = z.object({
   description: z.string().min(1, 'Description is required').max(2000),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
   dueDate: z.string().min(1, 'Due date is required'),
+  assignedToId: z.string().optional(),
   departmentId: z.string().optional(),
   departmentIds: z.array(z.string()).optional(),
 }).refine((data) => Boolean(data.departmentId || data.departmentIds?.length), {
