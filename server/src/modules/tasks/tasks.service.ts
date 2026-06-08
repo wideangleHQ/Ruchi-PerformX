@@ -18,7 +18,7 @@ export class TasksService {
     private readonly lifecycle: TaskLifecycleService,
   ) {}
 
-  private hodDepts(user: JwtPayload): string[] {
+  private mappedDepts(user: JwtPayload): string[] {
     return user.departmentIds?.length
       ? user.departmentIds
       : user.departmentId
@@ -76,11 +76,16 @@ export class TasksService {
 
     if (user.role === role_enum.MD || user.role === role_enum.ADMIN) {
       where = baseWhere;
-    } else if (user.role === role_enum.HOD) {
+    } else if (user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA) {
       where = {
         ...baseWhere,
-        ...this.departmentVisibility(this.hodDepts(user)),
+        ...this.departmentVisibility(this.mappedDepts(user)),
       };
+      if (user.role === role_enum.EA || user.role === role_enum.PA) {
+        // EA/PA can view tasks assigned by themselves, to themselves, or within mapped depts
+        // departmentVisibility already includes tasks within mapped depts. 
+        // We can just rely on departmentVisibility since they can only assign to/from their mapped depts.
+      }
     } else {
       where = {
         ...baseWhere,
@@ -144,7 +149,7 @@ export class TasksService {
   async remove(id: string, user: JwtPayload) {
     const task = await this.getTaskOrFail(id);
 
-    if (user.role === role_enum.HOD && !this.hasDepartmentAccess(task, this.hodDepts(user))) {
+    if ((user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA) && !this.hasDepartmentAccess(task, this.mappedDepts(user))) {
       throw new ForbiddenException();
     }
 
@@ -159,8 +164,8 @@ export class TasksService {
   ) {
     const task = await this.getTaskOrFail(id);
 
-    if (user.role === role_enum.HOD && !this.hasDepartmentAccess(task, this.hodDepts(user))) {
-      throw new ForbiddenException('HOD cannot act on tasks outside their departments');
+    if ((user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA) && !this.hasDepartmentAccess(task, this.mappedDepts(user))) {
+      throw new ForbiddenException('Cannot act on tasks outside mapped departments');
     }
 
     if (
@@ -201,8 +206,8 @@ export class TasksService {
   async getPending(user: JwtPayload) {
     const where: Prisma.tasksWhereInput = { status: task_status_enum.PENDING };
 
-    if (user.role === role_enum.HOD) {
-      Object.assign(where, this.departmentVisibility(this.hodDepts(user)));
+    if (user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA) {
+      Object.assign(where, this.departmentVisibility(this.mappedDepts(user)));
     } else if (user.role === role_enum.EMPLOYEE) {
       Object.assign(where, this.departmentVisibility(user.departmentId ? [user.departmentId] : []));
       where.assigned_to_id = user.sub;
@@ -228,8 +233,8 @@ export class TasksService {
       status: { notIn: terminalStatuses },
     };
 
-    if (user.role === role_enum.HOD) {
-      Object.assign(where, this.departmentVisibility(this.hodDepts(user)));
+    if (user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA) {
+      Object.assign(where, this.departmentVisibility(this.mappedDepts(user)));
     }
 
     return this.prisma.tasks.findMany({
@@ -245,7 +250,9 @@ export class TasksService {
         is_active: true,
         ...(user.role === role_enum.HOD
           ? { hod_departments: { some: { hod_id: user.sub } } }
-          : {}),
+          : user.role === role_enum.EA || user.role === role_enum.PA
+            ? { assistant_departments: { some: { assistant_id: user.sub } } }
+            : {}),
       },
       select: { id: true, name: true, description: true, is_active: true },
       orderBy: { name: 'asc' },
@@ -300,7 +307,7 @@ export class TasksService {
 
   private assertAccess(task: any, user: JwtPayload) {
     if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return;
-    if (user.role === role_enum.HOD && this.hasDepartmentAccess(task, this.hodDepts(user))) return;
+    if ((user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA) && this.hasDepartmentAccess(task, this.mappedDepts(user))) return;
     if (user.role === role_enum.EMPLOYEE && this.hasDepartmentAccess(task, user.departmentId ? [user.departmentId] : [])) return;
     throw new ForbiddenException('Access denied to this task');
   }
@@ -358,17 +365,25 @@ export class TasksService {
       throw new ForbiddenException('Invalid department selection');
     }
 
-    if (user.role === role_enum.HOD) {
-      const allowed = await this.prisma.hod_departments.count({
-        where: {
-          hod_id: user.sub,
-          department_id: { in: departmentIds },
-          departments: { is_active: true },
-        },
-      });
+    if (user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA) {
+      const allowed = user.role === role_enum.HOD
+        ? await this.prisma.hod_departments.count({
+            where: {
+              hod_id: user.sub,
+              department_id: { in: departmentIds },
+              departments: { is_active: true },
+            },
+          })
+        : await this.prisma.assistant_departments.count({
+            where: {
+              assistant_id: user.sub,
+              department_id: { in: departmentIds },
+              departments: { is_active: true },
+            },
+          });
 
       if (allowed !== departmentIds.length) {
-        throw new ForbiddenException('HOD can only assign tasks within their departments');
+        throw new ForbiddenException('Cannot assign tasks outside mapped departments');
       }
     }
 
@@ -381,7 +396,7 @@ export class TasksService {
     const employee = await this.prisma.users.findFirst({
       where: {
         id: assignedToId,
-        role: role_enum.EMPLOYEE,
+        role: { in: [role_enum.EMPLOYEE, role_enum.HOD] },
         is_active: true,
         deleted_at: null,
         pending_approval: false,

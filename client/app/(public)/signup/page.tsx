@@ -6,23 +6,34 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Eye, EyeOff, User, Mail, Lock, Building2, Briefcase, ArrowRight, ShieldCheck } from 'lucide-react';
-import { signupSchema, SignupFormData } from '@/lib/validation';
+import { z } from 'zod';
+
+const signupSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  email: z.string().min(1, 'Email is required'),
+  username: z.string().min(1, 'Username is required'),
+  password: z.string().min(1, 'Password is required'),
+  confirmPassword: z.string().min(1, 'Password confirmation is required'),
+  role: z.enum(['MD', 'HOD', 'EMPLOYEE', 'EA', 'PA'], {
+    error: 'Please select a role',
+  }),
+  departments: z.array(z.string()),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
+}).refine((data) => data.role === 'MD' || data.departments.length > 0, {
+  message: 'Select at least one department',
+  path: ['departments'],
+});
+
+type SignupFormData = z.infer<typeof signupSchema>;
 import { authApi } from '@/api/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { Department } from '@/api/users';
 
-const DEPT_DISPLAY_NAMES: Record<string, string> = {
-  HR: 'HR & Administrative',
-  Accounts: 'Finance & Accounts',
-};
-
-const EXCLUDED_DEPTS = new Set(['Sales']);
-
 function normalizeDepartments(depts: Department[]): Department[] {
-  return depts
-    .filter((d) => !EXCLUDED_DEPTS.has(d.name))
-    .map((d) => ({ ...d, name: DEPT_DISPLAY_NAMES[d.name] ?? d.name }));
+  return depts;
 }
 
 export default function SignupPage() {
@@ -33,6 +44,8 @@ export default function SignupPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [mdExists, setMdExists] = useState(false);
+  const [eaExists, setEaExists] = useState(false);
+  const [paExists, setPaExists] = useState(false);
   const [hodTakenDepts, setHodTakenDepts] = useState<Set<string>>(new Set());
   const [constraintsLoading, setConstraintsLoading] = useState(true);
 
@@ -45,9 +58,11 @@ export default function SignupPage() {
   const selectedDepts = form.watch('departments') || [];
 
   useEffect(() => {
-    Promise.all([authApi.checkMdExists(), authApi.getDepartments()])
-      .then(([exists, list]) => {
-        setMdExists(exists);
+    Promise.all([authApi.checkMdExists(), authApi.checkEaExists(), authApi.checkPaExists(), authApi.getDepartments()])
+      .then(([mdExistsRes, eaExistsRes, paExistsRes, list]) => {
+        setMdExists(mdExistsRes);
+        setEaExists(eaExistsRes);
+        setPaExists(paExistsRes);
         setDepartments(normalizeDepartments(list));
       })
       .catch(() => setError('Failed to load configuration. Please refresh.'))
@@ -58,12 +73,13 @@ export default function SignupPage() {
     if (selectedRole !== 'HOD') return;
     selectedDepts.forEach((deptId) => {
       if (hodTakenDepts.has(deptId)) return;
-      authApi.checkHodExists(deptId).then((exists) => {
+      authApi.checkHodExists(deptId).then((exists: boolean) => {
         if (exists) setHodTakenDepts((prev) => new Set(prev).add(deptId));
       }).catch(() => {});
     });
   }, [selectedDepts, selectedRole, hodTakenDepts]);
 
+  const isMultiDeptRole = selectedRole === 'HOD' || selectedRole === 'EA' || selectedRole === 'PA' || selectedRole === 'EMPLOYEE';
   const anyHodBlocked = selectedRole === 'HOD' && selectedDepts.some((id) => hodTakenDepts.has(id));
 
   const onSubmit = async (data: SignupFormData) => {
@@ -76,8 +92,8 @@ export default function SignupPage() {
         fullName: data.name,
         password: data.password,
         role: data.role,
-        departmentId: data.role === 'MD' ? undefined : data.departments[0] || undefined,
-        departmentIds: data.role === 'HOD' ? data.departments : undefined,
+        departmentId: data.role === 'MD' ? undefined : (isMultiDeptRole ? undefined : data.departments[0]),
+        departmentIds: isMultiDeptRole ? data.departments : undefined,
       });
       router.push('/register-success');
     } catch (err: any) {
@@ -179,21 +195,29 @@ export default function SignupPage() {
                     <option value="">Select role</option>
                     <option value="MD" disabled={mdExists}>Managing Director{mdExists ? ' (position filled)' : ''}</option>
                     <option value="HOD">Head of Department</option>
+                    <option value="EA" disabled={eaExists}>Executive Assistant{eaExists ? ' (position filled)' : ''}</option>
+                    <option value="PA" disabled={paExists}>Personal Assistant{paExists ? ' (position filled)' : ''}</option>
                     <option value="EMPLOYEE">Employee</option>
                   </select>
                 </div>
                 {selectedRole === 'MD' && mdExists && (
                   <p className="mt-1 text-sm text-red-600">Managing Director already exists.</p>
                 )}
+                {selectedRole === 'EA' && eaExists && (
+                  <p className="mt-1 text-sm text-red-600">Executive Assistant already exists.</p>
+                )}
+                {selectedRole === 'PA' && paExists && (
+                  <p className="mt-1 text-sm text-red-600">Personal Assistant already exists.</p>
+                )}
               </div>
 
               {selectedRole && selectedRole !== 'MD' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Department(s)</label>
-                  {selectedRole === 'HOD' ? (
+                  {isMultiDeptRole ? (
                     <div className="grid grid-cols-2 gap-3 p-4 rounded-lg border border-gray-200 bg-white/50">
                       {departments.map((dept) => {
-                        const isTaken = hodTakenDepts.has(dept.id);
+                        const isTaken = selectedRole === 'HOD' && hodTakenDepts.has(dept.id);
                         return (
                           <label key={dept.id} className={`flex items-center gap-2 text-sm cursor-pointer ${isTaken ? 'opacity-50 cursor-not-allowed' : ''}`}>
                             <input
@@ -271,7 +295,7 @@ export default function SignupPage() {
 
               <Button
                 type="submit"
-                disabled={isLoading || constraintsLoading || (selectedRole === 'MD' && mdExists) || anyHodBlocked}
+                disabled={isLoading || constraintsLoading || (selectedRole === 'MD' && mdExists) || (selectedRole === 'EA' && eaExists) || (selectedRole === 'PA' && paExists) || anyHodBlocked}
                 className="h-12 w-full bg-green-700 hover:bg-green-800"
               >
                 {isLoading ? 'Creating Account...' : 'Create Account'}

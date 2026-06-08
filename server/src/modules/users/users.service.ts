@@ -22,6 +22,16 @@ const USER_SELECT = {
   pending_approval: true,
   department_id: true,
   departments: { select: { id: true, name: true } },
+  hod_departments: {
+    include: {
+      departments: { select: { name: true } },
+    },
+  },
+  assistant_departments: {
+    include: {
+      departments: { select: { name: true } },
+    },
+  },
   created_at: true,
 };
 
@@ -57,6 +67,28 @@ export class UsersService {
     return count > 0;
   }
 
+  async checkEaExists(): Promise<boolean> {
+    const count = await this.prisma.users.count({
+      where: {
+        role: role_enum.EA,
+        deleted_at: null,
+        OR: [{ is_active: true }, { pending_approval: true }],
+      },
+    });
+    return count > 0;
+  }
+
+  async checkPaExists(): Promise<boolean> {
+    const count = await this.prisma.users.count({
+      where: {
+        role: role_enum.PA,
+        deleted_at: null,
+        OR: [{ is_active: true }, { pending_approval: true }],
+      },
+    });
+    return count > 0;
+  }
+
   async checkHodExists(departmentId: string): Promise<boolean> {
     const count = await this.prisma.users.count({
       where: {
@@ -74,6 +106,20 @@ export class UsersService {
       const mdExists = await this.checkMdExists();
       if (mdExists) {
         throw new ConflictException('Managing Director already exists.');
+      }
+    }
+
+    if (role === role_enum.EA) {
+      const eaExists = await this.checkEaExists();
+      if (eaExists) {
+        throw new ConflictException('Executive Assistant already exists.');
+      }
+    }
+
+    if (role === role_enum.PA) {
+      const paExists = await this.checkPaExists();
+      if (paExists) {
+        throw new ConflictException('Personal Assistant already exists.');
       }
     }
 
@@ -126,10 +172,46 @@ export class UsersService {
       const deptIds = caller.departmentIds ?? (caller.departmentId ? [caller.departmentId] : []);
       where.department_id = { in: deptIds };
       where.role = role_enum.EMPLOYEE;
+    } else if (caller.role === role_enum.EA || caller.role === role_enum.PA) {
+      // EA/PA: HOD or EMPLOYEE across selected departments only
+      const allowedDepts = caller.departmentIds ?? [];
+      const depts = departmentId ? [departmentId] : allowedDepts;
+      const targetDepts = depts.filter(d => allowedDepts.includes(d));
+
+      where.OR = [
+        {
+          role: role_enum.EMPLOYEE,
+          department_id: { in: targetDepts },
+        },
+        {
+          role: role_enum.HOD,
+          hod_departments: { some: { department_id: { in: targetDepts } } },
+        }
+      ];
+
+      if (role) {
+        where.role = role;
+      }
     } else {
-      // MD: filter by department and/or role if provided
-      if (departmentId) where.department_id = departmentId;
-      if (role) where.role = role;
+      // MD/ADMIN: filter by department and/or role if provided
+      if (departmentId && role) {
+        where.role = role;
+        if (role === role_enum.EMPLOYEE) {
+          where.department_id = departmentId;
+        } else if (role === role_enum.HOD) {
+          where.hod_departments = { some: { department_id: departmentId } };
+        } else if (role === role_enum.EA || role === role_enum.PA) {
+          where.assistant_departments = { some: { department_id: departmentId } };
+        }
+      } else if (departmentId) {
+        where.OR = [
+          { department_id: departmentId },
+          { hod_departments: { some: { department_id: departmentId } } },
+          { assistant_departments: { some: { department_id: departmentId } } },
+        ];
+      } else if (role) {
+        where.role = role;
+      }
     }
 
     const users = await this.prisma.users.findMany({
@@ -158,8 +240,8 @@ export class UsersService {
         email: dto.email ?? null,
         password_hash: passwordHash,
         role: dto.role,
-        department_id: dto.role !== role_enum.HOD ? (dto.departmentId ?? null) : null,
-        is_active: dto.role === role_enum.MD || dto.role === role_enum.HOD,
+        department_id: (dto.role !== role_enum.HOD && dto.role !== role_enum.EA && dto.role !== role_enum.PA) ? (dto.departmentId ?? null) : null,
+        is_active: dto.role === role_enum.MD || dto.role === role_enum.HOD || dto.role === role_enum.EA || dto.role === role_enum.PA,
       },
     });
 
@@ -174,24 +256,42 @@ export class UsersService {
       });
     }
 
+    // EA/PA: create assistant_departments junction rows
+    if ((dto.role === role_enum.EA || dto.role === role_enum.PA) && dto.departmentIds && dto.departmentIds.length > 0) {
+      await this.prisma.assistant_departments.createMany({
+        data: dto.departmentIds.map((department_id) => ({
+          assistant_id: user.id,
+          department_id,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
     return user;
   }
 
   async update(id: string, dto: UpdateUserDto) {
-    await this.ensureExists(id);
+    const existing = await this.ensureExists(id);
     const departmentId =
       dto.departmentId !== undefined
         ? await this.resolveDepartmentId(dto.departmentId)
         : undefined;
+
+    const role = dto.role !== undefined ? dto.role : existing.role;
+
+    // Clear single department_id for HOD / EA / PA
+    const resolvedDeptId = (role === role_enum.HOD || role === role_enum.EA || role === role_enum.PA)
+      ? null
+      : dto.departmentId !== undefined ? departmentId : undefined;
 
     const user = await this.prisma.users.update({
       where: { id },
       data: {
         ...(dto.fullName !== undefined ? { full_name: dto.fullName } : {}),
         ...(dto.role !== undefined ? { role: dto.role } : {}),
-        ...(dto.departmentId !== undefined
-          ? departmentId
-            ? { departments: { connect: { id: departmentId } } }
+        ...(resolvedDeptId !== undefined
+          ? resolvedDeptId
+            ? { departments: { connect: { id: resolvedDeptId } } }
             : { departments: { disconnect: true } }
           : {}),
         ...(dto.isActive !== undefined ? { is_active: dto.isActive } : {}),
@@ -199,7 +299,49 @@ export class UsersService {
       select: USER_SELECT,
     });
 
-    return this.toUserResponse(user);
+    // Clean up unused relations if role changes
+    if (dto.role !== undefined) {
+      if (dto.role !== role_enum.HOD) {
+        await this.prisma.hod_departments.deleteMany({ where: { hod_id: id } });
+      }
+      if (dto.role !== role_enum.EA && dto.role !== role_enum.PA) {
+        await this.prisma.assistant_departments.deleteMany({ where: { assistant_id: id } });
+      }
+    }
+
+    // If departmentIds is provided, sync the junction table
+    if (dto.departmentIds !== undefined) {
+      if (user.role === role_enum.HOD) {
+        await this.prisma.hod_departments.deleteMany({ where: { hod_id: id } });
+        if (dto.departmentIds.length > 0) {
+          await this.prisma.hod_departments.createMany({
+            data: dto.departmentIds.map((department_id) => ({
+              hod_id: id,
+              department_id,
+            })),
+            skipDuplicates: true,
+          });
+        }
+      } else if (user.role === role_enum.EA || user.role === role_enum.PA) {
+        await this.prisma.assistant_departments.deleteMany({ where: { assistant_id: id } });
+        if (dto.departmentIds.length > 0) {
+          await this.prisma.assistant_departments.createMany({
+            data: dto.departmentIds.map((department_id) => ({
+              assistant_id: id,
+              department_id,
+            })),
+            skipDuplicates: true,
+          });
+        }
+      }
+    }
+
+    const updatedUser = await this.prisma.users.findUnique({
+      where: { id },
+      select: USER_SELECT,
+    });
+
+    return this.toUserResponse(updatedUser);
   }
 
   async remove(id: string) {
@@ -374,7 +516,26 @@ export class UsersService {
     return user;
   }
 
-  private toUserResponse(user: SelectedUser) {
+  private toUserResponse(user: any) {
+    let departmentName = user.departments?.name || null;
+    let departmentIds: string[] = [];
+
+    if (user.role === role_enum.HOD && user.hod_departments) {
+      departmentName = user.hod_departments
+        .map((hd: any) => hd.departments?.name)
+        .filter(Boolean)
+        .join(', ');
+      departmentIds = user.hod_departments.map((hd: any) => hd.department_id);
+    } else if ((user.role === role_enum.EA || user.role === role_enum.PA) && user.assistant_departments) {
+      departmentName = user.assistant_departments
+        .map((ad: any) => ad.departments?.name)
+        .filter(Boolean)
+        .join(', ');
+      departmentIds = user.assistant_departments.map((ad: any) => ad.department_id);
+    } else if (user.department_id) {
+      departmentIds = [user.department_id];
+    }
+
     return {
       id: user.id,
       username: user.username,
@@ -385,7 +546,8 @@ export class UsersService {
       isActive: user.is_active,
       pendingApproval: user.pending_approval,
       departmentId: user.department_id,
-      department: user.departments,
+      departmentIds,
+      department: departmentName,
       createdAt: user.created_at,
     };
   }

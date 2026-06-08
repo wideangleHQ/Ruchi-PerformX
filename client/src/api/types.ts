@@ -1,5 +1,5 @@
 // ─── Enums ────────────────────────────────────────────────────────────────────
-export type Role = 'MD' | 'HOD' | 'EMPLOYEE' | 'ADMIN';
+export type Role = 'MD' | 'HOD' | 'EMPLOYEE' | 'ADMIN' | 'EA' | 'PA';
 export type UserStatus = 'PENDING' | 'ACTIVE' | 'REJECTED' | 'SUSPENDED';
 
 export type TaskStatus =
@@ -67,7 +67,7 @@ export interface RegisterRequest {
   email: string;
   fullName: string;
   password: string;
-  role: 'MD' | 'HOD' | 'EMPLOYEE';
+  role: 'MD' | 'HOD' | 'EMPLOYEE' | 'EA' | 'PA';
   departmentId?: string;
   departmentIds?: string[];
 }

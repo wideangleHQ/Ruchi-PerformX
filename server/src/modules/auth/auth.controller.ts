@@ -48,6 +48,20 @@ export class AuthController {
   }
 
   @Public()
+  @Get('check-ea')
+  async checkEa() {
+    const exists = await this.authService.checkEaExists();
+    return { exists };
+  }
+
+  @Public()
+  @Get('check-pa')
+  async checkPa() {
+    const exists = await this.authService.checkPaExists();
+    return { exists };
+  }
+
+  @Public()
   @Get('departments')
   getDepartments() {
     return this.authService.getDepartments();

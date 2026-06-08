@@ -66,6 +66,28 @@ export const authApi = {
     return response.data.exists;
   },
 
+  /** GET /auth/check-ea */
+  checkEaExists: async (): Promise<boolean> => {
+    try {
+      const response = await axiosClient.get<{ exists: boolean }>('/auth/check-ea');
+      return response.data.exists;
+    } catch (error) {
+      console.warn('check-ea endpoint not available yet');
+      return false;
+    }
+  },
+
+  /** GET /auth/check-pa */
+  checkPaExists: async (): Promise<boolean> => {
+    try {
+      const response = await axiosClient.get<{ exists: boolean }>('/auth/check-pa');
+      return response.data.exists;
+    } catch (error) {
+      console.warn('check-pa endpoint not available yet');
+      return false;
+    }
+  },
+
   getDepartments: async (): Promise<Department[]> => {
     const response = await axiosClient.get<Department[]>('/auth/departments');
     return response.data;

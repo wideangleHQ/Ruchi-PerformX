@@ -34,6 +34,28 @@ export class AuthService {
     return count > 0;
   }
 
+  async checkEaExists(): Promise<boolean> {
+    const count = await this.prisma.users.count({
+      where: {
+        role: role_enum.EA,
+        deleted_at: null,
+        OR: [{ is_active: true }, { pending_approval: true }],
+      },
+    });
+    return count > 0;
+  }
+
+  async checkPaExists(): Promise<boolean> {
+    const count = await this.prisma.users.count({
+      where: {
+        role: role_enum.PA,
+        deleted_at: null,
+        OR: [{ is_active: true }, { pending_approval: true }],
+      },
+    });
+    return count > 0;
+  }
+
   async checkHodExists(departmentId: string): Promise<boolean> {
     const count = await this.prisma.users.count({
       where: {
@@ -103,7 +125,7 @@ export class AuthService {
       });
     }
 
-    // Resolve departmentIds: HOD uses junction table; others use department_id
+    // Resolve departmentIds: HOD/EA/PA uses junction table; others use department_id
     let departmentIds: string[] = [];
     if (user.role === role_enum.HOD) {
       const hodDepts = await this.prisma.hod_departments.findMany({
@@ -111,6 +133,12 @@ export class AuthService {
         select: { department_id: true },
       });
       departmentIds = hodDepts.map((d) => d.department_id);
+    } else if (user.role === role_enum.EA || user.role === role_enum.PA) {
+      const asstDepts = await this.prisma.assistant_departments.findMany({
+        where: { assistant_id: user.id },
+        select: { department_id: true },
+      });
+      departmentIds = asstDepts.map((d) => d.department_id);
     } else if (user.department_id) {
       departmentIds = [user.department_id];
     }
@@ -137,7 +165,7 @@ export class AuthService {
 
   async register(dto: CreateUserDto) {
   const departmentIds =
-    dto.role === role_enum.HOD
+    (dto.role === role_enum.HOD || dto.role === role_enum.EA || dto.role === role_enum.PA)
       ? [...new Set(dto.departmentIds ?? [])]
       : dto.departmentId
         ? [dto.departmentId]
@@ -212,6 +240,19 @@ export class AuthService {
         await tx.hod_departments.createMany({
           data: departmentIds.map((department_id) => ({
             hod_id: createdUser.id,
+            department_id,
+          })),
+          skipDuplicates: true,
+        });
+      }
+
+      if (
+        (dto.role === role_enum.EA || dto.role === role_enum.PA) &&
+        departmentIds.length > 0
+      ) {
+        await tx.assistant_departments.createMany({
+          data: departmentIds.map((department_id) => ({
+            assistant_id: createdUser.id,
             department_id,
           })),
           skipDuplicates: true,

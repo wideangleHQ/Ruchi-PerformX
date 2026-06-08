@@ -38,6 +38,7 @@ model departments {
   users                                                   users[]
   hod_departments                                         hod_departments[]
   task_departments                                        task_departments[]
+  assistant_departments                                   assistant_departments[]
 }
 
 model hod_departments {
@@ -52,6 +53,20 @@ model hod_departments {
   @@index([hod_id])
   @@index([department_id])
   @@map("hod_departments")
+}
+
+model assistant_departments {
+  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  assistant_id  String      @db.Uuid
+  department_id String      @db.Uuid
+  created_at    DateTime    @default(now()) @db.Timestamptz(6)
+  users         users       @relation(fields: [assistant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  departments   departments @relation(fields: [department_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([assistant_id, department_id])
+  @@index([assistant_id])
+  @@index([department_id])
+  @@map("assistant_departments")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -368,6 +383,7 @@ model users {
   departments                                          departments?            @relation(fields: [department_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_department")
   password_reset_requests                              PasswordResetRequest[]
   hod_departments                                      hod_departments[]
+  assistant_departments                                assistant_departments[]
 }
 
 enum action_status_enum {
@@ -442,6 +458,8 @@ enum role_enum {
   HOD
   EMPLOYEE
   ADMIN
+  EA
+  PA
 }
 
 enum score_status_enum {
@@ -454,6 +472,7 @@ enum task_category_enum {
   SALES
   MARKETING
   PRODUCTION
+  MAINTENANCE
   HR
   FINANCE
   OTHER

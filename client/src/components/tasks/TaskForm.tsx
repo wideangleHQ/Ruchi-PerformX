@@ -23,6 +23,8 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
 
   const isMD = user?.role === 'MD';
   const isHOD = user?.role === 'HOD';
+  const isAssistant = user?.role === 'EA' || user?.role === 'PA';
+  const canSelectMultiDept = isHOD || isAssistant;
 
   const form = useForm<CreateTaskFormData>({
     resolver: zodResolver(createTaskSchema),
@@ -44,7 +46,7 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
   });
   const selectedDepartmentIds = form.watch('departmentIds') ?? [];
   const selectedDepartmentId = form.watch('departmentId');
-  const assigneeDepartmentIds = isHOD
+  const assigneeDepartmentIds = canSelectMultiDept
     ? selectedDepartmentIds
     : selectedDepartmentId
       ? [selectedDepartmentId]
@@ -53,7 +55,7 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
   const { data: assignees = [] } = useQuery<User[]>({
     queryKey: ['task-assignees', assigneeDepartmentIds],
     queryFn: () => tasksApi.getAssignees(assigneeDepartmentIds),
-    enabled: (isMD || isHOD) && assigneeDepartmentIds.length > 0,
+    enabled: (isMD || canSelectMultiDept) && assigneeDepartmentIds.length > 0,
   });
 
   const createTaskMutation = useMutation({
@@ -154,7 +156,7 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
         </div>
       )}
 
-      {isHOD && (
+      {canSelectMultiDept && (
         <div>
           <label className="block text-sm font-medium text-gray-700">Department Selection</label>
           <div className="mt-2 grid gap-2 rounded-lg border border-gray-200 p-3">

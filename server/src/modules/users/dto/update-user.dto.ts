@@ -6,6 +6,7 @@ import {
   IsBoolean,
   IsUUID,
   IsEnum,
+  IsArray,
   MaxLength,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
@@ -25,6 +26,11 @@ export class UpdateUserDto {
   @IsUUID()
   @IsOptional()
   departmentId?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('all', { each: true })
+  departmentIds?: string[];
 
   @IsBoolean()
   @IsOptional()

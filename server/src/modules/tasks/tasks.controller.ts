@@ -28,7 +28,7 @@ export class TasksController {
   // ─── Create ────────────────────────────────────────────────────
 
   @Post()
-  @Roles(role_enum.MD, role_enum.HOD)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA)
   create(@Body() dto: CreateTaskDto, @CurrentUser() user: JwtPayload) {
     return this.tasksService.create(dto, user);
   }
@@ -36,7 +36,7 @@ export class TasksController {
   // ─── List ──────────────────────────────────────────────────────
 
   @Get()
-  @Roles(role_enum.MD, role_enum.HOD, role_enum.EMPLOYEE)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EMPLOYEE, role_enum.EA, role_enum.PA)
   findAll(@Query() filters: TaskFilterDto, @CurrentUser() user: JwtPayload) {
     return this.tasksService.findAll(filters, user);
   }
@@ -44,7 +44,7 @@ export class TasksController {
   // ─── Pending Bar ───────────────────────────────────────────────
 
   @Get('pending')
-  @Roles(role_enum.MD, role_enum.HOD, role_enum.EMPLOYEE)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EMPLOYEE, role_enum.EA, role_enum.PA)
   getPending(@CurrentUser() user: JwtPayload) {
     return this.tasksService.getPending(user);
   }
@@ -52,19 +52,19 @@ export class TasksController {
   // ─── Overdue ───────────────────────────────────────────────────
 
   @Get('overdue')
-  @Roles(role_enum.MD, role_enum.HOD)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA)
   getOverdue(@CurrentUser() user: JwtPayload) {
     return this.tasksService.getOverdue(user);
   }
 
   @Get('meta/departments')
-  @Roles(role_enum.MD, role_enum.HOD)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA)
   getDepartments(@CurrentUser() user: JwtPayload) {
     return this.tasksService.getDepartments(user);
   }
 
   @Get('meta/assignees')
-  @Roles(role_enum.MD, role_enum.HOD)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA)
   getAssignees(
     @Query('departmentIds') departmentIds: string | string[] | undefined,
     @CurrentUser() user: JwtPayload,
@@ -75,7 +75,7 @@ export class TasksController {
   // ─── Find One ──────────────────────────────────────────────────
 
   @Get(':id')
-  @Roles(role_enum.MD, role_enum.HOD, role_enum.EMPLOYEE)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EMPLOYEE, role_enum.EA, role_enum.PA)
   findOne(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.tasksService.findOne(id, user);
   }
@@ -83,7 +83,7 @@ export class TasksController {
   // ─── Update Fields ─────────────────────────────────────────────
 
   @Patch(':id')
-  @Roles(role_enum.MD, role_enum.HOD)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA)
   update(
     @Param('id') id: string,
     @Body() dto: UpdateTaskDto,
@@ -95,7 +95,7 @@ export class TasksController {
   // ─── Delete ────────────────────────────────────────────────────
 
   @Delete(':id')
-  @Roles(role_enum.MD, role_enum.HOD)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA)
   remove(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.tasksService.remove(id, user);
   }
@@ -103,13 +103,13 @@ export class TasksController {
   // ─── State Transitions ─────────────────────────────────────────
 
   @Patch(':id/accept')
-  @Roles(role_enum.MD, role_enum.EMPLOYEE)
+  @Roles(role_enum.MD, role_enum.EMPLOYEE, role_enum.EA, role_enum.PA)
   accept(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.tasksService.transition(id, task_status_enum.ACCEPTED, user);
   }
 
   @Patch(':id/reject')
-  @Roles(role_enum.MD, role_enum.EMPLOYEE)
+  @Roles(role_enum.MD, role_enum.EMPLOYEE, role_enum.EA, role_enum.PA)
   reject(
     @Param('id') id: string,
     @Body('reason') reason: string,
@@ -119,31 +119,31 @@ export class TasksController {
   }
 
   @Patch(':id/progress')
-  @Roles(role_enum.MD, role_enum.EMPLOYEE)
+  @Roles(role_enum.MD, role_enum.EMPLOYEE, role_enum.EA, role_enum.PA)
   markInProgress(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.tasksService.transition(id, task_status_enum.IN_PROGRESS, user);
   }
 
   @Patch(':id/complete')
-  @Roles(role_enum.MD, role_enum.EMPLOYEE)
+  @Roles(role_enum.MD, role_enum.EMPLOYEE, role_enum.EA, role_enum.PA)
   complete(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.tasksService.transition(id, task_status_enum.COMPLETED, user);
   }
 
   @Patch(':id/review')
-  @Roles(role_enum.MD, role_enum.HOD)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA)
   review(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.tasksService.transition(id, task_status_enum.REVIEWED, user);
   }
 
   @Patch(':id/close')
-  @Roles(role_enum.MD, role_enum.HOD)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA)
   close(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.tasksService.transition(id, task_status_enum.CLOSED, user);
   }
 
   @Patch(':id/return')
-  @Roles(role_enum.MD, role_enum.HOD)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA)
   returnForRework(
     @Param('id') id: string,
     @Body('reason') reason: string,
