@@ -10,19 +10,22 @@ import { z } from 'zod';
 
 const signupSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  email: z.string().min(1, 'Email is required'),
+  email: z.string().email('Valid email required'),
   username: z.string().min(1, 'Username is required'),
-  password: z.string().min(1, 'Password is required'),
+  password: z.string().min(6, 'Minimum 6 characters'),
   confirmPassword: z.string().min(1, 'Password confirmation is required'),
-  role: z.enum(['MD', 'HOD', 'EMPLOYEE', 'EA', 'PA'], {
-    error: 'Please select a role',
-  }),
+  role: z.enum(['MD', 'HOD', 'EMPLOYEE', 'EA', 'PA'], { error: 'Please select a role' }),
   departments: z.array(z.string()),
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Passwords do not match',
   path: ['confirmPassword'],
-}).refine((data) => data.role === 'MD' || data.departments.length > 0, {
-  message: 'Select at least one department',
+}).refine((data) => {
+  if (['MD', 'EA', 'PA'].includes(data.role)) return true; // ← was: departments.length === 0
+  if (data.role === 'EMPLOYEE') return data.departments.length === 1;
+  if (data.role === 'HOD') return data.departments.length >= 1;
+  return true;
+}, {
+  message: 'Invalid department selection for the chosen role',
   path: ['departments'],
 });
 
@@ -57,6 +60,13 @@ export default function SignupPage() {
   const selectedRole = form.watch('role');
   const selectedDepts = form.watch('departments') || [];
 
+  // Clear departments when role changes to MD, EA, or PA
+  useEffect(() => {
+    if (selectedRole && ['MD', 'EA', 'PA'].includes(selectedRole)) {
+      form.setValue('departments', [], { shouldValidate: true });
+    }
+  }, [selectedRole, form]);
+
   useEffect(() => {
     Promise.all([authApi.checkMdExists(), authApi.checkEaExists(), authApi.checkPaExists(), authApi.getDepartments()])
       .then(([mdExistsRes, eaExistsRes, paExistsRes, list]) => {
@@ -79,21 +89,23 @@ export default function SignupPage() {
     });
   }, [selectedDepts, selectedRole, hodTakenDepts]);
 
-  const isMultiDeptRole = selectedRole === 'HOD' || selectedRole === 'EA' || selectedRole === 'PA' || selectedRole === 'EMPLOYEE';
+  const isMultiDeptRole = selectedRole === 'HOD';
   const anyHodBlocked = selectedRole === 'HOD' && selectedDepts.some((id) => hodTakenDepts.has(id));
 
   const onSubmit = async (data: SignupFormData) => {
+    if (isLoading) return; 
     try {
       setError(null);
       setIsLoading(true);
+      const noDepRole = ['MD', 'EA', 'PA'].includes(data.role);
       await authApi.register({
         username: data.username,
         email: data.email,
         fullName: data.name,
         password: data.password,
         role: data.role,
-        departmentId: data.role === 'MD' ? undefined : (isMultiDeptRole ? undefined : data.departments[0]),
-        departmentIds: isMultiDeptRole ? data.departments : undefined,
+        departmentId: noDepRole ? undefined : (isMultiDeptRole ? undefined : data.departments[0]),
+        departmentIds: noDepRole ? undefined : (isMultiDeptRole ? data.departments : undefined),
       });
       router.push('/register-success');
     } catch (err: any) {
@@ -211,7 +223,7 @@ export default function SignupPage() {
                 )}
               </div>
 
-              {selectedRole && selectedRole !== 'MD' && (
+              {selectedRole && !['MD', 'EA', 'PA'].includes(selectedRole) && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Department(s)</label>
                   {isMultiDeptRole ? (

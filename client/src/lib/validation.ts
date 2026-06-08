@@ -20,8 +20,19 @@ export const signupSchema = z.object({
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Passwords do not match',
   path: ['confirmPassword'],
-}).refine((data) => data.role === 'MD' || data.departments.length > 0, {
-  message: 'Select at least one department',
+}).refine((data) => {
+  if (['MD', 'EA', 'PA'].includes(data.role)) {
+    return data.departments.length === 0;
+  }
+  if (data.role === 'EMPLOYEE') {
+    return data.departments.length === 1;
+  }
+  if (data.role === 'HOD') {
+    return data.departments.length >= 1;
+  }
+  return false;
+}, {
+  message: 'Invalid department selection for the chosen role',
   path: ['departments'],
 });
 

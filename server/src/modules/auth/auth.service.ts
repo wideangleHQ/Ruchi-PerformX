@@ -164,18 +164,37 @@ export class AuthService {
   // ─── REGISTER ────────────────────────────────────────────────────────────────
 
   async register(dto: CreateUserDto) {
-  const departmentIds =
-    (dto.role === role_enum.HOD || dto.role === role_enum.EA || dto.role === role_enum.PA)
-      ? [...new Set(dto.departmentIds ?? [])]
-      : dto.departmentId
-        ? [dto.departmentId]
-        : [];
+  const allDepartments = await this.prisma.departments.findMany({
+    where: { is_active: true },
+    select: { id: true },
+  });
+  const allDepartmentIds = allDepartments.map((d) => d.id);
 
-  if (dto.role !== role_enum.MD && !departmentIds.length) {
-    throw new BadRequestException('Department is required');
+  let departmentIds: string[] = [];
+  let primaryDepartmentId: string | undefined;
+
+  if (dto.role === role_enum.MD || dto.role === role_enum.EA || dto.role === role_enum.PA) {
+    departmentIds = allDepartmentIds;
+    primaryDepartmentId = allDepartmentIds[0];
+  } else if (dto.role === role_enum.EMPLOYEE) {
+    if (dto.departmentId) {
+      departmentIds = [dto.departmentId];
+      primaryDepartmentId = dto.departmentId;
+    }
+  } else if (dto.role === role_enum.HOD) {
+    departmentIds = [...new Set(dto.departmentIds ?? [])];
   }
 
-  // Check duplicate username/email first
+  if (dto.role === role_enum.EMPLOYEE) {
+    if (departmentIds.length !== 1) {
+      throw new BadRequestException('Employee must be assigned exactly one department');
+    }
+  } else if (dto.role === role_enum.HOD) {
+    if (departmentIds.length < 1) {
+      throw new BadRequestException('HOD must be assigned at least one department');
+    }
+  }
+
   const existingUser = await this.prisma.users.findFirst({
     where: {
       OR: [
@@ -191,8 +210,7 @@ export class AuthService {
     );
   }
 
-  // Validate departments
-  if (departmentIds.length) {
+  if (departmentIds.length && (dto.role === role_enum.EMPLOYEE || dto.role === role_enum.HOD)) {
     const departments = await this.prisma.departments.findMany({
       where: {
         id: {
@@ -224,10 +242,9 @@ export class AuthService {
     role: dto.role,
     password_hash: passwordHash,
 
-    ...(dto.role === role_enum.EMPLOYEE &&
-    departmentIds.length > 0
+    ...(primaryDepartmentId
       ? {
-          department_id: departmentIds[0],
+          department_id: primaryDepartmentId,
         }
       : {}),
   },
