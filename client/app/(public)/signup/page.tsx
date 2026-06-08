@@ -5,90 +5,72 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import {
-  Eye,
-  EyeOff,
-  User,
-  Mail,
-  Lock,
-  Building2,
-  Briefcase,
-  ArrowRight,
-  ShieldCheck,
-} from 'lucide-react';
-
-import {
-  signupSchema,
-  SignupFormData,
-} from '@/lib/validation';
-
+import { Eye, EyeOff, User, Mail, Lock, Building2, Briefcase, ArrowRight, ShieldCheck } from 'lucide-react';
+import { signupSchema, SignupFormData } from '@/lib/validation';
 import { authApi } from '@/api/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { Department } from '@/api/users';
 
+const DEPT_DISPLAY_NAMES: Record<string, string> = {
+  HR: 'HR & Administrative',
+  Accounts: 'Finance & Accounts',
+};
+
+const EXCLUDED_DEPTS = new Set(['Sales']);
+
+function normalizeDepartments(depts: Department[]): Department[] {
+  return depts
+    .filter((d) => !EXCLUDED_DEPTS.has(d.name))
+    .map((d) => ({ ...d, name: DEPT_DISPLAY_NAMES[d.name] ?? d.name }));
+}
+
 export default function SignupPage() {
   const router = useRouter();
-
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [departments, setDepartments] = useState<Department[]>([]);
-
-  // Role constraint state
   const [mdExists, setMdExists] = useState(false);
   const [hodTakenDepts, setHodTakenDepts] = useState<Set<string>>(new Set());
   const [constraintsLoading, setConstraintsLoading] = useState(true);
 
   const form = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
-    defaultValues: {
-      username: '',
-      email: '',
-      name: '',
-      password: '',
-      confirmPassword: '',
-      role: undefined,
-      departments: [],
-    },
+    defaultValues: { username: '', email: '', name: '', password: '', confirmPassword: '', role: undefined, departments: [] },
   });
 
   const selectedRole = form.watch('role');
   const selectedDepts = form.watch('departments') || [];
 
-  // Load MD existence once on mount
   useEffect(() => {
     Promise.all([authApi.checkMdExists(), authApi.getDepartments()])
-      .then(([exists, departmentList]) => {
+      .then(([exists, list]) => {
         setMdExists(exists);
-        setDepartments(departmentList);
+        setDepartments(normalizeDepartments(list));
       })
-      .catch(() => {})
+      .catch(() => setError('Failed to load configuration. Please refresh.'))
       .finally(() => setConstraintsLoading(false));
   }, []);
 
-  // Check HOD for selected departments
   useEffect(() => {
     if (selectedRole !== 'HOD') return;
     selectedDepts.forEach((deptId) => {
       if (hodTakenDepts.has(deptId)) return;
       authApi.checkHodExists(deptId).then((exists) => {
-        if (exists) {
-          setHodTakenDepts((prev) => new Set(prev).add(deptId));
-        }
+        if (exists) setHodTakenDepts((prev) => new Set(prev).add(deptId));
       }).catch(() => {});
     });
   }, [selectedDepts, selectedRole, hodTakenDepts]);
 
-  const anyHodBlocked = selectedRole === 'HOD' && selectedDepts.some(deptId => hodTakenDepts.has(deptId));
+  const anyHodBlocked = selectedRole === 'HOD' && selectedDepts.some((id) => hodTakenDepts.has(id));
 
   const onSubmit = async (data: SignupFormData) => {
     try {
       setError(null);
       setIsLoading(true);
-
-      const payload = {
+      await authApi.register({
         username: data.username,
         email: data.email,
         fullName: data.name,
@@ -96,16 +78,10 @@ export default function SignupPage() {
         role: data.role,
         departmentId: data.role === 'MD' ? undefined : data.departments[0] || undefined,
         departmentIds: data.role === 'HOD' ? data.departments : undefined,
-      };
-
-      await authApi.register(payload);
-
+      });
       router.push('/register-success');
     } catch (err: any) {
-      const msg =
-        err.response?.data?.message ||
-        err.response?.data?.error ||
-        'Registration failed. Please try again.';
+      const msg = err.response?.data?.message || err.response?.data?.error || 'Registration failed. Please try again.';
       setError(Array.isArray(msg) ? msg.join(', ') : msg);
     } finally {
       setIsLoading(false);
@@ -115,18 +91,13 @@ export default function SignupPage() {
   return (
     <main className="min-h-screen w-full overflow-hidden bg-gradient-to-br from-green-50 via-white to-green-100">
       <div className="flex min-h-screen flex-col md:flex-row">
-        {/* Left Branding */}
         <div className="relative hidden md:flex md:w-1/2 flex-col justify-between p-12 lg:p-16 overflow-hidden">
           <div className="absolute -top-20 -left-20 h-72 w-72 rounded-full bg-green-200/30 blur-3xl" />
           <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-green-300/20 blur-3xl" />
-
           <div className="relative z-10">
             <h1 className="text-5xl font-bold text-green-700">RUCHI PerformX</h1>
-            <p className="mt-4 max-w-md text-lg text-gray-600">
-              Create your enterprise account and start managing workflows efficiently.
-            </p>
+            <p className="mt-4 max-w-md text-lg text-gray-600">Create your enterprise account and start managing workflows efficiently.</p>
           </div>
-
           <div className="relative z-10 space-y-8">
             <div className="flex items-start gap-4">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-green-100">
@@ -137,7 +108,6 @@ export default function SignupPage() {
                 <p className="text-gray-600">Track productivity, goals and team performance in one place.</p>
               </div>
             </div>
-
             <div className="flex items-start gap-4">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-green-100">
                 <ShieldCheck className="h-6 w-6 text-green-700" />
@@ -148,23 +118,19 @@ export default function SignupPage() {
               </div>
             </div>
           </div>
-
           <div className="relative z-10">
             <p className="text-sm text-gray-500">© {new Date().getFullYear()} RUCHI PerformX</p>
           </div>
         </div>
 
-        {/* Signup Card */}
         <div className="relative flex w-full items-center justify-center p-6 md:w-1/2 md:p-10">
           <div className="absolute top-0 left-0 h-64 w-64 rounded-full bg-green-200/30 blur-3xl" />
           <div className="absolute bottom-0 right-0 h-64 w-64 rounded-full bg-green-300/20 blur-3xl" />
-
           <div className="relative z-10 w-full max-w-xl rounded-3xl border border-white/50 bg-white/80 p-8 shadow-2xl backdrop-blur-xl md:p-10">
             <div className="mb-8 text-center md:hidden">
               <h1 className="text-3xl font-bold text-green-700">RUCHI PerformX</h1>
               <p className="mt-2 text-sm text-gray-500">Enterprise workflow management</p>
             </div>
-
             <div className="mb-8">
               <h2 className="text-3xl font-bold text-gray-900">Create Account</h2>
               <p className="mt-2 text-gray-500">Join RUCHI PerformX and unlock your productivity.</p>
@@ -177,7 +143,6 @@ export default function SignupPage() {
                 </div>
               )}
 
-              {/* Full Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">Full Name</label>
                 <div className="relative mt-2">
@@ -186,7 +151,6 @@ export default function SignupPage() {
                 </div>
               </div>
 
-              {/* Username */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">Username</label>
                 <div className="relative mt-2">
@@ -195,7 +159,6 @@ export default function SignupPage() {
                 </div>
               </div>
 
-              {/* Email */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">Email</label>
                 <div className="relative mt-2">
@@ -204,7 +167,6 @@ export default function SignupPage() {
                 </div>
               </div>
 
-              {/* Role */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">Role</label>
                 <div className="relative mt-2">
@@ -215,9 +177,7 @@ export default function SignupPage() {
                     className="w-full rounded-md border border-gray-300 bg-white py-2 pl-10 pr-3 text-gray-900 disabled:opacity-50"
                   >
                     <option value="">Select role</option>
-                    <option value="MD" disabled={mdExists}>
-                      Managing Director{mdExists ? ' (position filled)' : ''}
-                    </option>
+                    <option value="MD" disabled={mdExists}>Managing Director{mdExists ? ' (position filled)' : ''}</option>
                     <option value="HOD">Head of Department</option>
                     <option value="EMPLOYEE">Employee</option>
                   </select>
@@ -227,31 +187,28 @@ export default function SignupPage() {
                 )}
               </div>
 
-              {/* Department selection */}
-              {selectedRole !== 'MD' && selectedRole && (
+              {selectedRole && selectedRole !== 'MD' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Department(s)</label>
                   {selectedRole === 'HOD' ? (
                     <div className="grid grid-cols-2 gap-3 p-4 rounded-lg border border-gray-200 bg-white/50">
-                      {departments.map((department) => {
-                        const isTaken = hodTakenDepts.has(department.id);
-                        const isChecked = selectedDepts.includes(department.id);
+                      {departments.map((dept) => {
+                        const isTaken = hodTakenDepts.has(dept.id);
                         return (
-                          <label key={department.id} className={`flex items-center gap-2 text-sm cursor-pointer ${isTaken ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                          <label key={dept.id} className={`flex items-center gap-2 text-sm cursor-pointer ${isTaken ? 'opacity-50 cursor-not-allowed' : ''}`}>
                             <input
                               type="checkbox"
-                              checked={isChecked}
+                              checked={selectedDepts.includes(dept.id)}
                               disabled={isLoading || isTaken}
                               onChange={(e) => {
-                                if (e.target.checked) {
-                                  form.setValue('departments', [...selectedDepts, department.id], { shouldValidate: true });
-                                } else {
-                                  form.setValue('departments', selectedDepts.filter((d) => d !== department.id), { shouldValidate: true });
-                                }
+                                const next = e.target.checked
+                                  ? [...selectedDepts, dept.id]
+                                  : selectedDepts.filter((d) => d !== dept.id);
+                                form.setValue('departments', next, { shouldValidate: true });
                               }}
                               className="rounded border-gray-300 text-green-700 focus:ring-green-500"
                             />
-                            <span>{department.name}{isTaken ? ' (Filled)' : ''}</span>
+                            <span>{dept.name}{isTaken ? ' (Filled)' : ''}</span>
                           </label>
                         );
                       })}
@@ -261,17 +218,13 @@ export default function SignupPage() {
                       <Building2 className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
                       <select
                         value={selectedDepts[0] ?? ''}
-                        onChange={(e) =>
-                          form.setValue('departments', e.target.value ? [e.target.value] : [], { shouldValidate: true })
-                        }
+                        onChange={(e) => form.setValue('departments', e.target.value ? [e.target.value] : [], { shouldValidate: true })}
                         disabled={isLoading}
                         className="w-full rounded-md border border-gray-300 bg-white py-2 pl-10 pr-3 text-gray-900"
                       >
                         <option value="">Select Department</option>
-                        {departments.map((department) => (
-                          <option key={department.id} value={department.id}>
-                            {department.name}
-                          </option>
+                        {departments.map((dept) => (
+                          <option key={dept.id} value={dept.id}>{dept.name}</option>
                         ))}
                       </select>
                     </div>
@@ -282,7 +235,6 @@ export default function SignupPage() {
                 </div>
               )}
 
-              {/* Password */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">Password</label>
                 <div className="relative mt-2">
@@ -300,7 +252,6 @@ export default function SignupPage() {
                 </div>
               </div>
 
-              {/* Confirm Password */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">Confirm Password</label>
                 <div className="relative mt-2">
@@ -329,9 +280,7 @@ export default function SignupPage() {
               <div className="text-center">
                 <p className="text-sm text-gray-600">
                   Already have an account?{' '}
-                  <Link href="/login" className="font-semibold text-green-700 hover:underline">
-                    Login here
-                  </Link>
+                  <Link href="/login" className="font-semibold text-green-700 hover:underline">Login here</Link>
                 </p>
               </div>
             </form>
