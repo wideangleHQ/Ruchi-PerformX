@@ -48,6 +48,12 @@ export class AuthController {
   }
 
   @Public()
+  @Get('departments')
+  getDepartments() {
+    return this.authService.getDepartments();
+  }
+
+  @Public()
   @Get('check-hod/:departmentId')
   async checkHod(@Param('departmentId') departmentId: string) {
     const exists = await this.authService.checkHodExists(departmentId);

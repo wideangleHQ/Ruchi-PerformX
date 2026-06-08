@@ -55,6 +55,20 @@ export class AuthService {
     return this.checkHodExists(dept.id);
   }
 
+  async getDepartments() {
+    return this.prisma.departments.findMany({
+      where: { is_active: true },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        is_active: true,
+        created_at: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+  }
+
   async login(dto: LoginDto) {
     const user = await this.prisma.users.findUnique({
       where: { username: dto.username },
@@ -122,59 +136,157 @@ export class AuthService {
   // ─── REGISTER ────────────────────────────────────────────────────────────────
 
   async register(dto: CreateUserDto) {
-    const passwordHash = await bcrypt.hash(dto.password, 12);
+  const departmentIds =
+    dto.role === role_enum.HOD
+      ? [...new Set(dto.departmentIds ?? [])]
+      : dto.departmentId
+        ? [dto.departmentId]
+        : [];
 
-    const user = await this.prisma.users.create({
-      data: {
-        username: dto.username,
-        email: dto.email,
-        full_name: dto.fullName,
-        role: dto.role,
-        password_hash: passwordHash,
+  if (dto.role !== role_enum.MD && !departmentIds.length) {
+    throw new BadRequestException('Department is required');
+  }
+
+  // Check duplicate username/email first
+  const existingUser = await this.prisma.users.findFirst({
+    where: {
+      OR: [
+        { username: dto.username },
+        { email: dto.email },
+      ],
+    },
+  });
+
+  if (existingUser) {
+    throw new BadRequestException(
+      'Username or Email already exists',
+    );
+  }
+
+  // Validate departments
+  if (departmentIds.length) {
+    const departments = await this.prisma.departments.findMany({
+      where: {
+        id: {
+          in: departmentIds,
+        },
+        is_active: true,
+      },
+      select: {
+        id: true,
       },
     });
 
-    // HOD: create hod_departments junction rows for each selected department
-    if (dto.role === role_enum.HOD && dto.departmentIds && dto.departmentIds.length > 0) {
-      await this.prisma.hod_departments.createMany({
-        data: dto.departmentIds.map((department_id) => ({
-          hod_id: user.id,
-          department_id,
-        })),
-        skipDuplicates: true,
-      });
+    if (departments.length !== departmentIds.length) {
+      throw new BadRequestException(
+        'Invalid department selection',
+      );
     }
-
-    return user;
   }
 
-  // ─── FORGOT PASSWORD REQUEST ──────────────────────────────────────────────────
+  const passwordHash = await bcrypt.hash(dto.password, 12);
 
-  async forgotPassword(dto: ForgotPasswordDto) {
-    const user = await this.prisma.users.findUnique({
-      where: { email: dto.email },
-      select: { id: true, is_active: true, pending_approval: true },
+  try {
+    const user = await this.prisma.$transaction(async (tx) => {
+      const createdUser = await tx.users.create({
+       data: {
+    username: dto.username,
+    email: dto.email,
+    full_name: dto.fullName,
+    role: dto.role,
+    password_hash: passwordHash,
+
+    ...(dto.role === role_enum.EMPLOYEE &&
+    departmentIds.length > 0
+      ? {
+          department_id: departmentIds[0],
+        }
+      : {}),
+  },
+      });
+
+      if (
+        dto.role === role_enum.HOD &&
+        departmentIds.length > 0
+      ) {
+        await tx.hod_departments.createMany({
+          data: departmentIds.map((department_id) => ({
+            hod_id: createdUser.id,
+            department_id,
+          })),
+          skipDuplicates: true,
+        });
+      }
+
+      return createdUser;
     });
 
-    if (!user) return { message: 'Password reset request submitted.' };
+    return {
+      success: true,
+      message: 'User registered successfully',
+      user,
+    };
+  } catch (error) {
+    console.error('REGISTER ERROR:', error);
 
-    if (!user.is_active || user.pending_approval)
-      throw new BadRequestException('Account is not active.');
+    throw new BadRequestException(
+      'Registration failed. Please verify department selection and user details.',
+    );
+  }
+}
 
-    const existing = await this.prisma.passwordResetRequest.findFirst({
-      where: { user_id: user.id, status: 'PENDING' },
-    });
+async forgotPassword(dto: ForgotPasswordDto) {
+  const user = await this.prisma.users.findUnique({
+    where: { email: dto.email },
+    select: {
+      id: true,
+      is_active: true,
+      pending_approval: true,
+    },
+  });
 
-    if (existing)
-      return { message: 'A reset request is already pending HOD review.' };
-
-    await this.prisma.passwordResetRequest.create({
-      data: { users: { connect: { id: user.id } } },
-    });
-
-    return { message: 'Password reset request submitted. Contact your HOD.' };
+  if (!user) {
+    return {
+      message: 'Password reset request submitted.',
+    };
   }
 
+  if (!user.is_active || user.pending_approval) {
+    throw new BadRequestException(
+      'Account is not active.',
+    );
+  }
+
+  const existing =
+    await this.prisma.passwordResetRequest.findFirst({
+      where: {
+        user_id: user.id,
+        status: 'PENDING',
+      },
+    });
+
+  if (existing) {
+    return {
+      message:
+        'A reset request is already pending HOD review.',
+    };
+  }
+
+  await this.prisma.passwordResetRequest.create({
+    data: {
+      users: {
+        connect: {
+          id: user.id,
+        },
+      },
+    },
+  });
+
+  return {
+    message:
+      'Password reset request submitted. Contact your HOD.',
+  };
+}
   // ─── CHANGE PASSWORD ─────────────────────────────────────────────────────────
 
   async changePassword(userId: string, newPassword: string) {
@@ -192,3 +304,4 @@ export class AuthService {
     return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
   }
 }
+

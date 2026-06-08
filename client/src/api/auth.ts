@@ -10,6 +10,7 @@ import type {
   MessageResponse,
   JwtUser,
 } from './types';
+import type { Department } from './users';
 
 export const authApi = {
   /** POST /auth/register */
@@ -63,6 +64,11 @@ export const authApi = {
   checkMdExists: async (): Promise<boolean> => {
     const response = await axiosClient.get<{ exists: boolean }>('/auth/check-md');
     return response.data.exists;
+  },
+
+  getDepartments: async (): Promise<Department[]> => {
+    const response = await axiosClient.get<Department[]>('/auth/departments');
+    return response.data;
   },
 
   /** GET /auth/check-hod/:departmentId */

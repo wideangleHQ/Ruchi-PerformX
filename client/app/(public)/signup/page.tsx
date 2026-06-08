@@ -25,21 +25,7 @@ import {
 import { authApi } from '@/api/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-
-const DEPARTMENT_MAP: Record<string, string> = {
-  "IT": "24a53abb-4a19-4805-81e8-5dce729d1630",
-  "Accounts": "30a7879e-2ec8-4d48-8516-2eda6d0c04a6",
-  "HR": "b1b41df3-f25a-479d-841a-5caa5acf28bd",
-  "Marketing": "ae196955-f2cb-477b-9104-570123188bc1",
-  "Operations": "ef4bfcc6-f403-43e1-90ff-71955403e741",
-  "Production": "54e60de7-4c95-4f56-9261-8cfd7ec10e5e",
-  "Sales": "48beac91-420c-488d-993e-9adf29a2e3ae"
-};
-
-// Reversing the map for checkHodExistsByName logic
-const DEPT_NAME_BY_ID = Object.fromEntries(
-  Object.entries(DEPARTMENT_MAP).map(([name, id]) => [id, name])
-);
+import type { Department } from '@/api/users';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -48,6 +34,7 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [departments, setDepartments] = useState<Department[]>([]);
 
   // Role constraint state
   const [mdExists, setMdExists] = useState(false);
@@ -72,8 +59,11 @@ export default function SignupPage() {
 
   // Load MD existence once on mount
   useEffect(() => {
-    authApi.checkMdExists()
-      .then((exists) => setMdExists(exists))
+    Promise.all([authApi.checkMdExists(), authApi.getDepartments()])
+      .then(([exists, departmentList]) => {
+        setMdExists(exists);
+        setDepartments(departmentList);
+      })
       .catch(() => {})
       .finally(() => setConstraintsLoading(false));
   }, []);
@@ -83,9 +73,7 @@ export default function SignupPage() {
     if (selectedRole !== 'HOD') return;
     selectedDepts.forEach((deptId) => {
       if (hodTakenDepts.has(deptId)) return;
-      const deptName = DEPT_NAME_BY_ID[deptId];
-      if (!deptName) return;
-      authApi.checkHodExistsByName(deptName).then((exists) => {
+      authApi.checkHodExists(deptId).then((exists) => {
         if (exists) {
           setHodTakenDepts((prev) => new Set(prev).add(deptId));
         }
@@ -109,9 +97,6 @@ export default function SignupPage() {
         departmentId: data.role === 'MD' ? undefined : data.departments[0] || undefined,
         departmentIds: data.role === 'HOD' ? data.departments : undefined,
       };
-
-      console.log('Selected Departments:', data.departments);
-      console.log('DepartmentIds Payload:', payload.departmentIds);
 
       await authApi.register(payload);
 
@@ -248,25 +233,25 @@ export default function SignupPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Department(s)</label>
                   {selectedRole === 'HOD' ? (
                     <div className="grid grid-cols-2 gap-3 p-4 rounded-lg border border-gray-200 bg-white/50">
-                      {Object.entries(DEPARTMENT_MAP).map(([name, id]) => {
-                        const isTaken = hodTakenDepts.has(id);
-                        const isChecked = selectedDepts.includes(id);
+                      {departments.map((department) => {
+                        const isTaken = hodTakenDepts.has(department.id);
+                        const isChecked = selectedDepts.includes(department.id);
                         return (
-                          <label key={id} className={`flex items-center gap-2 text-sm cursor-pointer ${isTaken ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                          <label key={department.id} className={`flex items-center gap-2 text-sm cursor-pointer ${isTaken ? 'opacity-50 cursor-not-allowed' : ''}`}>
                             <input
                               type="checkbox"
                               checked={isChecked}
                               disabled={isLoading || isTaken}
                               onChange={(e) => {
                                 if (e.target.checked) {
-                                  form.setValue('departments', [...selectedDepts, id], { shouldValidate: true });
+                                  form.setValue('departments', [...selectedDepts, department.id], { shouldValidate: true });
                                 } else {
-                                  form.setValue('departments', selectedDepts.filter((d) => d !== id), { shouldValidate: true });
+                                  form.setValue('departments', selectedDepts.filter((d) => d !== department.id), { shouldValidate: true });
                                 }
                               }}
                               className="rounded border-gray-300 text-green-700 focus:ring-green-500"
                             />
-                            <span>{name}{isTaken ? ' (Filled)' : ''}</span>
+                            <span>{department.name}{isTaken ? ' (Filled)' : ''}</span>
                           </label>
                         );
                       })}
@@ -283,9 +268,9 @@ export default function SignupPage() {
                         className="w-full rounded-md border border-gray-300 bg-white py-2 pl-10 pr-3 text-gray-900"
                       >
                         <option value="">Select Department</option>
-                        {Object.entries(DEPARTMENT_MAP).map(([name, id]) => (
-                          <option key={id} value={id}>
-                            {name}
+                        {departments.map((department) => (
+                          <option key={department.id} value={department.id}>
+                            {department.name}
                           </option>
                         ))}
                       </select>
