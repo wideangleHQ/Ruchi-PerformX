@@ -93,11 +93,26 @@ export class DashboardService {
 
     const departments = await this.prisma.departments.findMany({
       where: { id: { in: departmentGroups.map((g) => g.department_id) } },
-      select: { id: true, name: true },
+      select: { id: true, name: true, sort_order: true },
     });
 
     const completedByDepartment = new Map(completedDepartmentGroups.map((g) => [g.department_id, g._count.id]));
     const departmentNames = new Map(departments.map((d) => [d.id, d.name]));
+    const sortOrderMap = new Map(departments.map((d) => [d.id, d.sort_order]));
+
+    const departmentSummary = departmentGroups.map((group) => {
+      const completed = completedByDepartment.get(group.department_id) ?? 0;
+      const completionRate = this.percent(completed, group._count.id);
+      return {
+        department: departmentNames.get(group.department_id) ?? 'Unassigned',
+        tasks: group._count.id,
+        completion: `${completionRate}%`,
+        status: completionRate >= 95 ? 'On Track' : completionRate >= 85 ? 'Stable' : 'Review',
+        sortOrder: sortOrderMap.get(group.department_id) ?? 999,
+      };
+    });
+
+    departmentSummary.sort((a, b) => a.sortOrder - b.sortOrder);
 
     return {
       activeTasks,
@@ -109,16 +124,7 @@ export class DashboardService {
       escalatedTasks,
       overdueTasks,
       chartData: this.weeklyChart(weeklyCompleted, weekStart),
-      departmentSummary: departmentGroups.map((group) => {
-        const completed = completedByDepartment.get(group.department_id) ?? 0;
-        const completionRate = this.percent(completed, group._count.id);
-        return {
-          department: departmentNames.get(group.department_id) ?? 'Unassigned',
-          tasks: group._count.id,
-          completion: `${completionRate}%`,
-          status: completionRate >= 95 ? 'On Track' : completionRate >= 85 ? 'Stable' : 'Review',
-        };
-      }),
+      departmentSummary: departmentSummary.map(({ sortOrder, ...rest }) => rest),
     };
   }
 

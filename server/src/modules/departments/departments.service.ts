@@ -26,7 +26,7 @@ export class DepartmentsService {
           ? { hod_departments: { some: { hod_id: user.sub } } }
           : {}),
       },
-      orderBy: { name: 'asc' },
+      orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
       select: {
         id: true,
         name: true,

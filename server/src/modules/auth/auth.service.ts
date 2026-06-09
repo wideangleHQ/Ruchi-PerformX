@@ -87,7 +87,7 @@ export class AuthService {
         is_active: true,
         created_at: true,
       },
-      orderBy: { name: 'asc' },
+      orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
     });
   }
 

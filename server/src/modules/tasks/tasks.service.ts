@@ -255,7 +255,7 @@ export class TasksService {
             : {}),
       },
       select: { id: true, name: true, description: true, is_active: true },
-      orderBy: { name: 'asc' },
+      orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
     });
   }
 
