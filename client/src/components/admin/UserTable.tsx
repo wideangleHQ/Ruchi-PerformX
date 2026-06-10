@@ -1,3 +1,4 @@
+'use client';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2, Edit2 } from 'lucide-react';
 import { User } from '@/api/types';
@@ -114,3 +115,4 @@ export function UserTable({
     </div>
   );
 }
+
