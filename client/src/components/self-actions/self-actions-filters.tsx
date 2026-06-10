@@ -12,6 +12,8 @@ type Props = {
   initialValues: SelfActionFilters;
   departments: Department[];
   users: User[];
+  showDepartmentField?: boolean;
+  showCreatorField?: boolean;
   onApply: (values: SelfActionFilters) => void;
   onReset: () => void;
 };
@@ -20,6 +22,8 @@ export function SelfActionsFilters({
   initialValues,
   departments,
   users,
+  showDepartmentField = true,
+  showCreatorField = true,
   onApply,
   onReset,
 }: Props) {
@@ -71,31 +75,37 @@ export function SelfActionsFilters({
           <option value="CRITICAL">Critical</option>
         </select>
 
-        <select
-          value={values.departmentId ?? ''}
-          onChange={(event) => setValues((current) => ({ ...current, departmentId: event.target.value }))}
-          className="h-8 rounded-lg border border-input bg-white px-3 text-sm text-slate-700 outline-none"
-        >
-          <option value="">All Departments</option>
-          {departments.map((department) => (
-            <option key={department.id} value={department.id}>
-              {department.name}
-            </option>
-          ))}
-        </select>
+        {showDepartmentField ? (
+          <select
+            value={values.departmentId ?? ''}
+            onChange={(event) => setValues((current) => ({ ...current, departmentId: event.target.value }))}
+            className="h-8 rounded-lg border border-input bg-white px-3 text-sm text-slate-700 outline-none"
+          >
+            <option value="">All Departments</option>
+            {departments.map((department) => (
+              <option key={department.id} value={department.id}>
+                {department.name}
+              </option>
+            ))}
+          </select>
+        ) : null}
 
-        <select
-          value={values.createdById ?? ''}
-          onChange={(event) => setValues((current) => ({ ...current, createdById: event.target.value }))}
-          className="h-8 rounded-lg border border-input bg-white px-3 text-sm text-slate-700 outline-none"
-        >
-          <option value="">All Creators</option>
-          {users.map((user) => (
-            <option key={user.id} value={user.id}>
-              {user.fullName}
-            </option>
-          ))}
-        </select>
+        {showCreatorField ? (
+          <>
+            <select
+              value={values.createdById ?? ''}
+              onChange={(event) => setValues((current) => ({ ...current, createdById: event.target.value }))}
+              className="h-8 rounded-lg border border-input bg-white px-3 text-sm text-slate-700 outline-none"
+            >
+              <option value="">All Creators</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.fullName}
+                </option>
+              ))}
+            </select>
+          </>
+        ) : null}
 
         <Input
           type="date"

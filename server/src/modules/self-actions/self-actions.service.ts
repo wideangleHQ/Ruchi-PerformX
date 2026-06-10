@@ -11,7 +11,7 @@ import { UpdateSelfActionDto } from './dto/update-self-action.dto';
 import { ChangeStatusDto } from './dto/change-status.dto';
 import { SelfActionFilterDto } from './dto/self-action-filter.dto';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
-import { role_enum, self_action_status_enum } from '@prisma/client';
+import { Prisma, role_enum, self_action_status_enum } from '@prisma/client';
 
 const SELECT = {
   id: true,
@@ -57,42 +57,88 @@ export class SelfActionsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateSelfActionDto, user: JwtPayload) {
-    const userDept = await this.prisma.users.findUnique({
-      where: { id: user.sub },
-      select: { department_id: true },
-    });
-
-    if (!userDept?.department_id) {
-      throw new BadRequestException('User must belong to a department');
+    if (!user?.sub) {
+      throw new BadRequestException('Invalid token: missing user identity');
     }
 
-    const action = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.self_actions.create({
-        data: {
-          title: dto.title,
-          description: dto.description,
-          priority: dto.priority || 'MEDIUM',
-          status: 'OPEN',
-          created_by_id: user.sub,
-          department_id: userDept.department_id as string,
-        },
-        select: SELECT,
+    try {
+      let departmentId: string | undefined | null = dto.department_id;
+
+      if (!departmentId) {
+        const userDept = await this.prisma.users.findUnique({
+          where: { id: user.sub },
+          select: { department_id: true },
+        });
+        departmentId = userDept?.department_id;
+      }
+
+      // fallback 1: JWT singular departmentId (EMPLOYEE / MD)
+      if (!departmentId && user.departmentId) {
+        departmentId = user.departmentId;
+      }
+
+      // fallback 2: JWT plural departmentIds (HOD / EA / PA)
+      if (!departmentId && user.departmentIds && user.departmentIds.length > 0) {
+        departmentId = user.departmentIds[0];
+      }
+
+      this.logger.log(
+        `create self-action payload=${JSON.stringify(dto)} user=${JSON.stringify({
+          sub: user?.sub,
+          username: user?.username,
+          role: user?.role,
+          department_id: departmentId,
+        })}`,
+      );
+
+      if (!departmentId) {
+        throw new BadRequestException('User must belong to a department');
+      }
+
+      const action = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.self_actions.create({
+          data: {
+            title: dto.title,
+            description: dto.description,
+            priority: dto.priority ?? 'MEDIUM',
+            status: 'OPEN',
+            created_by_id: user.sub,
+            department_id: departmentId as string,
+          },
+          select: SELECT,
+        });
+
+        await tx.self_action_logs.create({
+          data: {
+            self_action_id: created.id,
+            actor_id: user.sub,
+            event_type: 'CREATED',
+            new_value: JSON.stringify({ status: 'OPEN', priority: dto.priority ?? 'MEDIUM' }),
+          },
+        });
+
+        return created;
       });
 
-      await tx.self_action_logs.create({
-        data: {
-          self_action_id: created.id,
-          actor_id: user.sub,
-          event_type: 'CREATED',
-          new_value: JSON.stringify({ status: 'OPEN', priority: dto.priority }),
-        },
-      });
-
-      return created;
-    });
-
-    this.logger.log(`SelfAction ${action.id} created by ${user.username}`);
-    return action;
+      this.logger.log(`SelfAction ${action.id} created by ${user.username}`);
+      return action;
+    } catch (error) {
+      this.logger.error(
+        `SelfAction create failed: ${(error as any)?.message ?? error}`,
+        (error as any)?.stack,
+      );
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2003') {
+          throw new BadRequestException(
+            `Foreign key constraint failed on field: ${(error.meta as any)?.field_name ?? 'unknown'}. Verify JWT sub is a valid user UUID.`,
+          );
+        }
+        if (error.code === 'P2002') {
+          throw new BadRequestException('Duplicate record');
+        }
+      }
+      throw error;
+    }
   }
 
   async findAll(user: JwtPayload, filter: SelfActionFilterDto) {
@@ -130,9 +176,7 @@ export class SelfActionsService {
         skip: ((filter.page || 1) - 1) * (filter.limit || 20),
         take: filter.limit || 20,
       }),
-      this.prisma.self_actions.count({
-        where,
-      }),
+      this.prisma.self_actions.count({ where }),
     ]);
 
     return {
@@ -140,7 +184,7 @@ export class SelfActionsService {
       total,
       page: filter.page || 1,
       limit: filter.limit || 20,
-      hasMore: ((filter.page || 1) * (filter.limit || 20)) < total,
+      hasMore: (filter.page || 1) * (filter.limit || 20) < total,
     };
   }
 
@@ -223,7 +267,10 @@ export class SelfActionsService {
 
     if (!action) throw new NotFoundException('Self action not found');
 
-    const canEdit = user.role === role_enum.MD || user.role === role_enum.ADMIN || action.created_by_id === user.sub;
+    const canEdit =
+      user.role === role_enum.MD ||
+      user.role === role_enum.ADMIN ||
+      action.created_by_id === user.sub;
     if (!canEdit) throw new ForbiddenException('Not authorized');
 
     this.validateStatusTransition(action.status as self_action_status_enum, dto.status);
@@ -263,7 +310,10 @@ export class SelfActionsService {
 
     if (!action) throw new NotFoundException('Self action not found');
 
-    const canDelete = user.role === role_enum.MD || user.role === role_enum.ADMIN || action.created_by_id === user.sub;
+    const canDelete =
+      user.role === role_enum.MD ||
+      user.role === role_enum.ADMIN ||
+      action.created_by_id === user.sub;
     if (!canDelete) throw new ForbiddenException('Not authorized to delete');
 
     await this.prisma.$transaction(async (tx) => {
@@ -285,19 +335,17 @@ export class SelfActionsService {
   }
 
   private getVisibilityFilter(user: JwtPayload) {
-    if (user.role === role_enum.MD || user.role === role_enum.ADMIN) {
-      return null;
-    }
-
-    if (user.role === role_enum.EA || user.role === role_enum.PA) {
-      return null;
-    }
+    if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return null;
+    if (user.role === role_enum.EA || user.role === role_enum.PA) return null;
 
     if (user.role === role_enum.HOD) {
       return {
         OR: [
           { created_by_id: user.sub },
-          { department_id: user.departmentId, users: { role: role_enum.EMPLOYEE } },
+          {
+            department_id: { in: user.departmentIds || [] },
+            users: { role: role_enum.EMPLOYEE },
+          },
         ],
       };
     }
@@ -311,7 +359,11 @@ export class SelfActionsService {
 
     if (user.role === role_enum.HOD) {
       if (action.users?.id === user.sub) return;
-      if (action.department_id === user.departmentId && action.users?.role === role_enum.EMPLOYEE) return;
+      if (
+        user.departmentIds?.includes(action.department_id) &&
+        action.users?.role === role_enum.EMPLOYEE
+      )
+        return;
       throw new ForbiddenException('Access denied');
     }
 
@@ -325,14 +377,17 @@ export class SelfActionsService {
     if (action.created_by_id === user.sub) return true;
     if (user.role === role_enum.EA || user.role === role_enum.PA) return true;
 
-    if (user.role === role_enum.HOD && action.department_id === user.departmentId) {
+    if (user.role === role_enum.HOD && user.departmentIds?.includes(action.department_id)) {
       return action.users?.role === role_enum.EMPLOYEE || action.created_by_id === user.sub;
     }
 
     return false;
   }
 
-  private validateStatusTransition(from: self_action_status_enum, to: self_action_status_enum) {
+  private validateStatusTransition(
+    from: self_action_status_enum,
+    to: self_action_status_enum,
+  ) {
     const allowed: Record<self_action_status_enum, self_action_status_enum[]> = {
       OPEN: ['ONGOING', 'ABORTED'],
       ONGOING: ['COMPLETED', 'ABORTED'],

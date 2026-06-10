@@ -17,4 +17,8 @@ export class CreateSelfActionDto {
 
   @IsOptional()
   attachments?: Express.Multer.File[];
+
+  @IsOptional()
+  @IsString()
+  department_id?: string;
 }

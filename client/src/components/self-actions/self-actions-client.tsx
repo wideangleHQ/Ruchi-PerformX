@@ -87,7 +87,8 @@ export function SelfActionsClient() {
   const filters = useMemo(() => parseFilters(searchParams), [searchParams]);
 
   const { user } = useAuth();
-  const isManager = user?.role !== 'EMPLOYEE';
+  const canUseDepartmentLookup = !!user && (user.role === 'MD' || user.role === 'HOD' || user.role === 'ADMIN');
+  const canUseCreatorLookup = !!user && user.role === 'ADMIN';
 
   const { data, isLoading, isError, refetch } = useSelfActions(filters);
   const createMutation = useCreateSelfAction();
@@ -102,7 +103,7 @@ export function SelfActionsClient() {
         return [];
       }
     },
-    enabled: isManager,
+    enabled: canUseDepartmentLookup,
   });
 
   const { data: usersPage } = useQuery({
@@ -114,7 +115,7 @@ export function SelfActionsClient() {
         return { data: [], total: 0 };
       }
     },
-    enabled: isManager,
+    enabled: canUseCreatorLookup,
   });
 
   const users = usersPage?.data ?? [];
@@ -258,6 +259,8 @@ export function SelfActionsClient() {
         initialValues={filters}
         departments={departments}
         users={users}
+        showDepartmentField={canUseDepartmentLookup}
+        showCreatorField={canUseCreatorLookup}
         onApply={applyFilters}
         onReset={resetFilters}
       />
