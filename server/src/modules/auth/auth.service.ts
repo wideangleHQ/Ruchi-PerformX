@@ -164,19 +164,10 @@ export class AuthService {
   // ─── REGISTER ────────────────────────────────────────────────────────────────
 
   async register(dto: CreateUserDto) {
-  const allDepartments = await this.prisma.departments.findMany({
-    where: { is_active: true },
-    select: { id: true },
-  });
-  const allDepartmentIds = allDepartments.map((d) => d.id);
-
   let departmentIds: string[] = [];
   let primaryDepartmentId: string | undefined;
 
-  if (dto.role === role_enum.MD || dto.role === role_enum.EA || dto.role === role_enum.PA) {
-    departmentIds = allDepartmentIds;
-    primaryDepartmentId = allDepartmentIds[0];
-  } else if (dto.role === role_enum.EMPLOYEE) {
+  if (dto.role === role_enum.EMPLOYEE) {
     if (dto.departmentId) {
       departmentIds = [dto.departmentId];
       primaryDepartmentId = dto.departmentId;
