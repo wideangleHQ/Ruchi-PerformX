@@ -7,6 +7,7 @@ import { useState } from 'react';
 import {
   LayoutDashboard,
   ClipboardList,
+  ClipboardCheck,
   FileText,
   ArrowRightLeft,
   Bell,
@@ -29,6 +30,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
   { href: '/tasks', label: 'Tasks', icon: <ClipboardList size={20} /> },
+  { href: '/self-actions', label: 'Self Actions', icon: <ClipboardCheck size={20} /> },
   { href: '/requests', label: 'Requests', icon: <FileText size={20} /> },
   { href: '/transfers', label: 'Transfers', icon: <ArrowRightLeft size={20} /> },
   { href: '/notifications', label: 'Notifications', icon: <Bell size={20} /> },

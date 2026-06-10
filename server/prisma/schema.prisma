@@ -40,6 +40,7 @@ model departments {
   hod_departments                                         hod_departments[]
   task_departments                                        task_departments[]
   assistant_departments                                   assistant_departments[]
+  self_actions                                            self_actions[]
 }
 
 model hod_departments {
@@ -157,19 +158,59 @@ model registration_requests {
   users            users?                    @relation(fields: [reviewed_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_registration_reviewer")
 }
 
+enum self_action_status_enum {
+  OPEN
+  ONGOING
+  COMPLETED
+  ABORTED
+}
+
+enum self_action_priority_enum {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model self_actions {
-  id               String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id          String              @db.Uuid
-  title            String              @db.VarChar(255)
-  status           action_status_enum
-  remarks          String?
-  category         task_category_enum?
-  action_date      DateTime?           @default(dbgenerated("CURRENT_DATE")) @db.Date
-  created_at       DateTime?           @default(now()) @db.Timestamptz(6)
-  updated_at       DateTime?           @default(now()) @db.Timestamptz(6)
-  users            users               @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id               String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title            String                      @db.VarChar(255)
+  description      String
+  priority         self_action_priority_enum   @default(MEDIUM)
+  status           self_action_status_enum     @default(OPEN)
+  created_by_id    String                      @db.Uuid
+  department_id    String                      @db.Uuid
+  completed_at     DateTime?                   @db.Timestamptz(6)
+  created_at       DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime                    @default(now()) @db.Timestamptz(6)
+  deleted_at       DateTime?                   @db.Timestamptz(6)
+  users            users                       @relation(fields: [created_by_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_self_action_creator")
+  departments      departments                 @relation(fields: [department_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_self_action_dept")
   task_attachments task_attachments[]
+  self_action_logs self_action_logs[]
+
+  @@index([created_by_id], map: "idx_self_actions_creator")
+  @@index([department_id], map: "idx_self_actions_dept")
+  @@index([status], map: "idx_self_actions_status")
+  @@index([created_at], map: "idx_self_actions_created")
+  @@index([deleted_at], map: "idx_self_actions_deleted")
+}
+
+model self_action_logs {
+  id               String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  self_action_id   String          @db.Uuid
+  actor_id         String          @db.Uuid
+  event_type       String          @db.VarChar(50)
+  old_value        String?
+  new_value        String?
+  created_at       DateTime        @default(now()) @db.Timestamptz(6)
+  self_actions     self_actions    @relation(fields: [self_action_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_log_action")
+  users            users           @relation(fields: [actor_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_log_actor")
+
+  @@index([self_action_id], map: "idx_self_action_logs_action")
+  @@index([actor_id], map: "idx_self_action_logs_actor")
+  @@index([event_type], map: "idx_self_action_logs_event")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -371,6 +412,7 @@ model users {
   performance_scores                                   performance_scores[]
   registration_requests                                registration_requests[]
   self_actions                                         self_actions[]
+  self_action_logs                                     self_action_logs[]
   task_attachments                                     task_attachments[]
   task_comments                                        task_comments[]
   task_escalations                                     task_escalations[]

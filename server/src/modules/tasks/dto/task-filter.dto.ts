@@ -1,5 +1,6 @@
-import { IsEnum, IsOptional, IsString, IsUUID, IsDateString } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsUUID, IsDateString, IsInt, Min, Max } from 'class-validator';
 import { task_status_enum , task_priority_enum } from '@prisma/client';
+import { Type } from 'class-transformer';
 
 export class TaskFilterDto {
   @IsOptional()
@@ -29,4 +30,17 @@ export class TaskFilterDto {
   @IsOptional()
   @IsDateString()
   dueAfter?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 20;
 }

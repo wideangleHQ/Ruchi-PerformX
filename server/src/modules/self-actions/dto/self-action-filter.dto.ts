@@ -1,15 +1,28 @@
-// src/modules/self-actions/dto/self-action-filter.dto.ts
-
-import { IsOptional, IsUUID, IsDateString } from 'class-validator';
+import { IsOptional, IsEnum, IsDateString, IsInt, Min, Max, IsString, MaxLength } from 'class-validator';
+import { self_action_status_enum, self_action_priority_enum } from '@prisma/client';
+import { Type } from 'class-transformer';
 
 export class SelfActionFilterDto {
   @IsOptional()
-  @IsUUID()
-  userId?: string;
+  @IsEnum(self_action_status_enum)
+  status?: self_action_status_enum;
 
   @IsOptional()
-  @IsUUID()
+  @IsEnum(self_action_priority_enum)
+  priority?: self_action_priority_enum;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  search?: string;
+
+  @IsOptional()
+  @IsString()
   departmentId?: string;
+
+  @IsOptional()
+  @IsString()
+  createdById?: string;
 
   @IsOptional()
   @IsDateString()
@@ -18,4 +31,17 @@ export class SelfActionFilterDto {
   @IsOptional()
   @IsDateString()
   dateTo?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 20;
 }

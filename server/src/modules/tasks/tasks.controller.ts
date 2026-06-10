@@ -28,7 +28,7 @@ export class TasksController {
   // ─── Create ────────────────────────────────────────────────────
 
   @Post()
-  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EMPLOYEE, role_enum.EA, role_enum.PA)
   create(@Body() dto: CreateTaskDto, @CurrentUser() user: JwtPayload) {
     return this.tasksService.create(dto, user);
   }
