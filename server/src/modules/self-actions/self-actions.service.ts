@@ -146,8 +146,6 @@ export class SelfActionsService {
 
     if (filter.status) clauses.push({ status: filter.status });
     if (filter.priority) clauses.push({ priority: filter.priority });
-    if (filter.departmentId) clauses.push({ department_id: filter.departmentId });
-    if (filter.createdById) clauses.push({ created_by_id: filter.createdById });
     if (filter.search) {
       clauses.push({
         OR: [
@@ -165,6 +163,9 @@ export class SelfActionsService {
 
     const visible = this.getVisibilityFilter(user);
     if (visible) clauses.push(visible);
+
+    if (filter.departmentId) clauses.push({ department_id: filter.departmentId });
+    if (filter.createdById) clauses.push({ created_by_id: filter.createdById });
 
     const where = clauses.length === 1 ? clauses[0] : { AND: clauses };
 

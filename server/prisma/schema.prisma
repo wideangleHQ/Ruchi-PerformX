@@ -394,6 +394,7 @@ model users {
   email                                                String                  @unique @db.VarChar(255)
   password_hash                                        String
   full_name                                            String                  @db.VarChar(255)
+  mobile_number                                        String?                 @db.VarChar(20)
   role                                                 role_enum
   department_id                                        String?                 @db.Uuid
   is_active                                            Boolean?                @default(true)

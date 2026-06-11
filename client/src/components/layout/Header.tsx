@@ -1,7 +1,8 @@
 'use client';
 
+import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-import { Search, Bell, Settings } from 'lucide-react';
+import { Bell, UserCircle2 } from 'lucide-react';
 
 export function Header() {
   const { user } = useAuth();
@@ -22,16 +23,17 @@ export function Header() {
       </div>
 
       <div className="flex flex-1 items-center justify-end gap-2 sm:gap-4 sm:flex-none">
-        <button className="flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100">
-          <Search size={20} />
-        </button>
         <button className="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100">
           <Bell size={20} />
           <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full border-2 border-white bg-green-600" />
         </button>
-        <button className="flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100">
-          <Settings size={20} />
-        </button>
+        <Link
+          href="/profile"
+          className="flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100"
+          aria-label="Profile"
+        >
+          <UserCircle2 size={20} />
+        </Link>
       </div>
     </header>
   );
