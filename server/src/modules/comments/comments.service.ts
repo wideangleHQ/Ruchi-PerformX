@@ -14,37 +14,47 @@ export class CommentsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateCommentDto, user: JwtPayload) {
-    await this.ensureTaskExists(dto.taskId);
+    return this.createForTask(dto.taskId, dto.content, user);
+  }
 
-    return this.prisma.task_comments.create({
+  async createForTask(taskId: string, content: string, user: JwtPayload) {
+    await this.ensureTaskExists(taskId);
+
+    const comment = await this.prisma.task_comments.create({
       data: {
-        content: dto.content,
-        task_id: dto.taskId,
+        content,
+        task_id: taskId,
         user_id: user.sub,
       },
       select: this.commentSelect(),
     });
+
+    return this.mapComment(comment);
   }
 
   async findByTask(taskId: string) {
     await this.ensureTaskExists(taskId);
 
-    return this.prisma.task_comments.findMany({
+    const comments = await this.prisma.task_comments.findMany({
       where: { task_id: taskId },
       select: this.commentSelect(),
       orderBy: { created_at: 'asc' },
     });
+
+    return comments.map((comment) => this.mapComment(comment));
   }
 
   async update(id: string, dto: UpdateCommentDto, user: JwtPayload) {
     const comment = await this.ensureCommentExists(id);
     this.ensureOwnership(comment.user_id, user);
 
-    return this.prisma.task_comments.update({
+    const updated = await this.prisma.task_comments.update({
       where: { id },
       data: { content: dto.content },
       select: this.commentSelect(),
     });
+
+    return this.mapComment(updated);
   }
 
   async remove(id: string, user: JwtPayload) {
@@ -81,8 +91,10 @@ export class CommentsService {
   private commentSelect() {
     return {
       id: true,
+      user_id: true,
       content: true,
       task_id: true,
+      is_tagged: true,
       created_at: true,
       updated_at: true,
       users: {
@@ -92,6 +104,34 @@ export class CommentsService {
           role: true,
         },
       },
+    };
+  }
+
+  private mapComment(comment: {
+    id: string;
+    user_id: string;
+    content: string;
+    task_id: string;
+    is_tagged: boolean | null;
+    created_at: Date;
+    updated_at: Date;
+    users: { id: string; full_name: string; role: role_enum } | null;
+  }) {
+    return {
+      id: comment.id,
+      userId: comment.user_id,
+      taskId: comment.task_id,
+      content: comment.content,
+      isTagged: comment.is_tagged ?? false,
+      createdAt: comment.created_at,
+      updatedAt: comment.updated_at,
+      user: comment.users
+        ? {
+            id: comment.users.id,
+            fullName: comment.users.full_name,
+            role: comment.users.role,
+          }
+        : undefined,
     };
   }
 }

@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { tasksApi } from '@/api/tasks';
 import { Comment } from '@/api/types';
-import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -19,7 +18,6 @@ export function TaskCommentSection({
   comments,
   isLoading,
 }: TaskCommentSectionProps) {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -59,7 +57,7 @@ export function TaskCommentSection({
             <div key={comment.id} className="border-l-2 border-gray-200 pl-4">
               <div className="flex items-start justify-between">
                 <p className="font-medium text-gray-900">
-                  {comment.user?.name || 'Unknown User'}
+                  {comment.user?.fullName || 'Unknown User'}
                 </p>
                 <p className="text-xs text-gray-500">
                   {new Date(comment.createdAt).toLocaleDateString()}
