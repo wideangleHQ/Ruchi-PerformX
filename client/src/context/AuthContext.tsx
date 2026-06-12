@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { User, LoginRequest, JwtUser } from '@/api/types';
 import { authApi } from '@/api/auth';
 import { initializeSocket, disconnectSocket } from '@/config/socketClient';
@@ -28,6 +29,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   // Initialize auth state on mount
   useEffect(() => {
@@ -67,6 +69,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       setIsLoading(true);
       setError(null);
+
+      // Ensure no stale data from a previous session remains
+      queryClient.clear();
+
       const res = await authApi.login(credentials);
       localStorage.setItem('accessToken', res.accessToken);
       const me = await authApi.getCurrentUser();
@@ -97,8 +103,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(null);
       setError(null);
       disconnectSocket();
+
+      // Remove all cached query data (self-actions, tasks, dashboard, etc.)
+      // so the next user never sees a previous user's cached records.
+      queryClient.clear();
     } catch (err: any) {
       console.error('Logout error:', err);
+      // Still clear cache even if the logout API call failed
+      queryClient.clear();
     } finally {
       setIsLoading(false);
     }
