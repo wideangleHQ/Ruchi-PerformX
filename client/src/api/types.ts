@@ -130,6 +130,21 @@ export interface Task {
   users_tasks_assigned_by_idTousers?: { id: string; full_name: string; role: Role };
   departments?: { id: string; name: string };
   task_departments?: Array<{ departments: { id: string; name: string } }>;
+  task_attachments?: Attachment[];
+}
+
+export interface Attachment {
+  id: string;
+  file_name: string;
+  file_url: string;
+  file_type?: string | null;
+  file_size_kb?: number | null;
+  uploaded_by_id?: string;
+  task_id?: string | null;
+  comment_id?: string | null;
+  self_action_id?: string | null;
+  self_action_comment_id?: string | null;
+  created_at?: string;
 }
 
 export interface Comment {
@@ -138,8 +153,12 @@ export interface Comment {
   userId: string;
   user?: User;
   taskId: string;
+  parentCommentId?: string | null;
   isTagged: boolean;
   createdAt: string;
+  updatedAt?: string;
+  attachments?: Attachment[];
+  replies?: Comment[];
 }
 
 // ─── Pagination ───────────────────────────────────────────────────────────────

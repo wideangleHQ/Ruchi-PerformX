@@ -2,6 +2,7 @@
 
 import { X } from 'lucide-react';
 import { SelfAction } from '@/api/self-actions';
+import { SelfActionCommentSection } from '@/components/self-actions/SelfActionCommentSection';
 
 type Props = {
   action?: SelfAction | null;
@@ -93,6 +94,8 @@ export function SelfActionDetailsSheet({ action, open, onClose }: Props) {
               )}
             </div>
           </div>
+
+          <SelfActionCommentSection actionId={action.id} />
         </div>
       </div>
     </div>

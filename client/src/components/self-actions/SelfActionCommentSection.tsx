@@ -1,18 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { tasksApi } from '@/api/tasks';
-import { Comment } from '@/api/types';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { selfActionsApi, SelfActionComment } from '@/api/self-actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { prepareAttachmentFiles } from '@/lib/attachmentUpload';
-
-interface TaskCommentSectionProps {
-  taskId: string;
-  comments: Comment[];
-  isLoading?: boolean;
-}
 
 type Draft = {
   content: string;
@@ -20,12 +13,12 @@ type Draft = {
 };
 
 function CommentNode({
-  taskId,
+  actionId,
   comment,
   onReply,
 }: {
-  taskId: string;
-  comment: Comment;
+  actionId: string;
+  comment: SelfActionComment;
   onReply: (parentId: string, draft: Draft) => Promise<void>;
 }) {
   const [isReplying, setIsReplying] = useState(false);
@@ -53,12 +46,12 @@ function CommentNode({
   };
 
   return (
-    <div className="border-l-2 border-gray-200 pl-4">
+    <div className="border-l-2 border-slate-200 pl-4">
       <div className="flex items-start justify-between gap-3">
-        <p className="font-medium text-gray-900">{comment.user?.fullName || 'Unknown User'}</p>
-        <p className="text-xs text-gray-500">{new Date(comment.createdAt).toLocaleDateString()}</p>
+        <p className="font-medium text-slate-900">{comment.user?.fullName || 'Unknown User'}</p>
+        <p className="text-xs text-slate-500">{new Date(comment.createdAt).toLocaleDateString()}</p>
       </div>
-      <p className="mt-1 whitespace-pre-wrap text-gray-600">{comment.content}</p>
+      <p className="mt-1 whitespace-pre-wrap text-slate-700">{comment.content}</p>
       {comment.attachments?.length ? (
         <div className="mt-3 space-y-2">
           {comment.attachments.map((file) => (
@@ -67,10 +60,10 @@ function CommentNode({
               href={file.file_url}
               target="_blank"
               rel="noreferrer"
-              className="block rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              className="block rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
             >
               <div className="font-medium">{file.file_name}</div>
-              <div className="text-xs text-gray-500">{(file.file_size_kb ?? 0).toLocaleString()} KB</div>
+              <div className="text-xs text-slate-500">{(file.file_size_kb ?? 0).toLocaleString()} KB</div>
             </a>
           ))}
         </div>
@@ -96,7 +89,7 @@ function CommentNode({
             disabled={submitting}
           />
           {attachments.length ? (
-            <div className="space-y-1 text-xs text-gray-500">
+            <div className="space-y-1 text-xs text-slate-500">
               {attachments.map((file) => (
                 <div key={`${file.name}-${file.size}`}>{file.name}</div>
               ))}
@@ -113,9 +106,9 @@ function CommentNode({
         </form>
       ) : null}
       {comment.replies?.length ? (
-        <div className="mt-4 space-y-4 border-l border-gray-100 pl-4">
+        <div className="mt-4 space-y-4 border-l border-slate-100 pl-4">
           {comment.replies.map((reply) => (
-            <CommentNode key={reply.id} taskId={taskId} comment={reply} onReply={onReply} />
+            <CommentNode key={reply.id} actionId={actionId} comment={reply} onReply={onReply} />
           ))}
         </div>
       ) : null}
@@ -123,41 +116,33 @@ function CommentNode({
   );
 }
 
-export function TaskCommentSection({ taskId, comments, isLoading }: TaskCommentSectionProps) {
+export function SelfActionCommentSection({ actionId }: { actionId: string }) {
   const queryClient = useQueryClient();
-  const [newComment, setNewComment] = useState('');
+  const [content, setContent] = useState('');
   const [attachments, setAttachments] = useState<File[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const { data: comments = [], isLoading } = useQuery({
+    queryKey: ['self-actions', actionId, 'comments'],
+    queryFn: () => selfActionsApi.getComments(actionId),
+    enabled: Boolean(actionId),
+  });
 
   const addCommentMutation = useMutation({
     mutationFn: (payload: { content: string; attachments?: File[]; parentCommentId?: string | null }) =>
-      tasksApi.addComment(taskId, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks', taskId, 'comments'] });
-      setNewComment('');
+      selfActionsApi.addComment(actionId, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['self-actions', actionId, 'comments'] });
+      setContent('');
       setAttachments([]);
-      setIsSubmitting(false);
+      setSubmitting(false);
     },
     onError: () => {
-      setIsSubmitting(false);
+      setSubmitting(false);
     },
   });
 
-  const handleSubmitComment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newComment.trim()) return;
-    setIsSubmitting(true);
-    try {
-      await addCommentMutation.mutateAsync({
-        content: newComment,
-        attachments: await prepareAttachmentFiles(attachments),
-      });
-    } catch {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleReply = async (parentId: string, draft: Draft) => {
+  const submitReply = async (parentId: string, draft: Draft) => {
     try {
       await addCommentMutation.mutateAsync({
         content: draft.content,
@@ -169,51 +154,60 @@ export function TaskCommentSection({ taskId, comments, isLoading }: TaskCommentS
     }
   };
 
+  const submitComment = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!content.trim()) return;
+    setSubmitting(true);
+    try {
+      await addCommentMutation.mutateAsync({
+        content,
+        attachments: await prepareAttachmentFiles(attachments),
+      });
+    } catch {
+      setSubmitting(false);
+    }
+  };
+
   return (
-    <div className="rounded-lg bg-white p-6 shadow">
-      <h2 className="text-lg font-semibold text-gray-900">Comments</h2>
-      {isLoading ? (
-        <div className="mt-4 text-center">
-          <p className="text-gray-600">Loading comments...</p>
-        </div>
-      ) : comments && comments.length > 0 ? (
-        <div className="mt-4 space-y-4">
-          {comments.map((comment) => (
-            <CommentNode key={comment.id} taskId={taskId} comment={comment} onReply={handleReply} />
-          ))}
-        </div>
-      ) : (
-        <div className="mt-4 text-center">
-          <p className="text-gray-600">No comments yet</p>
-        </div>
-      )}
-      <form onSubmit={handleSubmitComment} className="mt-6 border-t pt-6">
-        <div className="space-y-3">
-          <Input
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            placeholder="Add a comment..."
-            disabled={isSubmitting}
-            className="text-base"
-          />
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h3 className="text-sm font-semibold text-slate-900">Comments</h3>
+      <div className="mt-4 space-y-4">
+        {isLoading ? (
+          <p className="text-sm text-slate-500">Loading comments...</p>
+        ) : comments.length ? (
+          comments.map((comment) => (
+            <CommentNode key={comment.id} actionId={actionId} comment={comment} onReply={submitReply} />
+          ))
+        ) : (
+          <p className="text-sm text-slate-500">No comments yet.</p>
+        )}
+      </div>
+      <form onSubmit={submitComment} className="mt-6 space-y-3 border-t border-slate-200 pt-4">
+        <Input
+          value={content}
+          onChange={(event) => setContent(event.target.value)}
+          placeholder="Add a comment..."
+          disabled={submitting}
+        />
           <Input
             type="file"
             multiple
             accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.ppt,.pptx,image/jpeg,image/png,image/webp,application/pdf"
             onChange={(event) => setAttachments(Array.from(event.target.files ?? []))}
-            disabled={isSubmitting}
+            disabled={submitting}
           />
           {attachments.length ? (
-            <div className="space-y-1 text-xs text-gray-500">
+            <div className="space-y-1 text-xs text-slate-500">
               {attachments.map((file) => (
                 <div key={`${file.name}-${file.size}`}>{file.name}</div>
               ))}
             </div>
           ) : null}
-          <Button type="submit" disabled={isSubmitting || !newComment.trim()} className="bg-green-600 hover:bg-green-700">
-            {isSubmitting ? 'Adding...' : 'Add Comment'}
-          </Button>
-        </div>
+          <div className="flex items-center gap-2">
+            <Button type="submit" className="bg-green-600 hover:bg-green-700" disabled={submitting || !content.trim()}>
+              {submitting ? 'Adding...' : 'Add Comment'}
+            </Button>
+          </div>
       </form>
     </div>
   );

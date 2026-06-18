@@ -10,12 +10,15 @@ import { UpdateTaskDto } from './dto/update-task.dto';
 import { TaskFilterDto } from './dto/task-filter.dto';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
 import { Prisma, task_status_enum, role_enum } from '@prisma/client';
+import { AttachmentsService } from '../attachments/attachments.service';
+import { UploadedFile } from '../../common/types/uploaded-file.type';
 
 @Injectable()
 export class TasksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly lifecycle: TaskLifecycleService,
+    private readonly attachmentsService: AttachmentsService,
   ) {}
 
   private mappedDepts(user: JwtPayload): string[] {
@@ -26,48 +29,69 @@ export class TasksService {
         : [];
   }
 
-  async create(dto: CreateTaskDto, user: JwtPayload) {
-    const departmentIds = this.resolveDepartmentIds(dto);
-    const departmentId = departmentIds[0]!;
-    await this.assertCreateAccess(departmentIds, dto.assignedToId, user);
+  async create(dto: CreateTaskDto, user: JwtPayload, attachments: UploadedFile[] = []) {
+    try {
+      const departmentIds = this.resolveDepartmentIds(dto);
+      const departmentId = departmentIds[0]!;
 
-    return this.prisma.$transaction(async (tx) => {
-      const task = await tx.tasks.create({
-        data: {
-          title: dto.title,
-          description: dto.description,
-          priority: dto.priority,
-          due_date: new Date(dto.dueDate),
-          assigned_to_id: dto.assignedToId ?? null,
-          assigned_by_id: user.sub,
-          department_id: departmentId,
-          parent_task_id: dto.parentTaskId ?? null,
-          status: dto.assignedToId ? task_status_enum.ASSIGNED : task_status_enum.CREATED,
-        },
+      console.log('[CREATE TASK DEBUG] dto.departmentIds=', dto.departmentIds, 'dto.departmentId=', dto.departmentId);
+      console.log('[CREATE TASK DEBUG] resolved departmentIds=', departmentIds, 'departmentId=', departmentId);
+      console.log('[CREATE TASK DEBUG] user.sub=', user.sub, 'user.role=', user.role);
+
+      await this.assertCreateAccess(departmentIds, dto.assignedToId, user);
+
+      const task = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.tasks.create({
+          data: {
+            title: dto.title,
+            description: dto.description,
+            priority: dto.priority,
+            due_date: new Date(dto.dueDate),
+            assigned_to_id: dto.assignedToId ?? null,
+            assigned_by_id: user.sub,
+            department_id: departmentId,
+            parent_task_id: dto.parentTaskId ?? null,
+            status: dto.assignedToId ? task_status_enum.ASSIGNED : task_status_enum.CREATED,
+          },
+        });
+
+        await tx.task_departments.createMany({
+          data: departmentIds.map((department_id) => ({
+            task_id: created.id,
+            department_id,
+          })),
+          skipDuplicates: true,
+        });
+
+        await tx.task_status_logs.create({
+          data: {
+            task_id: created.id,
+            from_status: null,
+            to_status: dto.assignedToId ? task_status_enum.ASSIGNED : task_status_enum.CREATED,
+            changed_by_id: user.sub,
+          },
+        });
+
+        return created;
       });
 
-      await tx.task_departments.createMany({
-        data: departmentIds.map((department_id) => ({
-          task_id: task.id,
-          department_id,
-        })),
-        skipDuplicates: true,
-      });
+      try {
+        if (attachments.length) {
+          await this.attachmentsService.uploadTaskAttachments(task.id, attachments, user);
+        }
+      } catch (error) {
+        await this.prisma.tasks.delete({ where: { id: task.id } });
+        throw error;
+      }
 
-      await tx.task_status_logs.create({
-        data: {
-          task_id: task.id,
-          from_status: null,
-          to_status: dto.assignedToId ? task_status_enum.ASSIGNED : task_status_enum.CREATED,
-          changed_by_id: user.sub,
-        },
-      });
-
-      return tx.tasks.findUnique({
-        where: { id: task.id },
-        include: this.taskInclude(),
-      });
-    });
+      return this.findOne(task.id, user);
+    } catch (error: any) {
+      console.error('[CREATE TASK ERROR] message=', error?.message);
+      console.error('[CREATE TASK ERROR] code=', error?.code);
+      console.error('[CREATE TASK ERROR] meta=', error?.meta);
+      console.error('[CREATE TASK ERROR] stack=', error?.stack);
+      throw error;
+    }
   }
 
   async findAll(filters: TaskFilterDto, user: JwtPayload) {
@@ -81,11 +105,6 @@ export class TasksService {
         ...baseWhere,
         ...this.departmentVisibility(this.mappedDepts(user)),
       };
-      if (user.role === role_enum.EA || user.role === role_enum.PA) {
-        // EA/PA can view tasks assigned by themselves, to themselves, or within mapped depts
-        // departmentVisibility already includes tasks within mapped depts. 
-        // We can just rely on departmentVisibility since they can only assign to/from their mapped depts.
-      }
     } else {
       where = {
         ...baseWhere,
@@ -130,13 +149,29 @@ export class TasksService {
           include: { users: { select: { id: true, full_name: true } } },
           orderBy: { created_at: 'asc' },
         },
-        task_attachments: true,
+        task_attachments: {
+          select: {
+            id: true,
+            task_id: true,
+            comment_id: true,
+            self_action_id: true,
+            self_action_comment_id: true,
+            file_name: true,
+            file_url: true,
+            storage_path: true,
+            file_type: true,
+            file_size_kb: true,
+            uploaded_by_id: true,
+            created_at: true,
+          },
+        },
         task_escalations: true,
       },
     });
 
     if (!task) throw new NotFoundException('Task not found');
     this.assertAccess(task, user);
+    task.task_attachments = await this.attachmentsService.decorateTaskAttachments(task.task_attachments);
     return task;
   }
 
@@ -144,13 +179,19 @@ export class TasksService {
     const task = await this.getTaskOrFail(id);
     this.assertAccess(task, user);
 
+    if (user.role === role_enum.EMPLOYEE) {
+      throw new ForbiddenException('Employees are not authorized to update tasks');
+    }
+
     const updateData: Record<string, any> = { ...dto };
     if (dto.dueDate) {
       updateData.due_date = new Date(dto.dueDate);
       delete updateData.dueDate;
     }
     if (dto.assignedToId !== undefined) {
-      await this.assertAssigneeAccess(dto.assignedToId, this.taskDepartmentIds(task));
+      if (dto.assignedToId !== null) {
+        await this.assertAssigneeAccess(dto.assignedToId, this.taskDepartmentIds(task));
+      }
       updateData.assigned_to_id = dto.assignedToId;
       delete updateData.assignedToId;
     }
@@ -164,6 +205,10 @@ export class TasksService {
 
   async remove(id: string, user: JwtPayload) {
     const task = await this.getTaskOrFail(id);
+
+    if (user.role === role_enum.EMPLOYEE) {
+      throw new ForbiddenException('Employees are not authorized to delete tasks');
+    }
 
     if ((user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA) && !this.hasDepartmentAccess(task, this.mappedDepts(user))) {
       throw new ForbiddenException();
@@ -379,6 +424,13 @@ export class TasksService {
 
     if (activeDepartments !== departmentIds.length) {
       throw new ForbiddenException('Invalid department selection');
+    }
+
+    if (user.role === role_enum.EMPLOYEE) {
+      const userDeptId = user.departmentId;
+      if (!userDeptId || departmentIds.some((id) => id !== userDeptId)) {
+        throw new ForbiddenException('You can only create tasks in your own department');
+      }
     }
 
     if (user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA) {

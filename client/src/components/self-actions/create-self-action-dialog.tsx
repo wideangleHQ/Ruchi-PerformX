@@ -5,11 +5,12 @@ import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SelfActionPriority } from '@/api/self-actions';
+import { prepareAttachmentFiles } from '@/lib/attachmentUpload';
 
 type Props = {
   open: boolean;
   onClose: () => void;
-  onSubmit: (values: { title: string; description: string; priority: SelfActionPriority }) => Promise<void>;
+  onSubmit: (values: { title: string; description: string; priority: SelfActionPriority; attachments: File[] }) => Promise<void>;
   isPending?: boolean;
   error?: string | null;
 };
@@ -18,12 +19,14 @@ export function CreateSelfActionDialog({ open, onClose, onSubmit, isPending, err
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<SelfActionPriority>('MEDIUM');
+  const [attachments, setAttachments] = useState<File[]>([]);
 
   useEffect(() => {
     if (open) {
       setTitle('');
       setDescription('');
       setPriority('MEDIUM');
+      setAttachments([]);
     }
   }, [open]);
 
@@ -46,7 +49,7 @@ export function CreateSelfActionDialog({ open, onClose, onSubmit, isPending, err
           className="space-y-4 p-5"
           onSubmit={async (event) => {
             event.preventDefault();
-            await onSubmit({ title, description, priority });
+            await onSubmit({ title, description, priority, attachments: await prepareAttachmentFiles(attachments) });
           }}
         >
           {error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
@@ -79,6 +82,23 @@ export function CreateSelfActionDialog({ open, onClose, onSubmit, isPending, err
               <option value="HIGH">HIGH</option>
               <option value="CRITICAL">CRITICAL</option>
             </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Attachments</label>
+            <Input
+              type="file"
+              multiple
+              accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.ppt,.pptx,image/jpeg,image/png,image/webp,application/pdf"
+              onChange={(event) => setAttachments(Array.from(event.target.files ?? []))}
+            />
+            {attachments.length ? (
+              <div className="mt-2 space-y-1 text-xs text-slate-500">
+                {attachments.map((file) => (
+                  <div key={`${file.name}-${file.size}`}>{file.name}</div>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           <div className="flex justify-end gap-2 pt-2">

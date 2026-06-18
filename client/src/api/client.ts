@@ -19,6 +19,15 @@ axiosClient.interceptors.request.use(
         config.headers.Authorization = `Bearer ${token}`;
       }
     }
+    if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+      const headers = config.headers as any;
+      if (headers) {
+        delete headers['Content-Type'];
+        if (headers.common) {
+          delete headers.common['Content-Type'];
+        }
+      }
+    }
     return config;
   },
   (error) => Promise.reject(error),

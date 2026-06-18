@@ -24,7 +24,7 @@ const statusIcons: Record<TaskStatus, ReactNode> = {
   REVIEWED: <CheckCircle2 size={20} className="text-teal-500" />,
   CLOSED: <CheckCircle2 size={20} className="text-gray-500" />,
 };
-
+  
 function formatDate(date?: string | null) {
   if (!date) return 'No due date';
   return new Date(date).toLocaleDateString('en-GB', {
@@ -131,6 +131,25 @@ export default function TaskDetailPage() {
                 <p className="mt-1 text-gray-900">{formatDate(createdAt)}</p>
               </div>
             </div>
+            {task.task_attachments?.length ? (
+              <div className="mt-6">
+                <p className="text-sm font-semibold text-gray-900">Attachments</p>
+                <div className="mt-3 space-y-2">
+                  {task.task_attachments.map((file) => (
+                    <a
+                      key={file.id}
+                      href={file.file_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block rounded-lg border border-gray-200 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      <div className="font-medium">{file.file_name}</div>
+                      <div className="text-xs text-gray-500">{(file.file_size_kb ?? 0).toLocaleString()} KB</div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <TaskCommentSection taskId={taskId} comments={comments || []} isLoading={commentsLoading} />

@@ -1,8 +1,8 @@
 import { IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
-export class CreateTaskCommentDto {
+export class CreateSelfActionCommentDto {
   @IsString()
-  @IsNotEmpty({ message: 'Content is required' })
+  @IsNotEmpty()
   @MaxLength(1000)
   content!: string;
 

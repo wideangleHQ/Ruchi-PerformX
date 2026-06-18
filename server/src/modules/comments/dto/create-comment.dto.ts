@@ -1,6 +1,6 @@
 // src/modules/comments/dto/create-comment.dto.ts
 
-import { IsNotEmpty, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class CreateCommentDto {
   @IsString()
@@ -11,4 +11,8 @@ export class CreateCommentDto {
   @IsUUID()
   @IsNotEmpty({ message: 'Task ID is required' })
   taskId!: string;
+
+  @IsOptional()
+  @IsUUID()
+  parentCommentId?: string;
 }

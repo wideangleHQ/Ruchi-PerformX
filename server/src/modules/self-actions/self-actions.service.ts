@@ -10,8 +10,11 @@ import { CreateSelfActionDto } from './dto/create-self-action.dto';
 import { UpdateSelfActionDto } from './dto/update-self-action.dto';
 import { ChangeStatusDto } from './dto/change-status.dto';
 import { SelfActionFilterDto } from './dto/self-action-filter.dto';
+import { CreateSelfActionCommentDto } from './dto/create-self-action-comment.dto';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
 import { Prisma, role_enum, self_action_status_enum } from '@prisma/client';
+import { AttachmentsService } from '../attachments/attachments.service';
+import { UploadedFile } from '../../common/types/uploaded-file.type';
 
 const SELECT = {
   id: true,
@@ -42,10 +45,17 @@ const SELECT = {
   task_attachments: {
     select: {
       id: true,
+      task_id: true,
+      comment_id: true,
+      self_action_id: true,
+      self_action_comment_id: true,
       file_name: true,
       file_url: true,
+      storage_path: true,
       file_type: true,
       file_size_kb: true,
+      uploaded_by_id: true,
+      created_at: true,
     },
   },
 };
@@ -54,9 +64,12 @@ const SELECT = {
 export class SelfActionsService {
   private readonly logger = new Logger(SelfActionsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly attachmentsService: AttachmentsService,
+  ) {}
 
-  async create(dto: CreateSelfActionDto, user: JwtPayload) {
+  async create(dto: CreateSelfActionDto, user: JwtPayload, attachments: UploadedFile[] = []) {
     if (!user?.sub) {
       throw new BadRequestException('Invalid token: missing user identity');
     }
@@ -72,12 +85,10 @@ export class SelfActionsService {
         departmentId = userDept?.department_id;
       }
 
-      // fallback 1: JWT singular departmentId (EMPLOYEE / MD)
       if (!departmentId && user.departmentId) {
         departmentId = user.departmentId;
       }
 
-      // fallback 2: JWT plural departmentIds (HOD / EA / PA)
       if (!departmentId && user.departmentIds && user.departmentIds.length > 0) {
         departmentId = user.departmentIds[0];
       }
@@ -120,8 +131,18 @@ export class SelfActionsService {
         return created;
       });
 
+      if (attachments.length) {
+        try {
+          await this.attachmentsService.uploadSelfActionAttachments(action.id, attachments, user);
+        } catch (error) {
+          await this.prisma.self_actions.delete({ where: { id: action.id } });
+          throw error;
+        }
+      }
+
+      const hydrated = await this.findOne(action.id, user);
       this.logger.log(`SelfAction ${action.id} created by ${user.username}`);
-      return action;
+      return hydrated;
     } catch (error) {
       this.logger.error(
         `SelfAction create failed: ${(error as any)?.message ?? error}`,
@@ -181,7 +202,7 @@ export class SelfActionsService {
     ]);
 
     return {
-      data,
+      data: await Promise.all(data.map((item) => this.mapAction(item))),
       total,
       page: filter.page || 1,
       limit: filter.limit || 20,
@@ -199,7 +220,7 @@ export class SelfActionsService {
     if (action.deleted_at) throw new NotFoundException('Self action not found');
 
     this.checkReadAccess(action, user);
-    return action;
+    return this.mapAction(action);
   }
 
   async update(id: string, dto: UpdateSelfActionDto, user: JwtPayload) {
@@ -257,13 +278,13 @@ export class SelfActionsService {
       return result;
     });
 
-    return updated;
+    return this.mapAction(updated);
   }
 
   async changeStatus(id: string, dto: ChangeStatusDto, user: JwtPayload) {
     const action = await this.prisma.self_actions.findUnique({
       where: { id },
-      select: { id: true, created_by_id: true, status: true },
+      select: { id: true, created_by_id: true, status: true, department_id: true, users: { select: { role: true, department_id: true } } },
     });
 
     if (!action) throw new NotFoundException('Self action not found');
@@ -300,7 +321,7 @@ export class SelfActionsService {
       return result;
     });
 
-    return updated;
+    return this.mapAction(updated);
   }
 
   async softDelete(id: string, user: JwtPayload) {
@@ -333,6 +354,89 @@ export class SelfActionsService {
     });
 
     return { message: 'Self action deleted' };
+  }
+
+  async findComments(id: string, user: JwtPayload) {
+    const action = await this.ensureActionVisible(id, user);
+
+    const comments = await this.prisma.self_action_comments.findMany({
+      where: { self_action_id: action.id, parent_comment_id: null },
+      select: this.commentSelect(),
+      orderBy: { created_at: 'asc' },
+    });
+
+    return Promise.all(comments.map((comment) => this.mapComment(comment)));
+  }
+
+  async addComment(
+    id: string,
+    dto: CreateSelfActionCommentDto,
+    user: JwtPayload,
+    attachments: UploadedFile[] = [],
+  ) {
+    await this.ensureActionVisible(id, user);
+    await this.ensureParentCommentBelongsToAction(id, dto.parentCommentId);
+
+    const comment = await this.prisma.self_action_comments.create({
+      data: {
+        self_action_id: id,
+        user_id: user.sub,
+        content: dto.content,
+        parent_comment_id: dto.parentCommentId ?? null,
+      },
+      select: this.commentSelect(),
+    });
+
+    if (attachments.length) {
+      try {
+        await this.attachmentsService.uploadSelfActionCommentAttachments(id, comment.id, attachments, user);
+      } catch (error) {
+        await this.prisma.self_action_comments.delete({ where: { id: comment.id } });
+        throw error;
+      }
+    }
+
+    return this.mapComment(await this.findCommentById(comment.id));
+  }
+
+  private async ensureActionVisible(id: string, user: JwtPayload) {
+    const action = await this.prisma.self_actions.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        created_by_id: true,
+        department_id: true,
+        deleted_at: true,
+        users: { select: { id: true, role: true, department_id: true } },
+      },
+    });
+
+    if (!action || action.deleted_at) throw new NotFoundException('Self action not found');
+    this.checkReadAccess(action, user);
+    return action;
+  }
+
+  private async findCommentById(id: string) {
+    const comment = await this.prisma.self_action_comments.findUnique({
+      where: { id },
+      select: this.commentSelect(),
+    });
+
+    if (!comment) throw new NotFoundException('Comment not found');
+    return comment;
+  }
+
+  private async ensureParentCommentBelongsToAction(id: string, parentCommentId?: string) {
+    if (!parentCommentId) return;
+
+    const parent = await this.prisma.self_action_comments.findFirst({
+      where: { id: parentCommentId, self_action_id: id },
+      select: { id: true },
+    });
+
+    if (!parent) {
+      throw new NotFoundException('Parent comment not found');
+    }
   }
 
   private getVisibilityFilter(user: JwtPayload) {
@@ -399,5 +503,110 @@ export class SelfActionsService {
     if (!allowed[from]?.includes(to)) {
       throw new BadRequestException(`Cannot transition from ${from} to ${to}`);
     }
+  }
+
+  private async mapAction(action: any): Promise<any> {
+    return {
+      ...action,
+      task_attachments: await this.attachmentsService.decorateTaskAttachments(action.task_attachments),
+    };
+  }
+
+  private commentSelect() {
+    return {
+      id: true,
+      self_action_id: true,
+      user_id: true,
+      parent_comment_id: true,
+      content: true,
+      is_tagged: true,
+      created_at: true,
+      updated_at: true,
+      users: {
+        select: {
+          id: true,
+          full_name: true,
+          role: true,
+          department_id: true,
+        },
+      },
+      task_attachments: {
+        select: {
+          id: true,
+          task_id: true,
+          comment_id: true,
+          self_action_id: true,
+          self_action_comment_id: true,
+          file_name: true,
+          file_url: true,
+          storage_path: true,
+          file_type: true,
+          file_size_kb: true,
+          uploaded_by_id: true,
+          created_at: true,
+        },
+      },
+      self_action_comment_replies: {
+        select: {
+          id: true,
+          self_action_id: true,
+          user_id: true,
+          parent_comment_id: true,
+          content: true,
+          is_tagged: true,
+          created_at: true,
+          updated_at: true,
+          users: {
+            select: {
+              id: true,
+              full_name: true,
+              role: true,
+              department_id: true,
+            },
+          },
+          task_attachments: {
+            select: {
+              id: true,
+              task_id: true,
+              comment_id: true,
+              self_action_id: true,
+              self_action_comment_id: true,
+              file_name: true,
+              file_url: true,
+              storage_path: true,
+              file_type: true,
+              file_size_kb: true,
+              uploaded_by_id: true,
+              created_at: true,
+            },
+          },
+        },
+      },
+    };
+  }
+
+  private async mapComment(comment: any): Promise<any> {
+    return {
+      id: comment.id,
+      selfActionId: comment.self_action_id,
+      userId: comment.user_id,
+      parentCommentId: comment.parent_comment_id,
+      content: comment.content,
+      isTagged: comment.is_tagged ?? false,
+      createdAt: comment.created_at,
+      updatedAt: comment.updated_at,
+      attachments: await this.attachmentsService.decorateTaskAttachments(comment.task_attachments),
+      replies: comment.self_action_comment_replies?.length
+        ? await Promise.all(comment.self_action_comment_replies.map((reply: any) => this.mapComment(reply)))
+        : [],
+      user: comment.users
+        ? {
+            id: comment.users.id,
+            fullName: comment.users.full_name,
+            role: comment.users.role,
+            departmentId: comment.users.department_id,
+          }
+        : undefined,
+    };
   }
 }

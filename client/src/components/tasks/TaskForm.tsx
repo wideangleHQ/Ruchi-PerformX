@@ -9,6 +9,7 @@ import { tasksApi, TaskDepartment } from '@/api/tasks';
 import { User } from '@/api/types';
 import { useAuth } from '@/context/AuthContext';
 import { createTaskSchema, CreateTaskFormData } from '@/lib/taskValidation';
+import { prepareAttachmentFiles } from '@/lib/attachmentUpload';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -20,6 +21,7 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
   const router = useRouter();
   const { user } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<File[]>([]);
 
   const isMD = user?.role === 'MD';
   const isHOD = user?.role === 'HOD';
@@ -59,7 +61,7 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
   });
 
   const createTaskMutation = useMutation({
-    mutationFn: (data: CreateTaskFormData) =>
+    mutationFn: (data: CreateTaskFormData & { attachments?: File[] }) =>
       tasksApi.createTask({
         title: data.title,
         description: data.description,
@@ -68,6 +70,7 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
         assignedToId: data.assignedToId || undefined,
         departmentId: data.departmentId || undefined,
         departmentIds: data.departmentIds?.length ? data.departmentIds : undefined,
+        attachments: data.attachments,
       }),
     onSuccess: (task) => {
       onSuccess?.();
@@ -80,7 +83,8 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
 
   const onSubmit = async (data: CreateTaskFormData) => {
     setError(null);
-    await createTaskMutation.mutateAsync(data);
+    const preparedAttachments = await prepareAttachmentFiles(attachments);
+    await createTaskMutation.mutateAsync({ ...data, attachments: preparedAttachments });
   };
 
   return (
@@ -110,6 +114,24 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
         {form.formState.errors.description && (
           <p className="mt-1 text-sm text-red-600">{form.formState.errors.description.message}</p>
         )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Attachments</label>
+        <Input
+          type="file"
+          multiple
+          accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.ppt,.pptx,image/jpeg,image/png,image/webp,application/pdf"
+          className="mt-1"
+          onChange={(event) => setAttachments(Array.from(event.target.files ?? []))}
+        />
+        {attachments.length ? (
+          <div className="mt-2 space-y-1 text-xs text-gray-600">
+            {attachments.map((file) => (
+              <div key={`${file.name}-${file.size}`}>{file.name}</div>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-2 gap-4">

@@ -1,5 +1,6 @@
 import { IsString, IsOptional, IsEnum, MaxLength } from 'class-validator';
 import { self_action_priority_enum } from '@prisma/client';
+import { UploadedFile } from '../../../common/types/uploaded-file.type';
 
 export class UpdateSelfActionDto {
   @IsString()
@@ -16,5 +17,5 @@ export class UpdateSelfActionDto {
   priority?: self_action_priority_enum;
 
   @IsOptional()
-  attachments?: Express.Multer.File[];
+  attachments?: UploadedFile[];
 }

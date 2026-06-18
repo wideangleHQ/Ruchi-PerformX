@@ -188,6 +188,7 @@ model self_actions {
   users            users                       @relation(fields: [created_by_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_self_action_creator")
   departments      departments                 @relation(fields: [department_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_self_action_dept")
   task_attachments task_attachments[]
+  self_action_comments self_action_comments[]
   self_action_logs self_action_logs[]
 
   @@index([created_by_id], map: "idx_self_actions_creator")
@@ -219,13 +220,16 @@ model task_attachments {
   task_id        String?        @db.Uuid
   comment_id     String?        @db.Uuid
   self_action_id String?        @db.Uuid
+  self_action_comment_id String? @db.Uuid
   file_name      String         @db.VarChar(255)
   file_url       String
+  storage_path   String?        @db.VarChar(500)
   file_type      String?        @db.VarChar(100)
   file_size_kb   Int?
   uploaded_by_id String         @db.Uuid
   created_at     DateTime       @default(now()) @db.Timestamptz(6)
   task_comments  task_comments? @relation(fields: [comment_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_attachment_comment")
+  self_action_comments self_action_comments? @relation(fields: [self_action_comment_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_attachment_self_action_comment")
   self_actions   self_actions?  @relation(fields: [self_action_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_attachment_self_action")
   tasks          tasks?         @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_attachment_task")
   users          users          @relation(fields: [uploaded_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_attachment_user")
@@ -236,16 +240,40 @@ model task_comments {
   id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   task_id          String             @db.Uuid
   user_id          String             @db.Uuid
+  parent_comment_id String?           @db.Uuid
   content          String
   is_tagged        Boolean?           @default(false)
   created_at       DateTime           @default(now()) @db.Timestamptz(6)
   updated_at       DateTime           @default(now()) @db.Timestamptz(6)
   task_attachments task_attachments[]
+  task_comments    task_comments?    @relation("task_comment_replies", fields: [parent_comment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  task_comment_replies task_comments[] @relation("task_comment_replies")
   tasks            tasks              @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_comment_task")
   users            users              @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_comment_user")
 
   @@index([task_id], map: "idx_task_comments_task")
   @@index([user_id], map: "idx_task_comments_user")
+  @@index([parent_comment_id], map: "idx_task_comments_parent")
+}
+
+model self_action_comments {
+  id                   String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  self_action_id       String              @db.Uuid
+  user_id              String              @db.Uuid
+  parent_comment_id    String?             @db.Uuid
+  content              String
+  is_tagged            Boolean?            @default(false)
+  created_at           DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime            @default(now()) @db.Timestamptz(6)
+  task_attachments     task_attachments[]
+  self_action_comments self_action_comments? @relation("self_action_comment_replies", fields: [parent_comment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  self_action_comment_replies self_action_comments[] @relation("self_action_comment_replies")
+  self_actions         self_actions         @relation(fields: [self_action_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_self_action_comment_action")
+  users                users                @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_self_action_comment_user")
+
+  @@index([self_action_id], map: "idx_self_action_comments_action")
+  @@index([user_id], map: "idx_self_action_comments_user")
+  @@index([parent_comment_id], map: "idx_self_action_comments_parent")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -413,6 +441,7 @@ model users {
   performance_scores                                   performance_scores[]
   registration_requests                                registration_requests[]
   self_actions                                         self_actions[]
+  self_action_comments                                 self_action_comments[]
   self_action_logs                                     self_action_logs[]
   task_attachments                                     task_attachments[]
   task_comments                                        task_comments[]

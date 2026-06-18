@@ -8,18 +8,23 @@ import {
   Body,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFiles,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { SelfActionsService } from './self-actions.service';
 import { CreateSelfActionDto } from './dto/create-self-action.dto';
 import { UpdateSelfActionDto } from './dto/update-self-action.dto';
 import { ChangeStatusDto } from './dto/change-status.dto';
 import { SelfActionFilterDto } from './dto/self-action-filter.dto';
+import { CreateSelfActionCommentDto } from './dto/create-self-action-comment.dto';
 import { JwtAuthGuard } from '../../common/gaurds/jwt-auth.guard';
 import { RolesGuard } from '../../common/gaurds/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
 import { role_enum } from '@prisma/client';
+import { UploadedFile } from '../../common/types/uploaded-file.type';
 
 @Controller('self-actions')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -28,11 +33,13 @@ export class SelfActionsController {
 
   @Post()
   @Roles(role_enum.EMPLOYEE, role_enum.HOD, role_enum.MD, role_enum.EA, role_enum.PA)
+  @UseInterceptors(FilesInterceptor('attachments'))
   create(
     @Body() dto: CreateSelfActionDto,
+    @UploadedFiles() attachments: UploadedFile[],
     @CurrentUser() user: JwtPayload,
   ) {
-    return this.selfActionsService.create(dto, user);
+    return this.selfActionsService.create(dto, user, attachments ?? []);
   }
 
   @Get()
@@ -80,5 +87,26 @@ export class SelfActionsController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.selfActionsService.softDelete(id, user);
+  }
+
+  @Get(':id/comments')
+  @Roles(role_enum.EMPLOYEE, role_enum.HOD, role_enum.MD, role_enum.EA, role_enum.PA, role_enum.ADMIN)
+  findComments(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.selfActionsService.findComments(id, user);
+  }
+
+  @Post(':id/comments')
+  @Roles(role_enum.EMPLOYEE, role_enum.HOD, role_enum.MD, role_enum.EA, role_enum.PA, role_enum.ADMIN)
+  @UseInterceptors(FilesInterceptor('attachments'))
+  addComment(
+    @Param('id') id: string,
+    @Body() dto: CreateSelfActionCommentDto,
+    @UploadedFiles() attachments: UploadedFile[],
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.selfActionsService.addComment(id, dto, user, attachments ?? []);
   }
 }

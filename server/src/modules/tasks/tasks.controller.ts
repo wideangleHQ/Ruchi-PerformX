@@ -8,7 +8,10 @@ import {
   Param,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFiles,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -19,6 +22,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
 import { role_enum , task_status_enum } from '@prisma/client';
+import { UploadedFile } from '../../common/types/uploaded-file.type';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('tasks')
@@ -29,8 +33,13 @@ export class TasksController {
 
   @Post()
   @Roles(role_enum.MD, role_enum.HOD, role_enum.EMPLOYEE, role_enum.EA, role_enum.PA)
-  create(@Body() dto: CreateTaskDto, @CurrentUser() user: JwtPayload) {
-    return this.tasksService.create(dto, user);
+  @UseInterceptors(FilesInterceptor('attachments'))
+  create(
+    @Body() dto: CreateTaskDto,
+    @UploadedFiles() attachments: UploadedFile[],
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.tasksService.create(dto, user, attachments ?? []);
   }
 
   // ─── List ──────────────────────────────────────────────────────

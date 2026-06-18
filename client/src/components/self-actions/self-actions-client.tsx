@@ -164,6 +164,7 @@ export function SelfActionsClient() {
     title: string;
     description: string;
     priority: SelfActionPriority;
+    attachments: File[];
   }) => {
     try {
       setDialogError(null);

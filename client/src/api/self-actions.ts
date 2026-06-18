@@ -1,5 +1,5 @@
 import axiosClient from './client';
-import { PaginatedResponse } from './types';
+import { Attachment, PaginatedResponse, User } from './types';
 
 export type SelfActionStatus = 'OPEN' | 'ONGOING' | 'COMPLETED' | 'ABORTED';
 export type SelfActionPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
@@ -37,6 +37,20 @@ export interface SelfAction {
   task_attachments?: SelfActionAttachment[];
 }
 
+export interface SelfActionComment {
+  id: string;
+  selfActionId: string;
+  userId: string;
+  parentCommentId?: string | null;
+  content: string;
+  isTagged: boolean;
+  createdAt: string;
+  updatedAt?: string;
+  user?: User;
+  attachments?: Attachment[];
+  replies?: SelfActionComment[];
+}
+
 export interface SelfActionFilters {
   search?: string;
   status?: SelfActionStatus;
@@ -47,6 +61,12 @@ export interface SelfActionFilters {
   dateTo?: string;
   page?: number;
   limit?: number;
+}
+
+function appendAttachments(formData: FormData, attachments?: File[]) {
+  attachments?.forEach((file) => {
+    formData.append('attachments', file, file.name);
+  });
 }
 
 export const selfActionsApi = {
@@ -68,8 +88,14 @@ export const selfActionsApi = {
     title: string;
     description: string;
     priority?: SelfActionPriority;
+    attachments?: File[];
   }): Promise<SelfAction> => {
-    const response = await axiosClient.post<SelfAction>('/self-actions', data);
+    const formData = new FormData();
+    formData.append('title', data.title);
+    formData.append('description', data.description);
+    if (data.priority) formData.append('priority', data.priority);
+    appendAttachments(formData, data.attachments);
+    const response = await axiosClient.post<SelfAction>('/self-actions', formData);
     return response.data;
   },
 
@@ -94,5 +120,22 @@ export const selfActionsApi = {
 
   deleteSelfAction: async (id: string): Promise<void> => {
     await axiosClient.delete(`/self-actions/${id}`);
+  },
+
+  getComments: async (id: string): Promise<SelfActionComment[]> => {
+    const response = await axiosClient.get<SelfActionComment[]>(`/self-actions/${id}/comments`);
+    return response.data;
+  },
+
+  addComment: async (
+    id: string,
+    data: { content: string; attachments?: File[]; parentCommentId?: string | null },
+  ): Promise<SelfActionComment> => {
+    const formData = new FormData();
+    formData.append('content', data.content);
+    if (data.parentCommentId) formData.append('parentCommentId', data.parentCommentId);
+    appendAttachments(formData, data.attachments);
+    const response = await axiosClient.post<SelfActionComment>(`/self-actions/${id}/comments`, formData);
+    return response.data;
   },
 };
