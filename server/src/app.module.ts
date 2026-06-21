@@ -17,6 +17,7 @@ import { SelfActionsModule } from './modules/self-actions/self-actions.module'
 import { ScoringModule } from './modules/scoring/scoring.module'
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ProfileModule } from './modules/profile/profile.module';
+import { RequestsModule } from './modules/requests/requests.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { ProfileModule } from './modules/profile/profile.module';
     AttachmentsModule,
     TransfersModule,
     SelfActionsModule,
+    RequestsModule,
     ScoringModule,
     DashboardModule,
     ProfileModule,

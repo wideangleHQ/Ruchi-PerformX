@@ -1,16 +1,40 @@
-import { IsEnum, IsNotEmpty, IsString } from 'class-validator';
-import { request_type_enum } from '@prisma/client';
+import { IsIn, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+
+const REQUEST_TYPES = [
+  'BUDGET_APPROVAL',
+  'TRANSPORT_SUPPORT',
+  'CROSS_DEPT_ASSISTANCE',
+  'RESOURCE_REQUEST',
+  'OTHER',
+  'TASK_REASSIGNMENT',
+] as const;
 
 export class CreateRequestDto {
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  title!: string;
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
 
   @IsNotEmpty()
-  @IsString()
-  description!: string;
+  @IsIn(REQUEST_TYPES)
+  type!: typeof REQUEST_TYPES[number];
 
-  @IsNotEmpty()
-  @IsEnum(request_type_enum)
-  type!: request_type_enum;
+  @IsOptional()
+  @IsUUID()
+  taskId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  currentAssigneeId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  requestedAssigneeId?: string;
+
+  @IsOptional()
+  @IsString()
+  requestReason?: string;
 }

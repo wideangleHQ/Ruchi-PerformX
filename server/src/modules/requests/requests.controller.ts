@@ -44,8 +44,12 @@ export class RequestsController {
 
   @Patch(':id/approve')
   @Roles(role_enum.HOD, role_enum.MD)
-  approve(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
-    return this.requestsService.approve(id, user);
+  approve(
+    @Param('id') id: string,
+    @Body() dto: UpdateRequestStatusDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.requestsService.approve(id, dto, user);
   }
 
   @Patch(':id/reject')

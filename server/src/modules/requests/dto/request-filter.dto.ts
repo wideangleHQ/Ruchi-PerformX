@@ -1,5 +1,14 @@
-import { IsEnum, IsOptional } from 'class-validator';
-import { request_status_enum , request_type_enum} from '@prisma/client';
+import { IsEnum, IsIn, IsOptional } from 'class-validator';
+import { request_status_enum } from '@prisma/client';
+
+const REQUEST_TYPES = [
+  'BUDGET_APPROVAL',
+  'TRANSPORT_SUPPORT',
+  'CROSS_DEPT_ASSISTANCE',
+  'RESOURCE_REQUEST',
+  'OTHER',
+  'TASK_REASSIGNMENT',
+] as const;
 
 export class RequestFilterDto {
   @IsOptional()
@@ -7,6 +16,9 @@ export class RequestFilterDto {
   status?: request_status_enum;
 
   @IsOptional()
-  @IsEnum(request_type_enum)
-  type?: request_type_enum;
+  @IsIn(REQUEST_TYPES)
+  type?: typeof REQUEST_TYPES[number];
+
+  @IsOptional()
+  taskId?: string;
 }

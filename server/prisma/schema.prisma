@@ -300,18 +300,28 @@ model task_requests {
   type                                       request_type_enum
   status                                     request_status_enum @default(PENDING)
   rejection_reason                           String?
+  task_id                                    String?             @db.Uuid
+  task_title                                 String?             @db.VarChar(255)
+  task_description                           String?
+  current_assignee_id                        String?             @db.Uuid
+  requested_assignee_id                      String?             @db.Uuid
+  request_reason                             String?
   requested_by_id                            String              @db.Uuid
   reviewed_by_id                             String?             @db.Uuid
   reviewed_at                                DateTime?           @db.Timestamptz(6)
   generated_task_id                          String?             @unique @db.Uuid
   created_at                                 DateTime            @default(now()) @db.Timestamptz(6)
   updated_at                                 DateTime            @default(now()) @db.Timestamptz(6)
+  task                                       tasks?              @relation("task_request_task", fields: [task_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  current_assignee                           users?              @relation("task_request_current_assignee", fields: [current_assignee_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  requested_assignee                         users?              @relation("task_request_requested_assignee", fields: [requested_assignee_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   tasks                                      tasks?              @relation(fields: [generated_task_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_generated_task")
   users_task_requests_reviewed_by_idTousers  users?              @relation("task_requests_reviewed_by_idTousers", fields: [reviewed_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_request_reviewer")
   users_task_requests_requested_by_idTousers users               @relation("task_requests_requested_by_idTousers", fields: [requested_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_request_user")
 
   @@index([status], map: "idx_task_requests_status")
   @@index([requested_by_id], map: "idx_task_requests_user")
+  @@index([task_id], map: "idx_task_requests_task")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -405,6 +415,7 @@ model tasks {
   task_comments                     task_comments[]
   task_escalations                  task_escalations[]
   task_requests                     task_requests?
+  task_request_task                 task_requests[]     @relation("task_request_task")
   task_status_logs                  task_status_logs[]
   task_transfers                    task_transfers[]
   task_departments                  task_departments[]
@@ -443,6 +454,8 @@ model users {
   self_actions                                         self_actions[]
   self_action_comments                                 self_action_comments[]
   self_action_logs                                     self_action_logs[]
+  task_requests_current_assignee                       task_requests[]     @relation("task_request_current_assignee")
+  task_requests_requested_assignee                     task_requests[]     @relation("task_request_requested_assignee")
   task_attachments                                     task_attachments[]
   task_comments                                        task_comments[]
   task_escalations                                     task_escalations[]
@@ -524,6 +537,7 @@ enum request_type_enum {
   CROSS_DEPT_ASSISTANCE
   RESOURCE_REQUEST
   OTHER
+  TASK_REASSIGNMENT
 }
 
 enum role_enum {

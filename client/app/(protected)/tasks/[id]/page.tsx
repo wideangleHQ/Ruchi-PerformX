@@ -5,8 +5,9 @@ import type { ReactNode } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useTask, useTaskComments } from '@/hooks/useQueries';
+import { useRequests, useTask, useTaskComments } from '@/hooks/useQueries';
 import { useAuth } from '@/context/AuthContext';
+import { requestsApi } from '@/api/requests';
 import { tasksApi } from '@/api/tasks';
 import { Button } from '@/components/ui/button';
 import { TaskCommentSection } from '@/components/tasks/TaskCommentSection';
@@ -45,7 +46,10 @@ export default function TaskDetailPage() {
   const { user } = useAuth();
   const { data: task, isLoading } = useTask(taskId);
   const { data: comments, isLoading: commentsLoading } = useTaskComments(taskId);
+  const { data: requests = [] } = useRequests({ type: 'TASK_REASSIGNMENT', taskId });
   const [error, setError] = useState<string | null>(null);
+  const [showReassign, setShowReassign] = useState(false);
+  const [reason, setReason] = useState('');
 
   const mutation = useMutation({
     mutationFn: (action: 'accept' | 'progress' | 'complete' | 'review' | 'close') => {
@@ -90,6 +94,24 @@ export default function TaskDetailPage() {
   const isEmployeeOwner = user?.role === 'EMPLOYEE' && task.assigned_to_id === user.id;
   const isReviewer = user?.role === 'MD' || user?.role === 'HOD';
   const isMD = user?.role === 'MD';
+  const canRequestReassignment = isEmployeeOwner && task.status !== 'COMPLETED' && task.status !== 'CLOSED';
+  const hasPendingReassignment = Boolean(requests.some((request) => request.status === 'PENDING'));
+
+  const submitReassignment = async () => {
+    if (!reason.trim()) return;
+    try {
+      setError(null);
+      await requestsApi.createTaskReassignmentRequest({
+        taskId: task.id,
+        currentAssigneeId: task.assigned_to_id ?? user?.id ?? '',
+        requestReason: reason.trim(),
+      });
+      setShowReassign(false);
+      setReason('');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to submit reassignment request');
+    }
+  };
 
   return (
     <div>
@@ -194,8 +216,51 @@ export default function TaskDetailPage() {
               {isReviewer && task.status === 'REVIEWED' && (
                 <Button disabled={mutation.isPending} onClick={() => mutation.mutate('close')}>Close</Button>
               )}
+              {canRequestReassignment && !hasPendingReassignment && (
+                <Button variant="outline" onClick={() => setShowReassign((value) => !value)}>
+                  Request Reassignment
+                </Button>
+              )}
+              {canRequestReassignment && hasPendingReassignment && (
+                <p className="text-sm text-amber-600">A pending reassignment request already exists for this task.</p>
+              )}
               {!isEmployeeOwner && !isReviewer && <p className="text-sm text-gray-500">No actions available</p>}
             </div>
+            {showReassign && canRequestReassignment && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl">
+                  <h2 className="text-xl font-bold text-gray-900">Request Reassignment</h2>
+                  <div className="mt-4 space-y-3">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Task Name</p>
+                      <p className="mt-1 text-gray-900">{task.title}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Task Description</p>
+                      <p className="mt-1 whitespace-pre-wrap text-gray-900">{task.description}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Request Reason</p>
+                      <textarea
+                        value={reason}
+                        onChange={(event) => setReason(event.target.value)}
+                        required
+                        rows={4}
+                        className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-6 flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setShowReassign(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={submitReassignment} disabled={!reason.trim()}>
+                      Submit Request
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

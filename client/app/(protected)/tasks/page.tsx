@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useTasks } from '@/hooks/useQueries';
 import { useAuth } from '@/context/AuthContext';
+import { useRequests } from '@/hooks/useQueries';
 import { TaskList } from '@/components/tasks/TaskList';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,7 +26,14 @@ export default function TasksPage() {
   } as any;
 
   const { data: tasksData, isLoading } = useTasks(filters);
+  const { data: reassignmentRequests } = useRequests(user?.role === 'EMPLOYEE' ? { type: 'TASK_REASSIGNMENT' } : undefined);
   const tasks = Array.isArray(tasksData) ? tasksData : (tasksData?.data ?? []);
+  const reassignedTaskIds = useMemo(
+    () => (reassignmentRequests ?? [])
+      .filter((request) => request.status === 'ACCEPTED' && request.taskId)
+      .map((request) => request.taskId as string),
+    [reassignmentRequests],
+  );
 
   const clearFilters = () => {
     setSearch('');
@@ -128,7 +136,7 @@ export default function TasksPage() {
       )}
 
       {/* Task Table */}
-      <TaskList tasks={tasks} isLoading={isLoading} />
+      <TaskList tasks={tasks} isLoading={isLoading} reassignedTaskIds={reassignedTaskIds} />
     </div>
   );
 }

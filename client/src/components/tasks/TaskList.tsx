@@ -1,11 +1,13 @@
 'use client';
 
 import Link from 'next/link';
+import { CheckCircle2 } from 'lucide-react';
 import { Task } from '@/api/types';
 
 interface TaskListProps {
   tasks: any[];
   isLoading?: boolean;
+  reassignedTaskIds?: string[];
 }
 
 const priorityBadge: Record<string, string> = {
@@ -32,7 +34,9 @@ function fmt(date: string | null | undefined) {
   return new Date(date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-export function TaskList({ tasks, isLoading }: TaskListProps) {
+export function TaskList({ tasks, isLoading, reassignedTaskIds = [] }: TaskListProps) {
+  const reassignedSet = new Set(reassignedTaskIds);
+
   if (isLoading) {
     return <div className="py-12 text-center text-gray-500">Loading tasks...</div>;
   }
@@ -64,13 +68,22 @@ export function TaskList({ tasks, isLoading }: TaskListProps) {
             const departments = task.task_departments?.length
               ? task.task_departments.map((item: any) => item.departments?.name).filter(Boolean).join(', ')
               : task.departments?.name;
+            const isReassigned = reassignedSet.has(task.id);
 
             return (
-              <tr key={task.id} className="hover:bg-gray-50 transition-colors">
+              <tr key={task.id} className={`transition-colors hover:bg-gray-50 ${isReassigned ? 'bg-green-50/60' : ''}`}>
                 <td className="px-4 py-3 font-medium text-gray-900 max-w-[220px]">
-                  <Link href={`/tasks/${task.id}`} className="hover:text-green-700 hover:underline line-clamp-2">
-                    {task.title}
-                  </Link>
+                  <div className="space-y-1">
+                    <Link href={`/tasks/${task.id}`} className="hover:text-green-700 hover:underline line-clamp-2">
+                      {task.title}
+                    </Link>
+                    {isReassigned ? (
+                      <div className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
+                        <CheckCircle2 size={12} />
+                        Reassigned
+                      </div>
+                    ) : null}
+                  </div>
                 </td>
 
                 <td className="px-4 py-3 text-gray-600">

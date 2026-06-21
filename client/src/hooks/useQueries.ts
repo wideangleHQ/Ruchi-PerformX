@@ -103,6 +103,8 @@ export const useRequests = (params?: {
   page?: number;
   limit?: number;
   status?: string;
+  type?: string;
+  taskId?: string;
 }) => {
   return useQuery({
     queryKey: ['requests', params],
