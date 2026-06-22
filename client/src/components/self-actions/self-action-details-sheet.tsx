@@ -26,7 +26,7 @@ export function SelfActionDetailsSheet({ action, open, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/40">
-      <div className="absolute right-0 top-0 h-full w-full max-w-xl bg-white shadow-2xl">
+      <div className="absolute right-0 top-0 flex h-full w-full max-w-xl flex-col overflow-hidden bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <div>
             <h2 className="text-lg font-bold text-slate-900">Action Details</h2>
@@ -37,7 +37,8 @@ export function SelfActionDetailsSheet({ action, open, onClose }: Props) {
           </button>
         </div>
 
-        <div className="space-y-5 p-5 text-sm">
+        <div className="flex-1 overflow-y-auto p-5 text-sm">
+          <div className="space-y-5">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Title</p>
             <p className="mt-1 font-semibold text-slate-900">{action.title}</p>
@@ -96,6 +97,7 @@ export function SelfActionDetailsSheet({ action, open, onClose }: Props) {
           </div>
 
           <SelfActionCommentSection actionId={action.id} />
+          </div>
         </div>
       </div>
     </div>

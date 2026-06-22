@@ -11,6 +11,7 @@ import { TaskFilterDto } from './dto/task-filter.dto';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
 import { Prisma, task_status_enum, role_enum } from '@prisma/client';
 import { AttachmentsService } from '../attachments/attachments.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { UploadedFile } from '../../common/types/uploaded-file.type';
 
 @Injectable()
@@ -19,6 +20,7 @@ export class TasksService {
     private readonly prisma: PrismaService,
     private readonly lifecycle: TaskLifecycleService,
     private readonly attachmentsService: AttachmentsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   private mappedDepts(user: JwtPayload): string[] {
@@ -137,8 +139,8 @@ export class TasksService {
   }
 
   async findOne(id: string, user: JwtPayload) {
-    const task = await this.prisma.tasks.findUnique({
-      where: { id },
+    const task = await this.prisma.tasks.findFirst({
+      where: { id, deleted_at: null },
       include: {
         ...this.taskInclude(),
         task_comments: {
@@ -203,18 +205,66 @@ export class TasksService {
     });
   }
 
-  async remove(id: string, user: JwtPayload) {
+  async remove(id: string, user: JwtPayload, reason: string) {
     const task = await this.getTaskOrFail(id);
 
     if (user.role === role_enum.EMPLOYEE) {
       throw new ForbiddenException('Employees are not authorized to delete tasks');
+    }
+    if (!reason?.trim()) {
+      throw new ForbiddenException('Delete reason is required');
     }
 
     if ((user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA) && !this.hasDepartmentAccess(task, this.mappedDepts(user))) {
       throw new ForbiddenException();
     }
 
-    return this.prisma.tasks.delete({ where: { id } });
+    const deletedAt = new Date();
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.tasks.update({
+        where: { id },
+        data: {
+          deleted_at: deletedAt,
+          deleted_by_id: user.sub,
+          delete_reason: reason,
+        } as any,
+      } as any);
+
+      await tx.audit_logs.create({
+        data: {
+          user_id: user.sub,
+          action: 'TASK_DELETED',
+          entity: 'tasks',
+          entity_id: task.id,
+          old_value: JSON.stringify({
+            taskId: task.id,
+            taskTitle: task.title,
+            taskDescription: task.description,
+            assignedToId: task.assigned_to_id,
+            departmentId: task.department_id,
+          }),
+          new_value: JSON.stringify({
+            deletedBy: user.sub,
+            deletedAt: deletedAt.toISOString(),
+            deleteReason: reason,
+          }),
+        },
+      });
+
+      return result;
+    });
+
+    if (task.assigned_to_id) {
+      await this.notificationsService.createNotification({
+        recipientId: task.assigned_to_id,
+        type: 'TASK_REJECTED' as any,
+        title: 'Task Deleted',
+        message: `Task "${task.title}" has been deleted.`,
+      });
+    }
+
+    return updated;
   }
 
   async transition(
@@ -265,7 +315,7 @@ export class TasksService {
   }
 
   async getPending(user: JwtPayload) {
-    const where: Prisma.tasksWhereInput = { status: task_status_enum.PENDING };
+    const where: any = { status: task_status_enum.PENDING, deleted_at: null };
 
     if (user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA) {
       Object.assign(where, this.departmentVisibility(this.mappedDepts(user)));
@@ -289,9 +339,10 @@ export class TasksService {
       task_status_enum.REJECTED,
     ];
 
-    const where: Prisma.tasksWhereInput = {
+    const where: any = {
       due_date: { lt: new Date() },
       status: { notIn: terminalStatuses },
+      deleted_at: null,
     };
 
     if (user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA) {
@@ -358,8 +409,8 @@ export class TasksService {
   }
 
   private async getTaskOrFail(id: string) {
-    const task = await this.prisma.tasks.findUnique({
-      where: { id },
+    const task = await this.prisma.tasks.findFirst({
+      where: { id, deleted_at: null } as any,
       include: { task_departments: { select: { department_id: true } } },
     });
     if (!task) throw new NotFoundException('Task not found');
@@ -374,7 +425,7 @@ export class TasksService {
   }
 
   private buildWhereFromFilters(filters: TaskFilterDto): Prisma.tasksWhereInput {
-    const where: Prisma.tasksWhereInput = {};
+    const where: any = { deleted_at: null };
     if (filters.status) where.status = filters.status;
     if (filters.priority) where.priority = filters.priority;
     if (filters.title) where.title = { contains: filters.title, mode: 'insensitive' };

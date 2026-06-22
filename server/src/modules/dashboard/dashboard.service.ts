@@ -133,12 +133,13 @@ export class DashboardService {
   }
 
   private taskScope(user: JwtPayload): Prisma.tasksWhereInput {
-    if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return {};
+    const base = { deleted_at: null };
+    if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return base;
     if (user.role === role_enum.HOD) {
       const deptIds = this.hodDeptIds(user);
-      return deptIds.length ? this.departmentVisibility(deptIds) : { id: { in: [] } };
+      return deptIds.length ? { ...base, ...this.departmentVisibility(deptIds) } : { id: { in: [] } };
     }
-    return user.departmentId ? this.departmentVisibility([user.departmentId]) : { id: { in: [] } };
+    return user.departmentId ? { ...base, ...this.departmentVisibility([user.departmentId]) } : { id: { in: [] } };
   }
 
   private requestScope(user: JwtPayload): Prisma.task_requestsWhereInput {

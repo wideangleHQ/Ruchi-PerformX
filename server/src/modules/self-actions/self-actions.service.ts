@@ -292,7 +292,10 @@ export class SelfActionsService {
     const canEdit =
       user.role === role_enum.MD ||
       user.role === role_enum.ADMIN ||
-      action.created_by_id === user.sub;
+      user.role === role_enum.EA ||
+      user.role === role_enum.PA ||
+      action.created_by_id === user.sub ||
+      (user.role === role_enum.HOD && user.departmentIds?.includes(action.department_id));
     if (!canEdit) throw new ForbiddenException('Not authorized');
 
     this.validateStatusTransition(action.status as self_action_status_enum, dto.status);
@@ -493,11 +496,13 @@ export class SelfActionsService {
     from: self_action_status_enum,
     to: self_action_status_enum,
   ) {
+    if (from === to) return;
+
     const allowed: Record<self_action_status_enum, self_action_status_enum[]> = {
       OPEN: ['ONGOING', 'ABORTED'],
-      ONGOING: ['COMPLETED', 'ABORTED'],
-      COMPLETED: [],
-      ABORTED: [],
+      ONGOING: ['COMPLETED', 'ABORTED', 'OPEN'],
+      COMPLETED: ['OPEN', 'ONGOING'],
+      ABORTED: ['OPEN', 'ONGOING'],
     };
 
     if (!allowed[from]?.includes(to)) {

@@ -105,8 +105,12 @@ export class TasksController {
 
   @Delete(':id')
   @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA)
-  remove(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
-    return this.tasksService.remove(id, user);
+  remove(
+    @Param('id') id: string,
+    @Body('reason') reason: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.tasksService.remove(id, user, reason);
   }
 
   // ─── State Transitions ─────────────────────────────────────────

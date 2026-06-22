@@ -37,7 +37,7 @@ export class EmailService {
     const subject =
       type === 'REGISTRATION'
         ? 'RUCHI PerformX - Verify Your Email'
-        : 'RUCHI PerformX - Password Reset OTP';
+        : 'RUCHI PerformX Password Reset OTP';
 
     const heading =
       type === 'REGISTRATION'
@@ -56,11 +56,7 @@ export class EmailService {
         from: this.fromEmail,
         to: [email],
         subject,
-        html: this.buildOtpTemplate(
-          heading,
-          message,
-          otp,
-        ),
+        html: this.buildOtpTemplate(heading, message, otp),
       });
 
       this.logger.log(

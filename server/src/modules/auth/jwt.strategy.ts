@@ -24,10 +24,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: JwtPayload) {
     const user = await this.prisma.users.findUnique({
       where: { id: payload.sub },
-      select: { id: true, is_active: true },
+      select: { id: true, is_active: true, password_changed_at: true },
     });
 
     if (!user || !user.is_active) throw new UnauthorizedException('Account inactive or not found');
+    if (user.password_changed_at && payload.iat && payload.iat * 1000 < new Date(user.password_changed_at as any).getTime()) {
+      throw new UnauthorizedException('Session expired');
+    }
 
     return payload;
   }

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRequests, useTask, useTaskComments } from '@/hooks/useQueries';
@@ -41,6 +41,7 @@ function label(status: string) {
 
 export default function TaskDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const taskId = params.id as string;
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -50,6 +51,8 @@ export default function TaskDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [showReassign, setShowReassign] = useState(false);
   const [reason, setReason] = useState('');
+  const [showDelete, setShowDelete] = useState(false);
+  const [deleteReason, setDeleteReason] = useState('');
 
   const mutation = useMutation({
     mutationFn: (action: 'accept' | 'progress' | 'complete' | 'review' | 'close') => {
@@ -66,6 +69,21 @@ export default function TaskDetailPage() {
     },
     onError: (err: any) => {
       setError(err.response?.data?.message || 'Failed to update task');
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => tasksApi.deleteTask(taskId, deleteReason.trim()),
+    onSuccess: async () => {
+      setError(null);
+      setShowDelete(false);
+      setDeleteReason('');
+      await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      await queryClient.invalidateQueries({ queryKey: ['tasks', taskId] });
+      router.push('/tasks');
+    },
+    onError: (err: any) => {
+      setError(err.response?.data?.message || 'Failed to delete task');
     },
   });
 
@@ -94,6 +112,8 @@ export default function TaskDetailPage() {
   const isEmployeeOwner = user?.role === 'EMPLOYEE' && task.assigned_to_id === user.id;
   const isReviewer = user?.role === 'MD' || user?.role === 'HOD';
   const isMD = user?.role === 'MD';
+  const taskDepartmentIds = task.task_departments?.map((item) => item.departments?.id).filter(Boolean) ?? [];
+  const canDeleteTask = user?.role === 'HOD' && Boolean(user.departmentIds?.some((departmentId) => taskDepartmentIds.includes(departmentId)));
   const canRequestReassignment = isEmployeeOwner && task.status !== 'COMPLETED' && task.status !== 'CLOSED';
   const hasPendingReassignment = Boolean(requests.some((request) => request.status === 'PENDING'));
 
@@ -224,6 +244,11 @@ export default function TaskDetailPage() {
               {canRequestReassignment && hasPendingReassignment && (
                 <p className="text-sm text-amber-600">A pending reassignment request already exists for this task.</p>
               )}
+              {canDeleteTask && (
+                <Button variant="destructive" onClick={() => setShowDelete(true)}>
+                  Delete Task
+                </Button>
+              )}
               {!isEmployeeOwner && !isReviewer && <p className="text-sm text-gray-500">No actions available</p>}
             </div>
             {showReassign && canRequestReassignment && (
@@ -256,6 +281,45 @@ export default function TaskDetailPage() {
                     </Button>
                     <Button onClick={submitReassignment} disabled={!reason.trim()}>
                       Submit Request
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {showDelete && canDeleteTask && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl">
+                  <h2 className="text-xl font-bold text-gray-900">Delete Task</h2>
+                  <div className="mt-4 space-y-3">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Task Name</p>
+                      <p className="mt-1 text-gray-900">{task.title}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Task Description</p>
+                      <p className="mt-1 whitespace-pre-wrap text-gray-900">{task.description}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Delete Reason</p>
+                      <textarea
+                        value={deleteReason}
+                        onChange={(event) => setDeleteReason(event.target.value)}
+                        required
+                        rows={4}
+                        className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-6 flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => { setShowDelete(false); setDeleteReason(''); }}>
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      disabled={!deleteReason.trim() || deleteMutation.isPending}
+                      onClick={() => deleteMutation.mutate()}
+                    >
+                      Delete Task
                     </Button>
                   </div>
                 </div>

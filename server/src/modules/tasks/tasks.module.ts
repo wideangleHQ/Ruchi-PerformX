@@ -5,9 +5,10 @@ import { TaskLifecycleService } from './task-lifecycle.service';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { AuthModule } from '../auth/auth.module';
 import { AttachmentsModule } from '../attachments/attachments.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, AttachmentsModule],
+  imports: [PrismaModule, AuthModule, AttachmentsModule, NotificationsModule],
   controllers: [TasksController],
   providers: [TasksService, TaskLifecycleService],
   exports: [TasksService],

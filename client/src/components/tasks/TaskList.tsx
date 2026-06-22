@@ -8,6 +8,8 @@ interface TaskListProps {
   tasks: any[];
   isLoading?: boolean;
   reassignedTaskIds?: string[];
+  canDeleteTask?: boolean;
+  onDeleteTask?: (task: any) => void;
 }
 
 const priorityBadge: Record<string, string> = {
@@ -34,7 +36,7 @@ function fmt(date: string | null | undefined) {
   return new Date(date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-export function TaskList({ tasks, isLoading, reassignedTaskIds = [] }: TaskListProps) {
+export function TaskList({ tasks, isLoading, reassignedTaskIds = [], canDeleteTask = false, onDeleteTask }: TaskListProps) {
   const reassignedSet = new Set(reassignedTaskIds);
 
   if (isLoading) {
@@ -54,7 +56,7 @@ export function TaskList({ tasks, isLoading, reassignedTaskIds = [] }: TaskListP
       <table className="min-w-full divide-y divide-gray-200 text-sm">
         <thead className="bg-gray-50">
           <tr>
-            {['Task Title', 'Department', 'Assigned By', 'Assigned To', 'Priority', 'Status', 'Due Date', 'Created'].map((h) => (
+            {['Task Title', 'Department', 'Assigned By', 'Assigned To', 'Priority', 'Status', 'Due Date', 'Created', ...(canDeleteTask ? [''] : [])].map((h) => (
               <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 {h}
               </th>
@@ -117,6 +119,18 @@ export function TaskList({ tasks, isLoading, reassignedTaskIds = [] }: TaskListP
                 <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
                   {fmt(task.created_at)}
                 </td>
+
+                {canDeleteTask ? (
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => onDeleteTask?.(task)}
+                      className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                ) : null}
               </tr>
             );
           })}

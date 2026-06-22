@@ -2,22 +2,28 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTasks } from '@/hooks/useQueries';
 import { useAuth } from '@/context/AuthContext';
 import { useRequests } from '@/hooks/useQueries';
 import { TaskList } from '@/components/tasks/TaskList';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { tasksApi } from '@/api/tasks';
 import { Plus, Filter, X } from 'lucide-react';
 
 export default function TasksPage() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const canCreate = user?.role === 'MD' || user?.role === 'HOD';
+  const canDeleteTask = user?.role === 'HOD';
 
   const [showFilters, setShowFilters] = useState(false);
   const [search, setSearch]   = useState('');
   const [status, setStatus]   = useState('');
   const [priority, setPriority] = useState('');
+  const [deleteTask, setDeleteTask] = useState<any | null>(null);
+  const [deleteReason, setDeleteReason] = useState('');
 
   const filters = {
     title:    search   || undefined,
@@ -42,6 +48,15 @@ export default function TasksPage() {
   };
 
   const hasFilters = search || status || priority;
+
+  const deleteMutation = useMutation({
+    mutationFn: () => tasksApi.deleteTask(deleteTask.id, deleteReason.trim()),
+    onSuccess: async () => {
+      setDeleteTask(null);
+      setDeleteReason('');
+      await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
 
   return (
     <div>
@@ -136,7 +151,53 @@ export default function TasksPage() {
       )}
 
       {/* Task Table */}
-      <TaskList tasks={tasks} isLoading={isLoading} reassignedTaskIds={reassignedTaskIds} />
+      <TaskList
+        tasks={tasks}
+        isLoading={isLoading}
+        reassignedTaskIds={reassignedTaskIds}
+        canDeleteTask={canDeleteTask}
+        onDeleteTask={setDeleteTask}
+      />
+
+      {deleteTask && canDeleteTask ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl">
+            <h2 className="text-xl font-bold text-gray-900">Delete Task</h2>
+            <div className="mt-4 space-y-3">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Task Name</p>
+                <p className="mt-1 text-gray-900">{deleteTask.title}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Task Description</p>
+                <p className="mt-1 whitespace-pre-wrap text-gray-900">{deleteTask.description}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Delete Reason</p>
+                <textarea
+                  value={deleteReason}
+                  onChange={(event) => setDeleteReason(event.target.value)}
+                  required
+                  rows={4}
+                  className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => { setDeleteTask(null); setDeleteReason(''); }}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={!deleteReason.trim() || deleteMutation.isPending}
+                onClick={() => deleteMutation.mutate()}
+              >
+                Delete Task
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

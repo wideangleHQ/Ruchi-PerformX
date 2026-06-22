@@ -3,14 +3,19 @@ import {
   UnauthorizedException,
   BadRequestException,
   NotFoundException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { VerifyResetOtpDto } from './dto/verify-reset-otp.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { role_enum } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from '../users/dto/create-user.dto';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class AuthService {
@@ -19,6 +24,8 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+    private readonly emailService: EmailService,
   ) {}
 
   // ─── LOGIN ───────────────────────────────────────────────────────────────────
@@ -287,54 +294,146 @@ export class AuthService {
 async forgotPassword(dto: ForgotPasswordDto) {
   const user = await this.prisma.users.findUnique({
     where: { email: dto.email },
-    select: {
-      id: true,
-      is_active: true,
-      pending_approval: true,
-    },
+    select: { id: true, email: true, is_active: true, pending_approval: true },
   });
 
-  if (!user) {
-    return {
-      message: 'Password reset request submitted.',
-    };
-  }
+  if (user && user.is_active && !user.pending_approval) {
+    const otp = this.generateOtp();
+    const otpHash = await bcrypt.hash(otp, this.BCRYPT_ROUNDS);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-  if (!user.is_active || user.pending_approval) {
-    throw new BadRequestException(
-      'Account is not active.',
-    );
-  }
+    await this.prisma.otpVerification.updateMany({
+      where: { email: dto.email, type: 'PASSWORD_RESET', isUsed: false },
+      data: { isUsed: true },
+    });
 
-  const existing =
-    await this.prisma.passwordResetRequest.findFirst({
-      where: {
-        user_id: user.id,
-        status: 'PENDING',
+    await this.prisma.otpVerification.create({
+      data: {
+        email: dto.email,
+        otpHash,
+        type: 'PASSWORD_RESET',
+        expiresAt,
       },
     });
 
-  if (existing) {
-    return {
-      message:
-        'A reset request is already pending HOD review.',
-    };
+    await this.emailService.sendOtpEmail(dto.email, otp, 'PASSWORD_RESET');
   }
 
-  await this.prisma.passwordResetRequest.create({
-    data: {
-      users: {
-        connect: {
-          id: user.id,
-        },
-      },
+  return {
+    message: 'If the account exists, an OTP has been sent.',
+  };
+}
+
+async verifyResetOtp(dto: VerifyResetOtpDto) {
+  const otpRecord = await this.prisma.otpVerification.findFirst({
+    where: {
+      email: dto.email,
+      type: 'PASSWORD_RESET',
+      isUsed: false,
+      expiresAt: { gt: new Date() },
     },
+    orderBy: { createdAt: 'desc' },
   });
 
-  return {
-    message:
-      'Password reset request submitted. Contact your HOD.',
-  };
+  if (!otpRecord) {
+    throw new BadRequestException('Invalid or expired OTP');
+  }
+
+  const matches = await bcrypt.compare(dto.otp, otpRecord.otpHash);
+  if (!matches) {
+    throw new BadRequestException('Invalid or expired OTP');
+  }
+
+  const user = await this.prisma.users.findUnique({
+    where: { email: dto.email },
+    select: { id: true, email: true, is_active: true, pending_approval: true },
+  });
+
+  if (!user || !user.is_active || user.pending_approval) {
+    throw new BadRequestException('Invalid or expired OTP');
+  }
+
+  const resetToken = await this.jwtService.signAsync(
+    { sub: user.id },
+    {
+      secret: this.getResetSecret(),
+      expiresIn: '15m',
+    },
+  );
+
+  await this.prisma.$transaction([
+    this.prisma.otpVerification.update({
+      where: { id: otpRecord.id },
+      data: { isUsed: true },
+    }),
+    this.prisma.otpVerification.create({
+      data: {
+        email: dto.email,
+        otpHash: await bcrypt.hash(resetToken, this.BCRYPT_ROUNDS),
+        type: 'PASSWORD_RESET',
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+      },
+    }),
+  ]);
+
+  return { resetToken };
+}
+
+async resetPassword(dto: ResetPasswordDto) {
+  const payload = await this.jwtService.verifyAsync<{ sub: string }>(dto.resetToken, {
+    secret: this.getResetSecret(),
+  });
+
+  const user = await this.prisma.users.findUnique({
+    where: { id: payload.sub },
+    select: { id: true, email: true, is_active: true, pending_approval: true },
+  });
+
+  if (!user || !user.is_active || user.pending_approval) {
+    throw new BadRequestException('Reset token is invalid or expired');
+  }
+
+  const tokenRecord = await this.prisma.otpVerification.findFirst({
+    where: {
+      email: user.email,
+      type: 'PASSWORD_RESET',
+      isUsed: false,
+      expiresAt: { gt: new Date() },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  if (!tokenRecord) {
+    throw new BadRequestException('Reset token is invalid or expired');
+  }
+
+  const matches = await bcrypt.compare(dto.resetToken, tokenRecord.otpHash);
+  if (!matches) {
+    throw new BadRequestException('Reset token is invalid or expired');
+  }
+
+  const passwordHash = await bcrypt.hash(dto.newPassword, this.BCRYPT_ROUNDS);
+  const now = new Date();
+
+  await this.prisma.$transaction([
+    this.prisma.users.update({
+      where: { id: user.id },
+      data: {
+        password_hash: passwordHash,
+        password_changed_at: now,
+      },
+    }),
+    this.prisma.otpVerification.update({
+      where: { id: tokenRecord.id },
+      data: { isUsed: true },
+    }),
+    this.prisma.otpVerification.updateMany({
+      where: { email: user.email, type: 'PASSWORD_RESET', isUsed: false },
+      data: { isUsed: true },
+    }),
+  ]);
+
+  return { message: 'Password reset successful' };
 }
   // ─── CHANGE PASSWORD ─────────────────────────────────────────────────────────
 
@@ -343,14 +442,23 @@ async forgotPassword(dto: ForgotPasswordDto) {
 
     await this.prisma.users.update({
       where: { id: userId },
-      data: { password_hash: passwordHash },
+      data: { password_hash: passwordHash, password_changed_at: new Date() },
     });
 
     return { message: 'Password changed successfully.' };
+  }
+
+  private generateOtp() {
+    return `${Math.floor(100000 + Math.random() * 900000)}`;
+  }
+
+  private getResetSecret() {
+    const jwtSecret = this.configService.get<string>('JWT_SECRET') ?? process.env.JWT_SECRET;
+    if (!jwtSecret) throw new InternalServerErrorException('JWT_SECRET environment variable is required');
+    return `${jwtSecret}:reset-password`;
   }
 
   private isUuid(value: string) {
     return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
   }
 }
-

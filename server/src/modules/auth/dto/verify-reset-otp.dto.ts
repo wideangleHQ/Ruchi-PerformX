@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString, Length } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, Matches } from 'class-validator';
 
 export class VerifyResetOtpDto {
   @IsNotEmpty()
@@ -7,6 +7,6 @@ export class VerifyResetOtpDto {
 
   @IsNotEmpty()
   @IsString()
-  @Length(6, 6)
+  @Matches(/^\d{6}$/)
   otp!: string;
 }

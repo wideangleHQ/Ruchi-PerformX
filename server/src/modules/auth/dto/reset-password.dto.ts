@@ -1,12 +1,12 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { IsJWT, IsNotEmpty, IsString, Matches } from 'class-validator';
 
 export class ResetPasswordDto {
   @IsNotEmpty()
-  @IsEmail()
-  email!: string;
+  @IsJWT()
+  resetToken!: string;
 
   @IsNotEmpty()
   @IsString()
-  @MinLength(8)
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/)
   newPassword!: string;
 }

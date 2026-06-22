@@ -77,8 +77,8 @@ export const tasksApi = {
     return response.data;
   },
 
-  deleteTask: async (id: string): Promise<void> => {
-    await axiosClient.delete(`/tasks/${id}`);
+  deleteTask: async (id: string, reason: string): Promise<void> => {
+    await axiosClient.delete(`/tasks/${id}`, { data: { reason } });
   },
 
   acceptTask: async (id: string): Promise<Task> => {

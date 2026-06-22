@@ -472,7 +472,7 @@ export class UsersService {
     await this.prisma.$transaction([
       this.prisma.users.update({
         where: { id },
-        data: { password_hash: passwordHash },
+        data: { password_hash: passwordHash, password_changed_at: new Date() },
       }),
       this.prisma.passwordResetRequest.updateMany({
         where: { user_id: id, status: 'PENDING' },
@@ -493,7 +493,7 @@ export class UsersService {
 
     await this.prisma.users.update({
       where: { id },
-      data: { password_hash: passwordHash },
+      data: { password_hash: passwordHash, password_changed_at: new Date() },
     });
 
     return { message: 'Password reset successfully' };

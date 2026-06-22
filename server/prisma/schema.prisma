@@ -408,6 +408,9 @@ model tasks {
   assigned_by_id                    String              @db.Uuid
   department_id                     String              @db.Uuid
   parent_task_id                    String?             @db.Uuid
+  deleted_at                        DateTime?           @db.Timestamptz(6)
+  deleted_by_id                     String?             @db.Uuid
+  delete_reason                     String?
   created_at                        DateTime?           @default(now()) @db.Timestamptz(6)
   updated_at                        DateTime?           @default(now()) @db.Timestamptz(6)
   notifications                     notifications[]
@@ -421,6 +424,7 @@ model tasks {
   task_departments                  task_departments[]
   users_tasks_assigned_by_idTousers users               @relation("tasks_assigned_by_idTousers", fields: [assigned_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   users_tasks_assigned_to_idTousers users?              @relation("tasks_assigned_to_idTousers", fields: [assigned_to_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_tasks_deleted_by_idTousers   users?              @relation("tasks_deleted_by_idTousers", fields: [deleted_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   departments                       departments         @relation(fields: [department_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   tasks                             tasks?              @relation("tasksTotasks", fields: [parent_task_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   other_tasks                       tasks[]             @relation("tasksTotasks")
@@ -432,6 +436,7 @@ model users {
   username                                             String                  @unique @db.VarChar(50)
   email                                                String                  @unique @db.VarChar(255)
   password_hash                                        String
+  password_changed_at                                  DateTime?               @db.Timestamptz(6)
   full_name                                            String                  @db.VarChar(255)
   mobile_number                                        String?                 @db.VarChar(20)
   role                                                 role_enum
@@ -466,6 +471,7 @@ model users {
   task_transfers_task_transfers_received_by_idTousers  task_transfers[]        @relation("task_transfers_received_by_idTousers")
   tasks_tasks_assigned_by_idTousers                    tasks[]                 @relation("tasks_assigned_by_idTousers")
   tasks_tasks_assigned_to_idTousers                    tasks[]                 @relation("tasks_assigned_to_idTousers")
+  tasks_tasks_deleted_by_idTousers                     tasks[]                 @relation("tasks_deleted_by_idTousers")
   departments                                          departments?            @relation(fields: [department_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_department")
   password_reset_requests                              PasswordResetRequest[]
   hod_departments                                      hod_departments[]
