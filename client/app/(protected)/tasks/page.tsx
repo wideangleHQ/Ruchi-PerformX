@@ -15,7 +15,8 @@ import { Plus, Filter, X } from 'lucide-react';
 export default function TasksPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const canCreate = user?.role === 'MD' || user?.role === 'HOD';
+  const userRole = user?.role;
+  const canCreate = Boolean(userRole) && userRole !== 'EMPLOYEE';
   const canDeleteTask = user?.role === 'HOD';
 
   const [showFilters, setShowFilters] = useState(false);

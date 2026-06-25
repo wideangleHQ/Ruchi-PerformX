@@ -75,7 +75,7 @@ export class UsersService {
         OR: [{ is_active: true }, { pending_approval: true }],
       },
     });
-    return count > 0;
+    return count >= 2;
   }
 
   async checkPaExists(): Promise<boolean> {
@@ -121,7 +121,7 @@ export class UsersService {
     if (role === role_enum.EA) {
       const eaExists = await this.checkEaExists();
       if (eaExists) {
-        throw new ConflictException('Executive Assistant already exists.');
+        throw new ConflictException('Maximum of 2 Executive Assistants already exist.');
       }
     }
 

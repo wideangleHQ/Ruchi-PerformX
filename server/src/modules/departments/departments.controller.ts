@@ -19,6 +19,8 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
 export enum Role {
   MD = 'MD',
+  EA = 'EA',
+  PA = 'PA',
   HOD = 'HOD',
   ADMIN = 'ADMIN',
 }
@@ -29,13 +31,13 @@ export class DepartmentsController {
   constructor(private readonly departmentsService: DepartmentsService) {}
 
   @Get()
-  @Roles(Role.MD, Role.HOD, Role.ADMIN)
+  @Roles(Role.MD, Role.EA, Role.PA, Role.HOD, Role.ADMIN)
   findAll(@CurrentUser() user: JwtPayload) {
     return this.departmentsService.findAll(user);
   }
 
   @Get(':id')
-  @Roles(Role.MD, Role.HOD, Role.ADMIN)
+  @Roles(Role.MD, Role.EA, Role.PA, Role.HOD, Role.ADMIN)
   findOne(@Param('id') id: string) {
     return this.departmentsService.findOne(id);
   }

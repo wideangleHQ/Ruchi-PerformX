@@ -55,6 +55,7 @@ export interface User {
   status?: UserStatus;
   departmentId?: string | null;
   departmentIds?: string[];
+  department?: { id: string; name: string } | null;
 }
 
 export interface LoginRequest {

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
   ForbiddenException,
@@ -9,7 +10,7 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { TaskFilterDto } from './dto/task-filter.dto';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
-import { Prisma, task_status_enum, role_enum } from '@prisma/client';
+import { Prisma, task_status_enum, role_enum, notification_type_enum } from '@prisma/client';
 import { AttachmentsService } from '../attachments/attachments.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UploadedFile } from '../../common/types/uploaded-file.type';
@@ -34,64 +35,157 @@ export class TasksService {
   async create(dto: CreateTaskDto, user: JwtPayload, attachments: UploadedFile[] = []) {
     try {
       const departmentIds = this.resolveDepartmentIds(dto);
-      const departmentId = departmentIds[0]!;
+      await this.assertCreateAccess(departmentIds, user);
 
-      console.log('[CREATE TASK DEBUG] dto.departmentIds=', dto.departmentIds, 'dto.departmentId=', dto.departmentId);
-      console.log('[CREATE TASK DEBUG] resolved departmentIds=', departmentIds, 'departmentId=', departmentId);
-      console.log('[CREATE TASK DEBUG] user.sub=', user.sub, 'user.role=', user.role);
+      const assigneeIds = dto.assignAllEmployees
+        ? await this.resolveAllEmployeeIds(departmentIds)
+        : await this.resolveAssigneeIds(dto, departmentIds);
+      const createdAttachmentIds: string[] = [];
 
-      await this.assertCreateAccess(departmentIds, dto.assignedToId, user);
+      const tasks = await this.prisma.$transaction(async (tx) => {
+        const createdTasks: Array<{ id: string }> = [];
 
-      const task = await this.prisma.$transaction(async (tx) => {
-        const created = await tx.tasks.create({
-          data: {
-            title: dto.title,
-            description: dto.description,
-            priority: dto.priority,
-            due_date: new Date(dto.dueDate),
-            assigned_to_id: dto.assignedToId ?? null,
-            assigned_by_id: user.sub,
-            department_id: departmentId,
-            parent_task_id: dto.parentTaskId ?? null,
-            status: dto.assignedToId ? task_status_enum.ASSIGNED : task_status_enum.CREATED,
-          },
-        });
+        if (assigneeIds.length) {
+          for (const assigneeId of assigneeIds) {
+            const created = await tx.tasks.create({
+              data: {
+                title: dto.title,
+                description: dto.description,
+                priority: dto.priority,
+                due_date: new Date(dto.dueDate),
+                assigned_to_id: assigneeId,
+                assigned_by_id: user.sub,
+                department_id: departmentIds[0]!,
+                parent_task_id: dto.parentTaskId ?? null,
+                status: task_status_enum.ASSIGNED,
+              },
+            });
 
-        await tx.task_departments.createMany({
-          data: departmentIds.map((department_id) => ({
-            task_id: created.id,
-            department_id,
-          })),
-          skipDuplicates: true,
-        });
+            await tx.task_departments.createMany({
+              data: departmentIds.map((department_id) => ({
+                task_id: created.id,
+                department_id,
+              })),
+              skipDuplicates: true,
+            });
 
-        await tx.task_status_logs.create({
-          data: {
-            task_id: created.id,
-            from_status: null,
-            to_status: dto.assignedToId ? task_status_enum.ASSIGNED : task_status_enum.CREATED,
-            changed_by_id: user.sub,
-          },
-        });
+            await tx.task_status_logs.create({
+              data: {
+                task_id: created.id,
+                from_status: null,
+                to_status: task_status_enum.ASSIGNED,
+                changed_by_id: user.sub,
+              },
+            });
 
-        return created;
+            await tx.audit_logs.create({
+              data: {
+                user_id: user.sub,
+                action: 'TASK_CREATED',
+                entity: 'tasks',
+                entity_id: created.id,
+                old_value: null,
+                new_value: JSON.stringify({
+                  taskId: created.id,
+                  title: dto.title,
+                  description: dto.description,
+                  assignedToId: assigneeId,
+                  departmentIds,
+                }),
+              },
+            });
+
+            await tx.notifications.create({
+              data: {
+                user_id: assigneeId,
+                type: notification_type_enum.TASK_ASSIGNED,
+                title: 'New Task Assigned',
+                message: `You have been assigned task "${dto.title}".`,
+              },
+            });
+
+            createdTasks.push(created);
+          }
+        } else {
+          const created = await tx.tasks.create({
+            data: {
+              title: dto.title,
+              description: dto.description,
+              priority: dto.priority,
+              due_date: new Date(dto.dueDate),
+              assigned_to_id: null,
+              assigned_by_id: user.sub,
+              department_id: departmentIds[0]!,
+              parent_task_id: dto.parentTaskId ?? null,
+              status: task_status_enum.CREATED,
+            },
+          });
+
+          await tx.task_departments.createMany({
+            data: departmentIds.map((department_id) => ({
+              task_id: created.id,
+              department_id,
+            })),
+            skipDuplicates: true,
+          });
+
+          await tx.task_status_logs.create({
+            data: {
+              task_id: created.id,
+              from_status: null,
+              to_status: task_status_enum.CREATED,
+              changed_by_id: user.sub,
+            },
+          });
+
+          await tx.audit_logs.create({
+            data: {
+              user_id: user.sub,
+              action: 'TASK_CREATED',
+              entity: 'tasks',
+              entity_id: created.id,
+              old_value: null,
+              new_value: JSON.stringify({
+                taskId: created.id,
+                title: dto.title,
+                description: dto.description,
+                departmentIds,
+              }),
+            },
+          });
+
+          createdTasks.push(created);
+        }
+
+        return createdTasks;
       });
 
       try {
         if (attachments.length) {
-          await this.attachmentsService.uploadTaskAttachments(task.id, attachments, user);
+          for (const task of tasks) {
+            const uploadedAttachments = await this.attachmentsService.uploadTaskAttachments(task.id, attachments, user);
+            createdAttachmentIds.push(...uploadedAttachments.map((attachment) => attachment.id));
+          }
         }
       } catch (error) {
-        await this.prisma.tasks.delete({ where: { id: task.id } });
+        for (const attachmentId of createdAttachmentIds.reverse()) {
+          try {
+            await this.attachmentsService.remove(attachmentId, user);
+          } catch {
+            // Best-effort cleanup; task deletion below removes any remaining DB rows.
+          }
+        }
+        await this.prisma.tasks.deleteMany({ where: { id: { in: tasks.map((task) => task.id) } } });
         throw error;
       }
 
-      return this.findOne(task.id, user);
+      const createdTask = tasks[0];
+      if (!createdTask) {
+        throw new BadRequestException('Failed to create task');
+      }
+
+      return this.findOne(createdTask.id, user);
     } catch (error: any) {
-      console.error('[CREATE TASK ERROR] message=', error?.message);
-      console.error('[CREATE TASK ERROR] code=', error?.code);
-      console.error('[CREATE TASK ERROR] meta=', error?.meta);
-      console.error('[CREATE TASK ERROR] stack=', error?.stack);
       throw error;
     }
   }
@@ -364,8 +458,6 @@ export class TasksService {
           ? { hod_departments: { some: { hod_id: user.sub } } }
           : user.role === role_enum.PURCHASE_HEAD
             ? { name: { in: ['Purchase Agro', 'Purchase Non Agro'] } }
-            : user.role === role_enum.EA || user.role === role_enum.PA
-              ? { assistant_departments: { some: { assistant_id: user.sub } } }
               : {}),
       },
       select: { id: true, name: true, description: true, is_active: true },
@@ -377,7 +469,7 @@ export class TasksService {
     const departmentIds = this.resolveQueryDepartmentIds(departmentIdsParam);
     if (!departmentIds.length) return [];
 
-    await this.assertCreateAccess(departmentIds, undefined, user);
+    await this.assertCreateAccess(departmentIds, user);
 
     const users = await this.prisma.users.findMany({
       where: {
@@ -470,7 +562,7 @@ export class TasksService {
     return [...new Set(departmentIds)];
   }
 
-  private async assertCreateAccess(departmentIds: string[], assignedToId: string | undefined, user: JwtPayload) {
+  private async assertCreateAccess(departmentIds: string[], user: JwtPayload) {
     const activeDepartments = await this.prisma.departments.count({
       where: { id: { in: departmentIds }, is_active: true },
     });
@@ -486,56 +578,100 @@ export class TasksService {
       }
     }
 
-    if (user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA || user.role === role_enum.PURCHASE_HEAD) {
-      const allowed = user.role === role_enum.HOD
-        ? await this.prisma.hod_departments.count({
-            where: {
-              hod_id: user.sub,
-              department_id: { in: departmentIds },
-              departments: { is_active: true },
-            },
-          })
-        : user.role === role_enum.PURCHASE_HEAD
-          ? await this.prisma.departments.count({
-              where: {
-                id: { in: departmentIds },
-                is_active: true,
-                name: { in: ['Purchase Agro', 'Purchase Non Agro'] },
-              },
-            })
-          : await this.prisma.assistant_departments.count({
-              where: {
-                assistant_id: user.sub,
-                department_id: { in: departmentIds },
-                departments: { is_active: true },
-              },
-            });
+    if (user.role === role_enum.HOD) {
+      const allowed = await this.prisma.hod_departments.count({
+        where: {
+          hod_id: user.sub,
+          department_id: { in: departmentIds },
+          departments: { is_active: true },
+        },
+      });
 
       if (allowed !== departmentIds.length) {
         throw new ForbiddenException('Cannot assign tasks outside mapped departments');
       }
     }
 
-    if (assignedToId) {
-      await this.assertAssigneeAccess(assignedToId, departmentIds);
+    if (user.role === role_enum.PURCHASE_HEAD) {
+      const allowed = await this.prisma.departments.count({
+        where: {
+          id: { in: departmentIds },
+          is_active: true,
+          name: { in: ['Purchase Agro', 'Purchase Non Agro'] },
+        },
+      });
+
+      if (allowed !== departmentIds.length) {
+        throw new ForbiddenException('Cannot assign tasks outside mapped departments');
+      }
     }
+  }
+
+  private async resolveAssigneeIds(dto: CreateTaskDto, departmentIds: string[]) {
+    const assigneeIds = [...new Set([
+      ...(dto.assignedToIds ?? []),
+      dto.assignedToId ?? '',
+    ].filter(Boolean))];
+
+    if (!assigneeIds.length) {
+      return [];
+    }
+
+    const employees = await this.prisma.users.findMany({
+      where: {
+        id: { in: assigneeIds },
+        role: role_enum.EMPLOYEE,
+        is_active: true,
+        deleted_at: null,
+        pending_approval: false,
+        department_id: { in: departmentIds },
+      },
+      select: { id: true },
+    });
+
+    if (employees.length !== assigneeIds.length) {
+      throw new ForbiddenException('Assignee must belong to a selected department');
+    }
+
+    return employees.map((employee) => employee.id);
   }
 
   private async assertAssigneeAccess(assignedToId: string, departmentIds: string[]) {
     const employee = await this.prisma.users.findFirst({
       where: {
         id: assignedToId,
-        role: { in: [role_enum.EMPLOYEE, role_enum.HOD] },
+        role: role_enum.EMPLOYEE,
         is_active: true,
         deleted_at: null,
         pending_approval: false,
         department_id: { in: departmentIds },
       },
+      select: { id: true },
     });
 
     if (!employee) {
       throw new ForbiddenException('Assignee must belong to a selected department');
     }
+  }
+
+  private async resolveAllEmployeeIds(departmentIds: string[]) {
+    const employees = await this.prisma.users.findMany({
+      where: {
+        role: role_enum.EMPLOYEE,
+        is_active: true,
+        deleted_at: null,
+        pending_approval: false,
+        department_id: { in: departmentIds },
+      },
+      select: { id: true },
+      orderBy: { full_name: 'asc' },
+    });
+
+    if (!employees.length) {
+      throw new BadRequestException('No active employees found for selected departments');
+    }
+
+    return employees.map((employee) => employee.id);
   }
 
   private departmentVisibility(departmentIds: string[]): Prisma.tasksWhereInput {

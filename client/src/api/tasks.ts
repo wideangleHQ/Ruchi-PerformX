@@ -44,6 +44,8 @@ export const tasksApi = {
     priority: string;
     dueDate: string;
     assignedToId?: string;
+    assignedToIds?: string[];
+    assignAllEmployees?: boolean;
     departmentId?: string;
     departmentIds?: string[];
     attachments?: File[];
@@ -54,6 +56,10 @@ export const tasksApi = {
     formData.append('priority', data.priority);
     formData.append('dueDate', data.dueDate);
     if (data.assignedToId) formData.append('assignedToId', data.assignedToId);
+    if (data.assignedToIds?.length) {
+      data.assignedToIds.forEach((assignedToId) => formData.append('assignedToIds', assignedToId));
+    }
+    if (data.assignAllEmployees) formData.append('assignAllEmployees', 'true');
     if (data.departmentId) formData.append('departmentId', data.departmentId);
     if (data.departmentIds?.length) {
       data.departmentIds.forEach((departmentId) => formData.append('departmentIds', departmentId));

@@ -25,25 +25,25 @@ export class RequestsController {
   constructor(private readonly requestsService: RequestsService) {}
 
   @Post()
-  @Roles(role_enum.EMPLOYEE, role_enum.HOD, role_enum.PURCHASE_HEAD)
+  @Roles(role_enum.EMPLOYEE, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD)
   create(@Body() dto: CreateRequestDto, @CurrentUser() user: JwtPayload) {
     return this.requestsService.create(dto, user);
   }
 
   @Get()
-  @Roles(role_enum.EMPLOYEE, role_enum.HOD, role_enum.MD, role_enum.PURCHASE_HEAD)
+  @Roles(role_enum.EMPLOYEE, role_enum.HOD, role_enum.MD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD)
   findAll(@Query() filters: RequestFilterDto, @CurrentUser() user: JwtPayload) {
     return this.requestsService.findAll(filters, user);
   }
 
   @Get(':id')
-  @Roles(role_enum.EMPLOYEE, role_enum.HOD, role_enum.MD, role_enum.PURCHASE_HEAD)
+  @Roles(role_enum.EMPLOYEE, role_enum.HOD, role_enum.MD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD)
   findOne(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.requestsService.findOne(id, user);
   }
 
   @Patch(':id/approve')
-  @Roles(role_enum.HOD, role_enum.MD, role_enum.PURCHASE_HEAD)
+  @Roles(role_enum.HOD, role_enum.MD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD)
   approve(
     @Param('id') id: string,
     @Body() dto: UpdateRequestStatusDto,
@@ -53,7 +53,7 @@ export class RequestsController {
   }
 
   @Patch(':id/reject')
-  @Roles(role_enum.HOD, role_enum.MD, role_enum.PURCHASE_HEAD)
+  @Roles(role_enum.HOD, role_enum.MD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD)
   reject(
     @Param('id') id: string,
     @Body() dto: UpdateRequestStatusDto,

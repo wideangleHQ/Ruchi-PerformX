@@ -203,7 +203,7 @@ export class RequestsService {
   }
 
   private assertAccess(request: any, user: JwtPayload) {
-    if (user.role === role_enum.MD) return;
+    if (user.role === role_enum.MD || user.role === role_enum.EA || user.role === role_enum.PA) return;
     if ((user.role === role_enum.HOD || user.role === role_enum.PURCHASE_HEAD) && this.hasDepartmentAccess(request, this.getManagedDepartmentIds(user))) return;
     if (user.role === role_enum.EMPLOYEE && request.requested_by_id === user.sub) return;
     throw new ForbiddenException('Access denied');
@@ -211,9 +211,9 @@ export class RequestsService {
 
   private assertReviewAccess(request: any, user: JwtPayload) {
     if (request.status !== request_status_enum.PENDING) throw new ForbiddenException('Request has already been reviewed');
-    if (user.role === role_enum.MD) return;
+    if (user.role === role_enum.MD || user.role === role_enum.EA || user.role === role_enum.PA) return;
     if ((user.role === role_enum.HOD || user.role === role_enum.PURCHASE_HEAD) && this.hasDepartmentAccess(request, this.getManagedDepartmentIds(user))) return;
-    throw new ForbiddenException('Only HOD or MD can review requests');
+    throw new ForbiddenException('Only HOD, MD, EA, or PA can review requests');
   }
 
   private async createTaskReassignment(dto: CreateRequestDto, user: JwtPayload) {

@@ -1,4 +1,4 @@
-import { ArrayNotEmpty, ArrayUnique, IsArray, IsDateString, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import { ArrayNotEmpty, ArrayUnique, IsArray, IsBoolean, IsDateString, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { task_priority_enum } from '@prisma/client';
 
@@ -22,6 +22,20 @@ export class CreateTaskDto {
   @IsOptional()
   @IsUUID()
   assignedToId?: string;
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    Array.isArray(value) ? value : typeof value === 'string' ? [value] : value,
+  )
+  @IsArray()
+  @ArrayUnique()
+  @IsUUID(undefined, { each: true })
+  assignedToIds?: string[];
+
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  assignAllEmployees?: boolean;
 
   @IsOptional()
   @IsUUID()

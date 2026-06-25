@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -22,11 +22,9 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
   const { user } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<File[]>([]);
+  const userRole = user?.role;
 
-  const isMD = user?.role === 'MD';
-  const isHOD = user?.role === 'HOD';
-  const isAssistant = user?.role === 'EA' || user?.role === 'PA';
-  const canSelectMultiDept = isHOD || isAssistant;
+  const canCreateTask = Boolean(userRole) && userRole !== 'EMPLOYEE';
 
   const form = useForm<CreateTaskFormData>({
     resolver: zodResolver(createTaskSchema),
@@ -36,6 +34,8 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
       priority: 'MEDIUM',
       dueDate: '',
       assignedToId: '',
+      assignedToIds: [],
+      assignAllEmployees: false,
       departmentId: '',
       departmentIds: [],
     },
@@ -44,21 +44,31 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
   const { data: departments = [] } = useQuery<TaskDepartment[]>({
     queryKey: ['task-departments'],
     queryFn: () => tasksApi.getDepartments(),
-    enabled: isMD || isHOD,
+    enabled: canCreateTask,
   });
   const selectedDepartmentIds = form.watch('departmentIds') ?? [];
-  const selectedDepartmentId = form.watch('departmentId');
-  const assigneeDepartmentIds = canSelectMultiDept
-    ? selectedDepartmentIds
-    : selectedDepartmentId
-      ? [selectedDepartmentId]
-      : [];
+  const selectedAssigneeIds = form.watch('assignedToIds') ?? [];
+  const selectAllEmployees = form.watch('assignAllEmployees') ?? false;
 
   const { data: assignees = [] } = useQuery<User[]>({
-    queryKey: ['task-assignees', assigneeDepartmentIds],
-    queryFn: () => tasksApi.getAssignees(assigneeDepartmentIds),
-    enabled: (isMD || canSelectMultiDept) && assigneeDepartmentIds.length > 0,
+    queryKey: ['task-assignees', selectedDepartmentIds],
+    queryFn: () => tasksApi.getAssignees(selectedDepartmentIds),
+    enabled: canCreateTask && selectedDepartmentIds.length > 0,
   });
+
+  useEffect(() => {
+    const allowedIds = new Set(assignees.map((assignee) => assignee.id));
+    const filteredIds = selectedAssigneeIds.filter((id) => allowedIds.has(id));
+    const nextIds = selectAllEmployees ? assignees.map((assignee) => assignee.id) : filteredIds;
+
+    const isSame =
+      nextIds.length === selectedAssigneeIds.length &&
+      nextIds.every((id, index) => id === selectedAssigneeIds[index]);
+
+    if (!isSame) {
+      form.setValue('assignedToIds', nextIds, { shouldValidate: true });
+    }
+  }, [assignees, form, selectAllEmployees, selectedAssigneeIds]);
 
   const createTaskMutation = useMutation({
     mutationFn: (data: CreateTaskFormData & { attachments?: File[] }) =>
@@ -68,6 +78,8 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
         priority: data.priority,
         dueDate: data.dueDate,
         assignedToId: data.assignedToId || undefined,
+        assignedToIds: data.assignAllEmployees ? undefined : data.assignedToIds?.length ? data.assignedToIds : undefined,
+        assignAllEmployees: data.assignAllEmployees || undefined,
         departmentId: data.departmentId || undefined,
         departmentIds: data.departmentIds?.length ? data.departmentIds : undefined,
         attachments: data.attachments,
@@ -156,73 +168,91 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
         </div>
       </div>
 
-      {isMD && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Department</label>
-          <select
-            {...form.register('departmentId')}
-            onChange={(event) => {
-              form.setValue('departmentId', event.target.value, { shouldValidate: true });
-              form.setValue('assignedToId', '');
-            }}
-            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-          >
-            <option value="">Select department</option>
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
-          </select>
-          {form.formState.errors.departmentId && (
-            <p className="mt-1 text-sm text-red-600">{form.formState.errors.departmentId.message}</p>
-          )}
-        </div>
-      )}
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Department Selection</label>
+        <div className="mt-2 grid gap-2 rounded-lg border border-gray-200 p-3">
+          {departments.map((department) => (
+            <label key={department.id} className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={selectedDepartmentIds.includes(department.id)}
+                onChange={(event) => {
+                  const nextDepartmentIds = event.target.checked
+                    ? [...selectedDepartmentIds, department.id]
+                    : selectedDepartmentIds.filter((id) => id !== department.id);
 
-      {canSelectMultiDept && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Department Selection</label>
-          <div className="mt-2 grid gap-2 rounded-lg border border-gray-200 p-3">
-            {departments.map((department) => (
-              <label key={department.id} className="flex items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={selectedDepartmentIds.includes(department.id)}
-                  onChange={(event) => {
-                    form.setValue(
-                      'departmentIds',
-                      event.target.checked
-                        ? [...selectedDepartmentIds, department.id]
-                        : selectedDepartmentIds.filter((id) => id !== department.id),
-                      { shouldValidate: true },
-                    );
-                    form.setValue('assignedToId', '');
-                  }}
-                  className="h-4 w-4 rounded border-gray-300 text-green-600"
-                />
-                {department.name}
-              </label>
-            ))}
-          </div>
-          {form.formState.errors.departmentIds && (
-            <p className="mt-1 text-sm text-red-600">{form.formState.errors.departmentIds.message}</p>
-          )}
+                  form.setValue('departmentIds', nextDepartmentIds, { shouldValidate: true });
+                  form.setValue('departmentId', nextDepartmentIds[0] ?? '', { shouldValidate: true });
+                  form.setValue('assignedToId', '');
+                  form.setValue('assignedToIds', []);
+                  form.setValue('assignAllEmployees', false);
+                }}
+                className="h-4 w-4 rounded border-gray-300 text-green-600"
+              />
+              {department.name}
+            </label>
+          ))}
         </div>
-      )}
+        {form.formState.errors.departmentIds && (
+          <p className="mt-1 text-sm text-red-600">{form.formState.errors.departmentIds.message}</p>
+        )}
+      </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700">Assigned Employee</label>
-        <select
-          {...form.register('assignedToId')}
-          disabled={!assigneeDepartmentIds.length}
-          className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 disabled:bg-gray-50 disabled:text-gray-400"
-        >
-          <option value="">Unassigned</option>
-          {assignees.map((assignee) => (
-            <option key={assignee.id} value={assignee.id}>
-              {assignee.fullName}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center justify-between">
+          <label className="block text-sm font-medium text-gray-700">Employees</label>
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={selectAllEmployees}
+              disabled={!selectedDepartmentIds.length || !assignees.length}
+              onChange={(event) => {
+                const checked = event.target.checked;
+                form.setValue('assignAllEmployees', checked, { shouldValidate: true });
+                form.setValue('assignedToIds', checked ? assignees.map((assignee) => assignee.id) : []);
+              }}
+              className="h-4 w-4 rounded border-gray-300 text-green-600"
+            />
+            Select All Employees
+          </label>
+        </div>
+
+        <div className="mt-2 rounded-lg border border-gray-200 p-3">
+          {!selectedDepartmentIds.length ? (
+            <p className="text-sm text-gray-500">Select at least one department to load employees.</p>
+          ) : assignees.length ? (
+            <div className="grid gap-2">
+              {assignees.map((assignee) => {
+                const checked = selectedAssigneeIds.includes(assignee.id);
+
+                return (
+                  <label key={assignee.id} className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={selectAllEmployees}
+                      onChange={(event) => {
+                        const nextIds = event.target.checked
+                          ? [...selectedAssigneeIds, assignee.id]
+                          : selectedAssigneeIds.filter((id) => id !== assignee.id);
+
+                        form.setValue('assignedToIds', [...new Set(nextIds)], { shouldValidate: true });
+                        form.setValue('assignAllEmployees', false, { shouldValidate: true });
+                      }}
+                      className="h-4 w-4 rounded border-gray-300 text-green-600"
+                    />
+                    <span className="font-medium text-gray-900">{assignee.fullName}</span>
+                    <span className="text-xs text-gray-500">
+                      {assignee.department?.name ?? assignee.departmentId ?? ''}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">No active employees found for the selected department(s).</p>
+          )}
+        </div>
       </div>
 
       <div className="flex gap-4">

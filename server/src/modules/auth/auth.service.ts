@@ -50,7 +50,7 @@ export class AuthService {
         OR: [{ is_active: true }, { pending_approval: true }],
       },
     });
-    return count > 0;
+    return count >= 2;
   }
 
   async checkPaExists(): Promise<boolean> {
