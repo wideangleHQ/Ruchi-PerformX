@@ -29,7 +29,14 @@ export function Header() {
         </button>
         <Link
           href="/profile"
-          className="flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100"
+          className="flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 md:hidden"
+          aria-label="Profile"
+        >
+          <UserCircle2 size={20} />
+        </Link>
+        <Link
+          href="/profile"
+          className="hidden md:flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100"
           aria-label="Profile"
         >
           <UserCircle2 size={20} />

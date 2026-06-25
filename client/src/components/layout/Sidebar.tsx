@@ -18,6 +18,7 @@ import {
   LogOut,
   Menu,
   X,
+  UserCircle2,
 } from 'lucide-react';
 
 interface NavItem {
@@ -37,6 +38,7 @@ const navItems: NavItem[] = [
   { href: '/scoring', label: 'Scoring', icon: <Trophy size={20} /> },
   { href: '/analytics', label: 'Analytics', icon: <BarChart3 size={20} /> },
   { href: '/incentives', label: 'Incentives', icon: <Coins size={20} /> },
+  { href: '/profile', label: 'Profile', icon: <UserCircle2 size={20} /> },
   { href: '/admin', label: 'Admin', icon: <Users size={20} />, roles: ['ADMIN'] },
 ];
 
