@@ -102,7 +102,7 @@ export class TasksService {
 
     if (user.role === role_enum.MD || user.role === role_enum.ADMIN) {
       where = baseWhere;
-    } else if (user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA) {
+    } else if (user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA || user.role === role_enum.PURCHASE_HEAD) {
       where = {
         ...baseWhere,
         ...this.departmentVisibility(this.mappedDepts(user)),
@@ -215,7 +215,7 @@ export class TasksService {
       throw new ForbiddenException('Delete reason is required');
     }
 
-    if ((user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA) && !this.hasDepartmentAccess(task, this.mappedDepts(user))) {
+    if ((user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA || user.role === role_enum.PURCHASE_HEAD) && !this.hasDepartmentAccess(task, this.mappedDepts(user))) {
       throw new ForbiddenException();
     }
 
@@ -275,7 +275,7 @@ export class TasksService {
   ) {
     const task = await this.getTaskOrFail(id);
 
-    if ((user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA) && !this.hasDepartmentAccess(task, this.mappedDepts(user))) {
+    if ((user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA || user.role === role_enum.PURCHASE_HEAD) && !this.hasDepartmentAccess(task, this.mappedDepts(user))) {
       throw new ForbiddenException('Cannot act on tasks outside mapped departments');
     }
 
@@ -317,7 +317,7 @@ export class TasksService {
   async getPending(user: JwtPayload) {
     const where: any = { status: task_status_enum.PENDING, deleted_at: null };
 
-    if (user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA) {
+    if (user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA || user.role === role_enum.PURCHASE_HEAD) {
       Object.assign(where, this.departmentVisibility(this.mappedDepts(user)));
     } else if (user.role === role_enum.EMPLOYEE) {
       Object.assign(where, this.departmentVisibility(user.departmentId ? [user.departmentId] : []));
@@ -345,7 +345,7 @@ export class TasksService {
       deleted_at: null,
     };
 
-    if (user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA) {
+    if (user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA || user.role === role_enum.PURCHASE_HEAD) {
       Object.assign(where, this.departmentVisibility(this.mappedDepts(user)));
     }
 
@@ -362,9 +362,11 @@ export class TasksService {
         is_active: true,
         ...(user.role === role_enum.HOD
           ? { hod_departments: { some: { hod_id: user.sub } } }
-          : user.role === role_enum.EA || user.role === role_enum.PA
-            ? { assistant_departments: { some: { assistant_id: user.sub } } }
-            : {}),
+          : user.role === role_enum.PURCHASE_HEAD
+            ? { name: { in: ['Purchase Agro', 'Purchase Non Agro'] } }
+            : user.role === role_enum.EA || user.role === role_enum.PA
+              ? { assistant_departments: { some: { assistant_id: user.sub } } }
+              : {}),
       },
       select: { id: true, name: true, description: true, is_active: true },
       orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
@@ -419,7 +421,7 @@ export class TasksService {
 
   private assertAccess(task: any, user: JwtPayload) {
     if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return;
-    if ((user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA) && this.hasDepartmentAccess(task, this.mappedDepts(user))) return;
+    if ((user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA || user.role === role_enum.PURCHASE_HEAD) && this.hasDepartmentAccess(task, this.mappedDepts(user))) return;
     if (user.role === role_enum.EMPLOYEE && this.hasDepartmentAccess(task, user.departmentId ? [user.departmentId] : [])) return;
     throw new ForbiddenException('Access denied to this task');
   }
@@ -484,7 +486,7 @@ export class TasksService {
       }
     }
 
-    if (user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA) {
+    if (user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA || user.role === role_enum.PURCHASE_HEAD) {
       const allowed = user.role === role_enum.HOD
         ? await this.prisma.hod_departments.count({
             where: {
@@ -493,13 +495,21 @@ export class TasksService {
               departments: { is_active: true },
             },
           })
-        : await this.prisma.assistant_departments.count({
-            where: {
-              assistant_id: user.sub,
-              department_id: { in: departmentIds },
-              departments: { is_active: true },
-            },
-          });
+        : user.role === role_enum.PURCHASE_HEAD
+          ? await this.prisma.departments.count({
+              where: {
+                id: { in: departmentIds },
+                is_active: true,
+                name: { in: ['Purchase Agro', 'Purchase Non Agro'] },
+              },
+            })
+          : await this.prisma.assistant_departments.count({
+              where: {
+                assistant_id: user.sub,
+                department_id: { in: departmentIds },
+                departments: { is_active: true },
+              },
+            });
 
       if (allowed !== departmentIds.length) {
         throw new ForbiddenException('Cannot assign tasks outside mapped departments');

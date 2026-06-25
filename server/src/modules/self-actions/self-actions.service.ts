@@ -294,6 +294,7 @@ export class SelfActionsService {
       user.role === role_enum.ADMIN ||
       user.role === role_enum.EA ||
       user.role === role_enum.PA ||
+      user.role === role_enum.PURCHASE_HEAD ||
       action.created_by_id === user.sub ||
       (user.role === role_enum.HOD && user.departmentIds?.includes(action.department_id));
     if (!canEdit) throw new ForbiddenException('Not authorized');
@@ -445,6 +446,17 @@ export class SelfActionsService {
   private getVisibilityFilter(user: JwtPayload) {
     if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return null;
     if (user.role === role_enum.EA || user.role === role_enum.PA) return null;
+    if (user.role === role_enum.PURCHASE_HEAD) {
+      return {
+        OR: [
+          { created_by_id: user.sub },
+          {
+            department_id: { in: user.departmentIds || [] },
+            users: { role: role_enum.EMPLOYEE },
+          },
+        ],
+      };
+    }
 
     if (user.role === role_enum.HOD) {
       return {
@@ -464,6 +476,7 @@ export class SelfActionsService {
   private checkReadAccess(action: any, user: JwtPayload) {
     if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return;
     if (user.role === role_enum.EA || user.role === role_enum.PA) return;
+    if (user.role === role_enum.PURCHASE_HEAD) return;
 
     if (user.role === role_enum.HOD) {
       if (action.users?.id === user.sub) return;

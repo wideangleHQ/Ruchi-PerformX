@@ -13,7 +13,7 @@ export const signupSchema = z.object({
   username: z.string().min(1, 'Username is required'),
   password: z.string().min(1, 'Password is required'),
   confirmPassword: z.string().min(1, 'Password confirmation is required'),
-  role: z.enum(['MD', 'HOD', 'EMPLOYEE', 'EA', 'PA'], {
+  role: z.enum(['MD', 'EA', 'PA', 'PURCHASE_HEAD', 'HOD', 'EMPLOYEE'], {
     error: 'Please select a role',
   }),
   departments: z.array(z.string()),
@@ -21,7 +21,7 @@ export const signupSchema = z.object({
   message: 'Passwords do not match',
   path: ['confirmPassword'],
 }).refine((data) => {
-  if (['MD', 'EA', 'PA'].includes(data.role)) {
+  if (['MD', 'EA', 'PA', 'PURCHASE_HEAD'].includes(data.role)) {
     return data.departments.length === 0;
   }
   if (data.role === 'EMPLOYEE') {

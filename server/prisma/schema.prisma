@@ -427,7 +427,7 @@ model tasks {
   users_tasks_deleted_by_idTousers   users?              @relation("tasks_deleted_by_idTousers", fields: [deleted_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   departments                       departments         @relation(fields: [department_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   tasks                             tasks?              @relation("tasksTotasks", fields: [parent_task_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  other_tasks                       tasks[]             @relation("tasksTotasks")
+  other_tasks                       tasks[]             @relation("tasksTotasks") 
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -548,11 +548,12 @@ enum request_type_enum {
 
 enum role_enum {
   MD
+  EA
+  PA
+  PURCHASE_HEAD
   HOD
   EMPLOYEE
   ADMIN
-  EA
-  PA
 }
 
 enum score_status_enum {

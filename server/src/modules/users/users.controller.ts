@@ -51,7 +51,7 @@ export class UsersController {
   }
 
   @Get('assignable')
-  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD)
   findAssignable(
     @CurrentUser() user: JwtPayload,
     @Query('departmentId') departmentId?: string,
@@ -61,13 +61,13 @@ export class UsersController {
   }
 
   @Get('department/:departmentId')
-  @Roles(role_enum.MD, role_enum.HOD, role_enum.ADMIN, role_enum.EA, role_enum.PA)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.ADMIN, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD)
   findByDepartment(@Param('departmentId') departmentId: string) {
     return this.usersService.findByDepartment(departmentId);
   }
 
   @Get(':id')
-  @Roles(role_enum.MD, role_enum.HOD, role_enum.ADMIN, role_enum.EA, role_enum.PA)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.ADMIN, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD)
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
   }

@@ -32,7 +32,7 @@ export class TasksController {
   // ─── Create ────────────────────────────────────────────────────
 
   @Post()
-  @Roles(role_enum.MD, role_enum.HOD, role_enum.EMPLOYEE, role_enum.EA, role_enum.PA)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EMPLOYEE, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD)
   @UseInterceptors(FilesInterceptor('attachments'))
   create(
     @Body() dto: CreateTaskDto,
@@ -45,7 +45,7 @@ export class TasksController {
   // ─── List ──────────────────────────────────────────────────────
 
   @Get()
-  @Roles(role_enum.MD, role_enum.HOD, role_enum.EMPLOYEE, role_enum.EA, role_enum.PA)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EMPLOYEE, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD)
   findAll(@Query() filters: TaskFilterDto, @CurrentUser() user: JwtPayload) {
     return this.tasksService.findAll(filters, user);
   }
@@ -53,7 +53,7 @@ export class TasksController {
   // ─── Pending Bar ───────────────────────────────────────────────
 
   @Get('pending')
-  @Roles(role_enum.MD, role_enum.HOD, role_enum.EMPLOYEE, role_enum.EA, role_enum.PA)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EMPLOYEE, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD)
   getPending(@CurrentUser() user: JwtPayload) {
     return this.tasksService.getPending(user);
   }
@@ -61,19 +61,19 @@ export class TasksController {
   // ─── Overdue ───────────────────────────────────────────────────
 
   @Get('overdue')
-  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD)
   getOverdue(@CurrentUser() user: JwtPayload) {
     return this.tasksService.getOverdue(user);
   }
 
   @Get('meta/departments')
-  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD)
   getDepartments(@CurrentUser() user: JwtPayload) {
     return this.tasksService.getDepartments(user);
   }
 
   @Get('meta/assignees')
-  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD)
   getAssignees(
     @Query('departmentIds') departmentIds: string | string[] | undefined,
     @CurrentUser() user: JwtPayload,
@@ -84,7 +84,7 @@ export class TasksController {
   // ─── Find One ──────────────────────────────────────────────────
 
   @Get(':id')
-  @Roles(role_enum.MD, role_enum.HOD, role_enum.EMPLOYEE, role_enum.EA, role_enum.PA)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EMPLOYEE, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD)
   findOne(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.tasksService.findOne(id, user);
   }
@@ -92,7 +92,7 @@ export class TasksController {
   // ─── Update Fields ─────────────────────────────────────────────
 
   @Patch(':id')
-  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD)
   update(
     @Param('id') id: string,
     @Body() dto: UpdateTaskDto,
@@ -104,7 +104,7 @@ export class TasksController {
   // ─── Delete ────────────────────────────────────────────────────
 
   @Delete(':id')
-  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD)
   remove(
     @Param('id') id: string,
     @Body('reason') reason: string,
@@ -144,7 +144,7 @@ export class TasksController {
   }
 
   @Patch(':id/review')
-  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD)
   review(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.tasksService.transition(id, task_status_enum.REVIEWED, user);
   }

@@ -14,13 +14,13 @@ const signupSchema = z.object({
   username: z.string().min(1, 'Username is required'),
   password: z.string().min(6, 'Minimum 6 characters'),
   confirmPassword: z.string().min(1, 'Password confirmation is required'),
-  role: z.enum(['MD', 'HOD', 'EMPLOYEE', 'EA', 'PA'], { error: 'Please select a role' }),
+  role: z.enum(['MD', 'EA', 'PA', 'PURCHASE_HEAD', 'HOD', 'EMPLOYEE'], { error: 'Please select a role' }),
   departments: z.array(z.string()),
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Passwords do not match',
   path: ['confirmPassword'],
 }).refine((data) => {
-  if (['MD', 'EA', 'PA'].includes(data.role)) return true; // ← was: departments.length === 0
+  if (['MD', 'EA', 'PA', 'PURCHASE_HEAD'].includes(data.role)) return true;
   if (data.role === 'EMPLOYEE') return data.departments.length === 1;
   if (data.role === 'HOD') return data.departments.length >= 1;
   return true;
@@ -62,7 +62,7 @@ export default function SignupPage() {
 
   // Clear departments when role changes to MD, EA, or PA
   useEffect(() => {
-    if (selectedRole && ['MD', 'EA', 'PA'].includes(selectedRole)) {
+    if (selectedRole && ['MD', 'EA', 'PA', 'PURCHASE_HEAD'].includes(selectedRole)) {
       form.setValue('departments', [], { shouldValidate: true });
     }
   }, [selectedRole, form]);
@@ -206,9 +206,10 @@ export default function SignupPage() {
                   >
                     <option value="">Select role</option>
                     <option value="MD" disabled={mdExists}>Managing Director{mdExists ? ' (position filled)' : ''}</option>
-                    <option value="HOD">Head of Department</option>
                     <option value="EA" disabled={eaExists}>Executive Assistant{eaExists ? ' (position filled)' : ''}</option>
                     <option value="PA" disabled={paExists}>Personal Assistant{paExists ? ' (position filled)' : ''}</option>
+                    <option value="PURCHASE_HEAD">Purchase Head</option>
+                    <option value="HOD">Head of Department</option>
                     <option value="EMPLOYEE">Employee</option>
                   </select>
                 </div>
@@ -223,7 +224,7 @@ export default function SignupPage() {
                 )}
               </div>
 
-              {selectedRole && !['MD', 'EA', 'PA'].includes(selectedRole) && (
+              {selectedRole && !['MD', 'EA', 'PA', 'PURCHASE_HEAD'].includes(selectedRole) && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Department(s)</label>
                   {isMultiDeptRole ? (

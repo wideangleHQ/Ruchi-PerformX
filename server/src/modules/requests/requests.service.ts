@@ -54,7 +54,7 @@ export class RequestsService {
 
     if (user.role === role_enum.EMPLOYEE) {
       where.requested_by_id = user.sub;
-    } else if (user.role === role_enum.HOD) {
+    } else if (user.role === role_enum.HOD || user.role === role_enum.PURCHASE_HEAD) {
       const deptIds = this.getManagedDepartmentIds(user);
       if (!deptIds.length) {
         where.id = { in: [] };
@@ -204,7 +204,7 @@ export class RequestsService {
 
   private assertAccess(request: any, user: JwtPayload) {
     if (user.role === role_enum.MD) return;
-    if (user.role === role_enum.HOD && this.hasDepartmentAccess(request, this.getManagedDepartmentIds(user))) return;
+    if ((user.role === role_enum.HOD || user.role === role_enum.PURCHASE_HEAD) && this.hasDepartmentAccess(request, this.getManagedDepartmentIds(user))) return;
     if (user.role === role_enum.EMPLOYEE && request.requested_by_id === user.sub) return;
     throw new ForbiddenException('Access denied');
   }
@@ -212,7 +212,7 @@ export class RequestsService {
   private assertReviewAccess(request: any, user: JwtPayload) {
     if (request.status !== request_status_enum.PENDING) throw new ForbiddenException('Request has already been reviewed');
     if (user.role === role_enum.MD) return;
-    if (user.role === role_enum.HOD && this.hasDepartmentAccess(request, this.getManagedDepartmentIds(user))) return;
+    if ((user.role === role_enum.HOD || user.role === role_enum.PURCHASE_HEAD) && this.hasDepartmentAccess(request, this.getManagedDepartmentIds(user))) return;
     throw new ForbiddenException('Only HOD or MD can review requests');
   }
 
@@ -266,7 +266,12 @@ export class RequestsService {
     } as any);
 
     const hods = await this.prisma.users.findMany({
-      where: { role: role_enum.HOD, is_active: true, deleted_at: null, hod_departments: { some: { department_id: task.department_id } } },
+      where: {
+        role: { in: [role_enum.HOD, role_enum.PURCHASE_HEAD] },
+        is_active: true,
+        deleted_at: null,
+        hod_departments: { some: { department_id: task.department_id } },
+      },
       select: { id: true },
     });
 
@@ -290,7 +295,7 @@ export class RequestsService {
       select: { id: true, title: true, department_id: true, assigned_to_id: true },
     });
     if (!task) throw new NotFoundException('Task not found');
-    if (user.role === role_enum.HOD && !this.getManagedDepartmentIds(user).includes(task.department_id)) throw new ForbiddenException('Not authorized to review this task');
+    if ((user.role === role_enum.HOD || user.role === role_enum.PURCHASE_HEAD) && !this.getManagedDepartmentIds(user).includes(task.department_id)) throw new ForbiddenException('Not authorized to review this task');
     if (request.current_assignee_id && task.assigned_to_id && task.assigned_to_id !== request.current_assignee_id) {
       throw new ConflictException('Task assignment has changed');
     }
