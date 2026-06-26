@@ -381,9 +381,23 @@ export class AttachmentsService {
   }
 
   private async mapAttachment(attachment: AttachmentRecord) {
-    const fileUrl = attachment.storage_path
-      ? await this.createSignedUrl(attachment.storage_path)
-      : attachment.file_url;
+    let fileUrl = attachment.file_url;
+
+    if (attachment.storage_path) {
+      // Normalize: if storage_path is a full URL, extract the relative path
+      const relativePath = this.isAbsoluteUrl(attachment.storage_path)
+        ? (this.resolveStoragePath(attachment.storage_path) ?? null)
+        : attachment.storage_path;
+
+      if (relativePath) {
+        try {
+          fileUrl = await this.createSignedUrl(relativePath);
+        } catch {
+          // Fall back to stored URL — avoids crashing list endpoints on bad paths
+          fileUrl = attachment.file_url;
+        }
+      }
+    }
 
     return {
       id: attachment.id,
@@ -549,5 +563,9 @@ export class AttachmentsService {
       return null;
     }
     return null;
+  }
+
+  private isAbsoluteUrl(value: string) {
+    return value.startsWith('http://') || value.startsWith('https://');
   }
 }
