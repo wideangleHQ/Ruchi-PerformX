@@ -34,131 +34,8 @@ export class TasksService {
 
   async create(dto: CreateTaskDto, user: JwtPayload, attachments: UploadedFile[] = []) {
     try {
-      const departmentIds = this.resolveDepartmentIds(dto);
-      await this.assertCreateAccess(departmentIds, user);
-
-      const assigneeIds = dto.assignAllEmployees
-        ? await this.resolveAllEmployeeIds(departmentIds)
-        : await this.resolveAssigneeIds(dto, departmentIds);
+      const tasks = await this.prisma.$transaction(async (tx) => this.createTaskRecords(tx, dto, user));
       const createdAttachmentIds: string[] = [];
-
-      const tasks = await this.prisma.$transaction(async (tx) => {
-        const createdTasks: Array<{ id: string }> = [];
-
-        if (assigneeIds.length) {
-          for (const assigneeId of assigneeIds) {
-            const created = await tx.tasks.create({
-              data: {
-                title: dto.title,
-                description: dto.description,
-                priority: dto.priority,
-                due_date: new Date(dto.dueDate),
-                assigned_to_id: assigneeId,
-                assigned_by_id: user.sub,
-                department_id: departmentIds[0]!,
-                parent_task_id: dto.parentTaskId ?? null,
-                status: task_status_enum.ASSIGNED,
-              },
-            });
-
-            await tx.task_departments.createMany({
-              data: departmentIds.map((department_id) => ({
-                task_id: created.id,
-                department_id,
-              })),
-              skipDuplicates: true,
-            });
-
-            await tx.task_status_logs.create({
-              data: {
-                task_id: created.id,
-                from_status: null,
-                to_status: task_status_enum.ASSIGNED,
-                changed_by_id: user.sub,
-              },
-            });
-
-            await tx.audit_logs.create({
-              data: {
-                user_id: user.sub,
-                action: 'TASK_CREATED',
-                entity: 'tasks',
-                entity_id: created.id,
-                old_value: null,
-                new_value: JSON.stringify({
-                  taskId: created.id,
-                  title: dto.title,
-                  description: dto.description,
-                  assignedToId: assigneeId,
-                  departmentIds,
-                }),
-              },
-            });
-
-            await tx.notifications.create({
-              data: {
-                user_id: assigneeId,
-                type: notification_type_enum.TASK_ASSIGNED,
-                title: 'New Task Assigned',
-                message: `You have been assigned task "${dto.title}".`,
-              },
-            });
-
-            createdTasks.push(created);
-          }
-        } else {
-          const created = await tx.tasks.create({
-            data: {
-              title: dto.title,
-              description: dto.description,
-              priority: dto.priority,
-              due_date: new Date(dto.dueDate),
-              assigned_to_id: null,
-              assigned_by_id: user.sub,
-              department_id: departmentIds[0]!,
-              parent_task_id: dto.parentTaskId ?? null,
-              status: task_status_enum.CREATED,
-            },
-          });
-
-          await tx.task_departments.createMany({
-            data: departmentIds.map((department_id) => ({
-              task_id: created.id,
-              department_id,
-            })),
-            skipDuplicates: true,
-          });
-
-          await tx.task_status_logs.create({
-            data: {
-              task_id: created.id,
-              from_status: null,
-              to_status: task_status_enum.CREATED,
-              changed_by_id: user.sub,
-            },
-          });
-
-          await tx.audit_logs.create({
-            data: {
-              user_id: user.sub,
-              action: 'TASK_CREATED',
-              entity: 'tasks',
-              entity_id: created.id,
-              old_value: null,
-              new_value: JSON.stringify({
-                taskId: created.id,
-                title: dto.title,
-                description: dto.description,
-                departmentIds,
-              }),
-            },
-          });
-
-          createdTasks.push(created);
-        }
-
-        return createdTasks;
-      });
 
       try {
         if (attachments.length) {
@@ -188,6 +65,11 @@ export class TasksService {
     } catch (error: any) {
       throw error;
     }
+  }
+
+  async createInTransaction(dto: CreateTaskDto, user: JwtPayload, tx: any) {
+    const tasks = await this.createTaskRecords(tx, dto, user);
+    return tasks[0];
   }
 
   async findAll(filters: TaskFilterDto, user: JwtPayload) {
@@ -249,6 +131,7 @@ export class TasksService {
           select: {
             id: true,
             task_id: true,
+            request_id: true,
             comment_id: true,
             self_action_id: true,
             self_action_comment_id: true,
@@ -572,10 +455,7 @@ export class TasksService {
     }
 
     if (user.role === role_enum.EMPLOYEE) {
-      const userDeptId = user.departmentId;
-      if (!userDeptId || departmentIds.some((id) => id !== userDeptId)) {
-        throw new ForbiddenException('You can only create tasks in your own department');
-      }
+      throw new ForbiddenException('Employees are not allowed to create tasks directly');
     }
 
     if (user.role === role_enum.HOD) {
@@ -709,5 +589,130 @@ export class TasksService {
         },
       },
     };
+  }
+
+  private async createTaskRecords(db: any, dto: CreateTaskDto, user: JwtPayload) {
+    const departmentIds = this.resolveDepartmentIds(dto);
+    await this.assertCreateAccess(departmentIds, user);
+
+    const assigneeIds = dto.assignAllEmployees
+      ? await this.resolveAllEmployeeIds(departmentIds)
+      : await this.resolveAssigneeIds(dto, departmentIds);
+
+    const createdTasks: Array<{ id: string }> = [];
+
+    if (assigneeIds.length) {
+      for (const assigneeId of assigneeIds) {
+        const created = await db.tasks.create({
+          data: {
+            title: dto.title,
+            description: dto.description,
+            priority: dto.priority,
+            due_date: new Date(dto.dueDate),
+            assigned_to_id: assigneeId,
+            assigned_by_id: user.sub,
+            department_id: departmentIds[0]!,
+            parent_task_id: dto.parentTaskId ?? null,
+            status: task_status_enum.ASSIGNED,
+          },
+        });
+
+        await db.task_departments.createMany({
+          data: departmentIds.map((department_id) => ({
+            task_id: created.id,
+            department_id,
+          })),
+          skipDuplicates: true,
+        });
+
+        await db.task_status_logs.create({
+          data: {
+            task_id: created.id,
+            from_status: null,
+            to_status: task_status_enum.ASSIGNED,
+            changed_by_id: user.sub,
+          },
+        });
+
+        await db.audit_logs.create({
+          data: {
+            user_id: user.sub,
+            action: 'TASK_CREATED',
+            entity: 'tasks',
+            entity_id: created.id,
+            old_value: null,
+            new_value: JSON.stringify({
+              taskId: created.id,
+              title: dto.title,
+              description: dto.description,
+              assignedToId: assigneeId,
+              departmentIds,
+            }),
+          },
+        });
+
+        await db.notifications.create({
+          data: {
+            user_id: assigneeId,
+            type: notification_type_enum.TASK_ASSIGNED,
+            title: 'New Task Assigned',
+            message: `You have been assigned task "${dto.title}".`,
+          },
+        });
+
+        createdTasks.push(created);
+      }
+    } else {
+      const created = await db.tasks.create({
+        data: {
+          title: dto.title,
+          description: dto.description,
+          priority: dto.priority,
+          due_date: new Date(dto.dueDate),
+          assigned_to_id: null,
+          assigned_by_id: user.sub,
+          department_id: departmentIds[0]!,
+          parent_task_id: dto.parentTaskId ?? null,
+          status: task_status_enum.CREATED,
+        },
+      });
+
+      await db.task_departments.createMany({
+        data: departmentIds.map((department_id) => ({
+          task_id: created.id,
+          department_id,
+        })),
+        skipDuplicates: true,
+      });
+
+      await db.task_status_logs.create({
+        data: {
+          task_id: created.id,
+          from_status: null,
+          to_status: task_status_enum.CREATED,
+          changed_by_id: user.sub,
+        },
+      });
+
+      await db.audit_logs.create({
+        data: {
+          user_id: user.sub,
+          action: 'TASK_CREATED',
+          entity: 'tasks',
+          entity_id: created.id,
+          old_value: null,
+          new_value: JSON.stringify({
+            taskId: created.id,
+            title: dto.title,
+            description: dto.description,
+            departmentIds,
+          }),
+        },
+      });
+
+      createdTasks.push(created);
+    }
+
+    return createdTasks;
   }
 }

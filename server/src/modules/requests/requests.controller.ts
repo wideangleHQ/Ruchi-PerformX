@@ -7,7 +7,10 @@ import {
   Param,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFiles,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { RequestsService } from './requests.service';
 import { CreateRequestDto } from './dto/create-request.dto';
 import { UpdateRequestStatusDto } from './dto/update-request-status.dto';
@@ -18,6 +21,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
 import { role_enum } from '@prisma/client';
+import { UploadedFile } from '../../common/types/uploaded-file.type';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('requests')
@@ -26,8 +30,13 @@ export class RequestsController {
 
   @Post()
   @Roles(role_enum.EMPLOYEE, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD)
-  create(@Body() dto: CreateRequestDto, @CurrentUser() user: JwtPayload) {
-    return this.requestsService.create(dto, user);
+  @UseInterceptors(FilesInterceptor('attachments'))
+  create(
+    @Body() dto: CreateRequestDto,
+    @UploadedFiles() attachments: UploadedFile[],
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.requestsService.create(dto, user, attachments ?? []);
   }
 
   @Get()

@@ -1,13 +1,5 @@
 import { IsIn, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
-
-const REQUEST_TYPES = [
-  'BUDGET_APPROVAL',
-  'TRANSPORT_SUPPORT',
-  'CROSS_DEPT_ASSISTANCE',
-  'RESOURCE_REQUEST',
-  'OTHER',
-  'TASK_REASSIGNMENT',
-] as const;
+import { request_type_enum, task_priority_enum } from '@prisma/client';
 
 export class CreateRequestDto {
   @IsOptional()
@@ -19,8 +11,16 @@ export class CreateRequestDto {
   description?: string;
 
   @IsNotEmpty()
-  @IsIn(REQUEST_TYPES)
-  type!: typeof REQUEST_TYPES[number];
+  @IsIn(Object.values(request_type_enum))
+  type!: request_type_enum;
+
+  @IsOptional()
+  @IsUUID()
+  departmentId?: string;
+
+  @IsOptional()
+  @IsIn(Object.values(task_priority_enum))
+  priority?: task_priority_enum;
 
   @IsOptional()
   @IsUUID()

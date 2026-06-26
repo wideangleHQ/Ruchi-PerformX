@@ -36,6 +36,7 @@ model departments {
   task_transfers_task_transfers_from_dept_idTodepartments task_transfers[]        @relation("task_transfers_from_dept_idTodepartments")
   task_transfers_task_transfers_to_dept_idTodepartments   task_transfers[]        @relation("task_transfers_to_dept_idTodepartments")
   tasks                                                   tasks[]
+  task_requests                                           task_requests[]
   users                                                   users[]
   hod_departments                                         hod_departments[]
   task_departments                                        task_departments[]
@@ -174,22 +175,22 @@ enum self_action_priority_enum {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model self_actions {
-  id               String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  title            String                      @db.VarChar(255)
-  description      String
-  priority         self_action_priority_enum   @default(MEDIUM)
-  status           self_action_status_enum     @default(OPEN)
-  created_by_id    String                      @db.Uuid
-  department_id    String                      @db.Uuid
-  completed_at     DateTime?                   @db.Timestamptz(6)
-  created_at       DateTime                    @default(now()) @db.Timestamptz(6)
-  updated_at       DateTime                    @default(now()) @db.Timestamptz(6)
-  deleted_at       DateTime?                   @db.Timestamptz(6)
-  users            users                       @relation(fields: [created_by_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_self_action_creator")
-  departments      departments                 @relation(fields: [department_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_self_action_dept")
-  task_attachments task_attachments[]
+  id                   String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title                String                    @db.VarChar(255)
+  description          String
+  priority             self_action_priority_enum @default(MEDIUM)
+  status               self_action_status_enum   @default(OPEN)
+  created_by_id        String                    @db.Uuid
+  department_id        String                    @db.Uuid
+  completed_at         DateTime?                 @db.Timestamptz(6)
+  created_at           DateTime                  @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime                  @default(now()) @db.Timestamptz(6)
+  deleted_at           DateTime?                 @db.Timestamptz(6)
+  users                users                     @relation(fields: [created_by_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_self_action_creator")
+  departments          departments               @relation(fields: [department_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_self_action_dept")
+  task_attachments     task_attachments[]
   self_action_comments self_action_comments[]
-  self_action_logs self_action_logs[]
+  self_action_logs     self_action_logs[]
 
   @@index([created_by_id], map: "idx_self_actions_creator")
   @@index([department_id], map: "idx_self_actions_dept")
@@ -199,15 +200,15 @@ model self_actions {
 }
 
 model self_action_logs {
-  id               String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  self_action_id   String          @db.Uuid
-  actor_id         String          @db.Uuid
-  event_type       String          @db.VarChar(50)
-  old_value        String?
-  new_value        String?
-  created_at       DateTime        @default(now()) @db.Timestamptz(6)
-  self_actions     self_actions    @relation(fields: [self_action_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_log_action")
-  users            users           @relation(fields: [actor_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_log_actor")
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  self_action_id String       @db.Uuid
+  actor_id       String       @db.Uuid
+  event_type     String       @db.VarChar(50)
+  old_value      String?
+  new_value      String?
+  created_at     DateTime     @default(now()) @db.Timestamptz(6)
+  self_actions   self_actions @relation(fields: [self_action_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_log_action")
+  users          users        @relation(fields: [actor_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_log_actor")
 
   @@index([self_action_id], map: "idx_self_action_logs_action")
   @@index([actor_id], map: "idx_self_action_logs_actor")
@@ -216,40 +217,44 @@ model self_action_logs {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model task_attachments {
-  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  task_id        String?        @db.Uuid
-  comment_id     String?        @db.Uuid
-  self_action_id String?        @db.Uuid
-  self_action_comment_id String? @db.Uuid
-  file_name      String         @db.VarChar(255)
-  file_url       String
-  storage_path   String?        @db.VarChar(500)
-  file_type      String?        @db.VarChar(100)
-  file_size_kb   Int?
-  uploaded_by_id String         @db.Uuid
-  created_at     DateTime       @default(now()) @db.Timestamptz(6)
-  task_comments  task_comments? @relation(fields: [comment_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_attachment_comment")
-  self_action_comments self_action_comments? @relation(fields: [self_action_comment_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_attachment_self_action_comment")
-  self_actions   self_actions?  @relation(fields: [self_action_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_attachment_self_action")
-  tasks          tasks?         @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_attachment_task")
-  users          users          @relation(fields: [uploaded_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_attachment_user")
+  id                     String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_id                String?               @db.Uuid
+  request_id             String?               @db.Uuid
+  comment_id             String?               @db.Uuid
+  self_action_id         String?               @db.Uuid
+  self_action_comment_id String?               @db.Uuid
+  file_name              String                @db.VarChar(255)
+  file_url               String
+  storage_path           String?               @db.VarChar(500)
+  file_type              String?               @db.VarChar(100)
+  file_size_kb           Int?
+  uploaded_by_id         String                @db.Uuid
+  created_at             DateTime              @default(now()) @db.Timestamptz(6)
+  task_comments          task_comments?        @relation(fields: [comment_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_attachment_comment")
+  task_requests          task_requests?        @relation(fields: [request_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_attachment_request")
+  self_action_comments   self_action_comments? @relation(fields: [self_action_comment_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_attachment_self_action_comment")
+  self_actions           self_actions?         @relation(fields: [self_action_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_attachment_self_action")
+  tasks                  tasks?                @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_attachment_task")
+  users                  users                 @relation(fields: [uploaded_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_attachment_user")
+
+  @@index([request_id], map: "idx_task_attachments_request")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model task_comments {
-  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  task_id          String             @db.Uuid
-  user_id          String             @db.Uuid
-  parent_comment_id String?           @db.Uuid
-  content          String
-  is_tagged        Boolean?           @default(false)
-  created_at       DateTime           @default(now()) @db.Timestamptz(6)
-  updated_at       DateTime           @default(now()) @db.Timestamptz(6)
-  task_attachments task_attachments[]
-  task_comments    task_comments?    @relation("task_comment_replies", fields: [parent_comment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  task_comment_replies task_comments[] @relation("task_comment_replies")
-  tasks            tasks              @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_comment_task")
-  users            users              @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_comment_user")
+  id                   String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_id              String             @db.Uuid
+  user_id              String             @db.Uuid
+  parent_comment_id    String?            @db.Uuid
+  content              String
+  is_tagged            Boolean?           @default(false)
+  created_at           DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime           @default(now()) @db.Timestamptz(6)
+  task_attachments     task_attachments[]
+  task_comments        task_comments?     @relation("task_comment_replies", fields: [parent_comment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  task_comment_replies task_comments[]    @relation("task_comment_replies")
+  tasks                tasks              @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_comment_task")
+  users                users              @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_comment_user")
 
   @@index([task_id], map: "idx_task_comments_task")
   @@index([user_id], map: "idx_task_comments_user")
@@ -257,19 +262,19 @@ model task_comments {
 }
 
 model self_action_comments {
-  id                   String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  self_action_id       String              @db.Uuid
-  user_id              String              @db.Uuid
-  parent_comment_id    String?             @db.Uuid
-  content              String
-  is_tagged            Boolean?            @default(false)
-  created_at           DateTime            @default(now()) @db.Timestamptz(6)
-  updated_at           DateTime            @default(now()) @db.Timestamptz(6)
-  task_attachments     task_attachments[]
-  self_action_comments self_action_comments? @relation("self_action_comment_replies", fields: [parent_comment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id                          String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  self_action_id              String                 @db.Uuid
+  user_id                     String                 @db.Uuid
+  parent_comment_id           String?                @db.Uuid
+  content                     String
+  is_tagged                   Boolean?               @default(false)
+  created_at                  DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at                  DateTime               @default(now()) @db.Timestamptz(6)
+  task_attachments            task_attachments[]
+  self_action_comments        self_action_comments?  @relation("self_action_comment_replies", fields: [parent_comment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   self_action_comment_replies self_action_comments[] @relation("self_action_comment_replies")
-  self_actions         self_actions         @relation(fields: [self_action_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_self_action_comment_action")
-  users                users                @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_self_action_comment_user")
+  self_actions                self_actions           @relation(fields: [self_action_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_self_action_comment_action")
+  users                       users                  @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_self_action_comment_user")
 
   @@index([self_action_id], map: "idx_self_action_comments_action")
   @@index([user_id], map: "idx_self_action_comments_user")
@@ -299,6 +304,8 @@ model task_requests {
   description                                String
   type                                       request_type_enum
   status                                     request_status_enum @default(PENDING)
+  priority                                   task_priority_enum?
+  department_id                              String?             @db.Uuid
   rejection_reason                           String?
   task_id                                    String?             @db.Uuid
   task_title                                 String?             @db.VarChar(255)
@@ -313,15 +320,18 @@ model task_requests {
   created_at                                 DateTime            @default(now()) @db.Timestamptz(6)
   updated_at                                 DateTime            @default(now()) @db.Timestamptz(6)
   task                                       tasks?              @relation("task_request_task", fields: [task_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  departments                                departments?        @relation(fields: [department_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_request_department")
   current_assignee                           users?              @relation("task_request_current_assignee", fields: [current_assignee_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   requested_assignee                         users?              @relation("task_request_requested_assignee", fields: [requested_assignee_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   tasks                                      tasks?              @relation(fields: [generated_task_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_generated_task")
   users_task_requests_reviewed_by_idTousers  users?              @relation("task_requests_reviewed_by_idTousers", fields: [reviewed_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_request_reviewer")
   users_task_requests_requested_by_idTousers users               @relation("task_requests_requested_by_idTousers", fields: [requested_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_request_user")
+  request_attachments                        task_attachments[]
 
   @@index([status], map: "idx_task_requests_status")
   @@index([requested_by_id], map: "idx_task_requests_user")
   @@index([task_id], map: "idx_task_requests_task")
+  @@index([department_id], map: "idx_task_requests_department")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -424,10 +434,10 @@ model tasks {
   task_departments                  task_departments[]
   users_tasks_assigned_by_idTousers users               @relation("tasks_assigned_by_idTousers", fields: [assigned_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   users_tasks_assigned_to_idTousers users?              @relation("tasks_assigned_to_idTousers", fields: [assigned_to_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  users_tasks_deleted_by_idTousers   users?              @relation("tasks_deleted_by_idTousers", fields: [deleted_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_tasks_deleted_by_idTousers  users?              @relation("tasks_deleted_by_idTousers", fields: [deleted_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   departments                       departments         @relation(fields: [department_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   tasks                             tasks?              @relation("tasksTotasks", fields: [parent_task_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  other_tasks                       tasks[]             @relation("tasksTotasks") 
+  other_tasks                       tasks[]             @relation("tasksTotasks")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -459,8 +469,15 @@ model users {
   self_actions                                         self_actions[]
   self_action_comments                                 self_action_comments[]
   self_action_logs                                     self_action_logs[]
-  task_requests_current_assignee                       task_requests[]     @relation("task_request_current_assignee")
-  task_requests_requested_assignee                     task_requests[]     @relation("task_request_requested_assignee")
+  visitor_created_by                                   Visitor[]               @relation("visitor_created_by")
+  visitor_updated_by                                   Visitor[]               @relation("visitor_updated_by")
+  visit_host_employee                                  Visit[]                 @relation("visit_host_employee")
+  visit_created_by                                     Visit[]                 @relation("visit_created_by")
+  visit_updated_by                                     Visit[]                 @relation("visit_updated_by")
+  visitor_image_created_by                             VisitorImage[]          @relation("visitor_image_created_by")
+  visitor_image_updated_by                             VisitorImage[]          @relation("visitor_image_updated_by")
+  task_requests_current_assignee                       task_requests[]         @relation("task_request_current_assignee")
+  task_requests_requested_assignee                     task_requests[]         @relation("task_request_requested_assignee")
   task_attachments                                     task_attachments[]
   task_comments                                        task_comments[]
   task_escalations                                     task_escalations[]
@@ -602,7 +619,6 @@ enum OtpType {
   PASSWORD_RESET
 }
 
-
 enum UserStatus {
   PENDING
   ACTIVE
@@ -621,4 +637,136 @@ model PasswordResetRequest {
 
   @@index([user_id])
   @@map("password_reset_requests")
+}
+
+enum VisitorStatus {
+  ACTIVE
+  BLACKLISTED
+  INACTIVE
+  ARCHIVED
+}
+
+enum VisitStatus {
+  SCHEDULED
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+  NO_SHOW
+  EXPIRED
+}
+
+enum VisitorImageType {
+  PROFILE
+  FACE_REFERENCE
+  AADHAAR_FRONT
+  AADHAAR_BACK
+  VISIT_CAPTURE
+  OTHER
+}
+
+enum VisitorImageSource {
+  UPLOADED
+  CAMERA
+  SCANNED
+  SYSTEM
+}
+
+model Visitor {
+  id                     String         @id @default(uuid()) @db.Uuid
+  firstName              String         @db.VarChar(100)
+  lastName               String?        @db.VarChar(100)
+  fullName               String         @db.VarChar(255)
+  email                  String?        @db.VarChar(255)
+  mobileNumber           String?        @db.VarChar(20)
+  alternateMobileNumber  String?        @db.VarChar(20)
+  aadhaarLast4           String?        @db.VarChar(4)
+  status                 VisitorStatus  @default(ACTIVE)
+  blacklistReason        String?
+  blacklistedAt          DateTime?      @db.Timestamptz(6)
+  faceRecognitionConsent Boolean        @default(false)
+  notes                  String?
+  createdById            String         @db.Uuid
+  updatedById            String?        @db.Uuid
+  createdAt              DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt              DateTime       @updatedAt @db.Timestamptz(6)
+  deletedAt              DateTime?      @db.Timestamptz(6)
+  visits                 Visit[]        @relation("VisitorVisits")
+  images                 VisitorImage[] @relation("VisitorImages")
+  createdBy              users          @relation("visitor_created_by", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  updatedBy              users?         @relation("visitor_updated_by", fields: [updatedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([email], map: "idx_visitors_email")
+  @@index([mobileNumber], map: "idx_visitors_mobile_number")
+  @@index([status], map: "idx_visitors_status")
+  @@index([deletedAt], map: "idx_visitors_deleted_at")
+  @@map("visitors")
+}
+
+model Visit {
+  id                   String         @id @default(uuid()) @db.Uuid
+  visitorId            String         @db.Uuid
+  branchId             String         @db.Uuid
+  hostEmployeeId       String         @db.Uuid
+  status               VisitStatus    @default(SCHEDULED)
+  visitCode            String?        @unique @db.VarChar(50)
+  appointmentReference String?        @db.VarChar(100)
+  purpose              String         @db.VarChar(255)
+  meetingDetails       String?
+  scheduledAt          DateTime?      @db.Timestamptz(6)
+  checkInTime          DateTime?      @db.Timestamptz(6)
+  checkOutTime         DateTime?      @db.Timestamptz(6)
+  qrPassIssuedAt       DateTime?      @db.Timestamptz(6)
+  qrPassExpiresAt      DateTime?      @db.Timestamptz(6)
+  faceVerifiedAt       DateTime?      @db.Timestamptz(6)
+  faceMatchScore       Decimal?       @db.Decimal(5, 2)
+  aadhaarVerifiedAt    DateTime?      @db.Timestamptz(6)
+  createdById          String         @db.Uuid
+  updatedById          String?        @db.Uuid
+  createdAt            DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime       @updatedAt @db.Timestamptz(6)
+  deletedAt            DateTime?      @db.Timestamptz(6)
+  visitor              Visitor        @relation("VisitorVisits", fields: [visitorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  hostEmployee         users          @relation("visit_host_employee", fields: [hostEmployeeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdBy            users          @relation("visit_created_by", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  updatedBy            users?         @relation("visit_updated_by", fields: [updatedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  images               VisitorImage[] @relation("VisitImages")
+
+  @@index([branchId], map: "idx_visits_branch_id")
+  @@index([status], map: "idx_visits_status")
+  @@index([checkInTime], map: "idx_visits_check_in_time")
+  @@index([visitorId], map: "idx_visits_visitor_id")
+  @@index([deletedAt], map: "idx_visits_deleted_at")
+  @@map("visits")
+}
+
+model VisitorImage {
+  id                   String             @id @default(uuid()) @db.Uuid
+  visitorId            String             @db.Uuid
+  visitId              String?            @db.Uuid
+  imageType            VisitorImageType   @default(PROFILE)
+  imageSource          VisitorImageSource @default(UPLOADED)
+  fileName             String?            @db.VarChar(255)
+  fileUrl              String             @db.VarChar(500)
+  storagePath          String?            @db.VarChar(500)
+  mimeType             String?            @db.VarChar(100)
+  fileSizeKb           Int?
+  isPrimary            Boolean            @default(false)
+  isFaceTemplate       Boolean            @default(false)
+  faceEmbeddingVersion String?            @db.VarChar(50)
+  faceMatchScore       Decimal?           @db.Decimal(5, 2)
+  createdById          String             @db.Uuid
+  updatedById          String?            @db.Uuid
+  createdAt            DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime           @updatedAt @db.Timestamptz(6)
+  deletedAt            DateTime?          @db.Timestamptz(6)
+  visitor              Visitor            @relation("VisitorImages", fields: [visitorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  visit                Visit?             @relation("VisitImages", fields: [visitId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  createdBy            users              @relation("visitor_image_created_by", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  updatedBy            users?             @relation("visitor_image_updated_by", fields: [updatedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([visitorId], map: "idx_visitor_images_visitor_id")
+  @@index([visitId], map: "idx_visitor_images_visit_id")
+  @@index([imageType], map: "idx_visitor_images_image_type")
+  @@index([deletedAt], map: "idx_visitor_images_deleted_at")
+  @@map("visitor_images")
 }

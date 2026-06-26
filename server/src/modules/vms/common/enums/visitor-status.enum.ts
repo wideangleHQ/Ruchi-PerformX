@@ -1,0 +1,7 @@
+export enum VisitorStatus {
+  ACTIVE = 'ACTIVE',
+  BLACKLISTED = 'BLACKLISTED',
+  INACTIVE = 'INACTIVE',
+  ARCHIVED = 'ARCHIVED',
+}
+

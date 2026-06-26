@@ -134,6 +134,50 @@ export interface Task {
   task_attachments?: Attachment[];
 }
 
+export type RequestType =
+  | 'BUDGET_APPROVAL'
+  | 'TRANSPORT_SUPPORT'
+  | 'CROSS_DEPT_ASSISTANCE'
+  | 'RESOURCE_REQUEST'
+  | 'OTHER'
+  | 'TASK_REASSIGNMENT';
+
+export type RequestPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
+export interface RequestAttachment {
+  id: string;
+  file_name: string;
+  file_url: string;
+  file_type?: string | null;
+  file_size_kb?: number | null;
+  created_at?: string;
+}
+
+export interface Request {
+  id: string;
+  title: string;
+  description: string;
+  type: RequestType;
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
+  priority?: RequestPriority | null;
+  departmentId?: string | null;
+  taskId?: string | null;
+  generatedTaskId?: string | null;
+  taskDepartmentId?: string | null;
+  currentAssigneeId?: string | null;
+  requestedAssigneeId?: string | null;
+  requestReason?: string | null;
+  taskTitle?: string | null;
+  taskDescription?: string | null;
+  currentAssigneeName?: string | null;
+  requestedAssigneeName?: string | null;
+  requesterName?: string | null;
+  requesterDepartmentId?: string | null;
+  requestAttachments?: RequestAttachment[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Attachment {
   id: string;
   file_name: string;
@@ -182,6 +226,7 @@ export type NotificationType =
   | 'ESCALATION_MD'
   | 'REQUEST_ACCEPTED'
   | 'REQUEST_REJECTED'
+  | 'REVIEW_REQUESTED'
   | 'REMARKS_ADDED'
   | 'INCENTIVE_APPROVED'
   | 'TRANSFER_REQUESTED'

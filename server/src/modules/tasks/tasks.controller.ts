@@ -32,7 +32,7 @@ export class TasksController {
   // ─── Create ────────────────────────────────────────────────────
 
   @Post()
-  @Roles(role_enum.MD, role_enum.HOD, role_enum.EMPLOYEE, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD)
   @UseInterceptors(FilesInterceptor('attachments'))
   create(
     @Body() dto: CreateTaskDto,

@@ -1,0 +1,9 @@
+export enum VisitStatus {
+  SCHEDULED = 'SCHEDULED',
+  CHECKED_IN = 'CHECKED_IN',
+  CHECKED_OUT = 'CHECKED_OUT',
+  CANCELLED = 'CANCELLED',
+  NO_SHOW = 'NO_SHOW',
+  EXPIRED = 'EXPIRED',
+}
+

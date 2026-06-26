@@ -16,6 +16,7 @@ type AttachmentRecord = Prisma.task_attachmentsGetPayload<{
   select: {
     id: true;
     task_id: true;
+    request_id: true;
     comment_id: true;
     self_action_id: true;
     self_action_comment_id: true;
@@ -73,6 +74,16 @@ export class AttachmentsService {
     });
   }
 
+  async uploadRequestAttachments(requestId: string, files: UploadedFile[], user: JwtPayload) {
+    await this.ensureRequestVisible(requestId, user);
+    return this.uploadFiles(files, {
+      requestId,
+      uploadedById: user.sub,
+      folder: 'requests/attachments',
+      relation: 'request',
+    });
+  }
+
   async uploadTaskCommentAttachments(
     taskId: string,
     commentId: string,
@@ -119,6 +130,16 @@ export class AttachmentsService {
     await this.ensureTaskVisible(taskId, user);
     const attachments = await this.prisma.task_attachments.findMany({
       where: { task_id: taskId },
+      orderBy: { created_at: 'asc' },
+      select: this.selectAttachment(),
+    });
+    return this.mapAttachments(attachments);
+  }
+
+  async findRequestAttachments(requestId: string, user: JwtPayload) {
+    await this.ensureRequestVisible(requestId, user);
+    const attachments = await this.prisma.task_attachments.findMany({
+      where: { request_id: requestId },
       orderBy: { created_at: 'asc' },
       select: this.selectAttachment(),
     });
@@ -188,10 +209,11 @@ export class AttachmentsService {
       folder: string;
       uploadedById: string;
       taskId?: string;
+      requestId?: string;
       commentId?: string;
       selfActionId?: string;
       selfActionCommentId?: string;
-      relation: 'task' | 'taskComment' | 'selfAction' | 'selfActionComment';
+      relation: 'task' | 'request' | 'taskComment' | 'selfAction' | 'selfActionComment';
     },
   ) {
     if (!files?.length) {
@@ -219,13 +241,13 @@ export class AttachmentsService {
 
       for (const file of files) {
         const prepared = await this.prepareFile(file);
-        const contextId = target.selfActionCommentId || target.commentId || target.taskId || target.selfActionId;
+        const contextId = target.selfActionCommentId || target.commentId || target.taskId || target.requestId || target.selfActionId;
 
         if (!contextId) {
           throw new BadRequestException(
             `Storage path cannot be built: missing context ID (folder=${target.folder}). ` +
             `selfActionCommentId=${target.selfActionCommentId} commentId=${target.commentId} ` +
-            `taskId=${target.taskId} selfActionId=${target.selfActionId}`,
+            `taskId=${target.taskId} requestId=${target.requestId} selfActionId=${target.selfActionId}`,
           );
         }
 
@@ -250,6 +272,7 @@ export class AttachmentsService {
         const created = await this.prisma.task_attachments.create({
           data: {
             task_id: target.taskId ?? null,
+            request_id: target.requestId ?? null,
             comment_id: target.commentId ?? null,
             self_action_id: target.selfActionId ?? null,
             self_action_comment_id: target.selfActionCommentId ?? null,
@@ -371,6 +394,7 @@ export class AttachmentsService {
       file_size_kb: attachment.file_size_kb,
       uploaded_by_id: attachment.uploaded_by_id,
       task_id: attachment.task_id,
+      request_id: attachment.request_id,
       comment_id: attachment.comment_id,
       self_action_id: attachment.self_action_id,
       self_action_comment_id: attachment.self_action_comment_id,
@@ -401,6 +425,37 @@ export class AttachmentsService {
     if ((user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA) && this.hasOverlap(departmentIds, user.departmentIds || [])) return;
 
     throw new ForbiddenException('Access denied to this task');
+  }
+
+  private async ensureRequestVisible(requestId: string, user: JwtPayload) {
+    const request = await this.prisma.task_requests.findUnique({
+      where: { id: requestId },
+      select: {
+        id: true,
+        requested_by_id: true,
+        department_id: true,
+        users_task_requests_requested_by_idTousers: { select: { department_id: true } },
+      },
+    });
+
+    if (!request) {
+      throw new NotFoundException('Request not found');
+    }
+
+    if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return;
+    if (request.requested_by_id === user.sub) return;
+
+    const departmentId = request.department_id ?? request.users_task_requests_requested_by_idTousers?.department_id;
+    if (!departmentId) {
+      throw new ForbiddenException('Access denied to this request');
+    }
+
+    const departmentIds = user.departmentIds?.length ? user.departmentIds : user.departmentId ? [user.departmentId] : [];
+    if ((user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA || user.role === role_enum.PURCHASE_HEAD) && departmentIds.includes(departmentId)) {
+      return;
+    }
+
+    throw new ForbiddenException('Access denied to this request');
   }
 
   private async ensureTaskCommentVisible(taskId: string, commentId: string, user: JwtPayload) {
@@ -459,6 +514,7 @@ export class AttachmentsService {
     return {
       id: true,
       task_id: true,
+      request_id: true,
       comment_id: true,
       self_action_id: true,
       self_action_comment_id: true,
