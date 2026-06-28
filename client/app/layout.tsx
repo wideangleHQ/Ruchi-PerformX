@@ -41,7 +41,9 @@ export default function RootLayout({
           <QueryProvider>
             <AuthProvider>
               <SocketProvider>
-                {children}
+                <div className="screen-only min-h-screen flex flex-col w-full">
+                  {children}
+                </div>
               </SocketProvider>
             </AuthProvider>
           </QueryProvider>

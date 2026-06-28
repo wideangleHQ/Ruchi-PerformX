@@ -552,3 +552,72 @@ button, a, [role="button"] {
     gap: var(--space-sm);
   }
 }
+@media print {
+  .screen-only {
+    display: none !important;
+  }
+  
+  /* Hide all dialog and overlay elements */
+  [role="dialog"],
+  [data-state="open"],
+  .dialog-overlay,
+  .ant-modal-mask,
+  .ant-modal-wrap,
+  .MuiDialog-root,
+  .MuiDialog-paper,
+  .chakra-modal__overlay,
+  .chakra-modal__content,
+  [class*="DialogOverlay"],
+  [class*="DialogContent"],
+  [class*="ModalOverlay"],
+  [class*="ModalContent"],
+  [class*="backdrop"],
+  [class*="Backdrop"] {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+  }
+  
+  /* Ensure print-only content displays */
+  .print-only {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  
+  /* Reset all properties that could affect printing */
+  .print-only * {
+    opacity: 1 !important;
+    filter: none !important;
+    transform: none !important;
+    overflow: visible !important;
+    position: static !important;
+    z-index: auto !important;
+    pointer-events: auto !important;
+    background: white !important;
+    color: black !important;
+  }
+}
+
+@media screen {
+  .print-only {
+    display: none !important;
+  }
+}
+
+@page {
+  size: A4 portrait;
+  margin: 10mm;
+}
+
+html, body {
+  background: white;
+}
+
+
+@media print {
+  body {
+    overflow: visible !important;
+  }
+}
+

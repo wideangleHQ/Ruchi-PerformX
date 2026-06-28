@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { JwtModule } from '@nestjs/jwt';
 import { AuthModule } from './modules/auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { EmailModule } from './modules/email/email.module';
@@ -18,6 +17,7 @@ import { ScoringModule } from './modules/scoring/scoring.module'
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ProfileModule } from './modules/profile/profile.module';
 import { RequestsModule } from './modules/requests/requests.module';
+import { VmsModule } from './modules/vms/vms.module';
 
 @Module({
   imports: [
@@ -36,9 +36,7 @@ import { RequestsModule } from './modules/requests/requests.module';
     ScoringModule,
     DashboardModule,
     ProfileModule,
-    JwtModule.register({
-      secret: process.env.JWT_SECRET!,
-    }),
+    VmsModule,
   ],
   providers: [
     {

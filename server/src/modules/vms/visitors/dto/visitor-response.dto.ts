@@ -1,4 +1,4 @@
-import { Exclude, Expose, Type } from 'class-transformer';
+import { Exclude, Expose, Type, Transform } from 'class-transformer';
 import { VisitStatus } from '../../common/enums/visit-status.enum';
 import { VisitorImageSource } from '../../common/enums/visitor-image-source.enum';
 import { VisitorImageType } from '../../common/enums/visitor-image-type.enum';
@@ -182,13 +182,13 @@ export class VisitorResponseDto {
   @Expose()
   mobileNumber?: string | null;
 
-  @ApiPropertyOptional()
+  @ApiProperty()
   @Expose()
-  alternateMobileNumber?: string | null;
+  companyName!: string;
 
-  @ApiPropertyOptional()
+  @ApiProperty()
   @Expose()
-  aadhaarLast4?: string | null;
+  address!: string;
 
   @ApiProperty({ enum: VisitorStatus })
   @Expose()
@@ -231,4 +231,14 @@ export class VisitorResponseDto {
   @Expose()
   @Type(() => VisitorImageResponseDto)
   images?: VisitorImageResponseDto[];
+
+  @ApiPropertyOptional({ type: () => String })
+  @Expose()
+  @Transform(({ obj }) => {
+    if (obj.images && obj.images.length > 0) {
+      return obj.images[0].fileUrl;
+    }
+    return null;
+  })
+  profileImage?: string | null;
 }

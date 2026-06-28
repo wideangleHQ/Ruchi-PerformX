@@ -143,13 +143,19 @@ export class UsersService {
     }
   }
 
-  async findAll() {
+  async findAll(activeOnly?: boolean) {
+    const where: any = { deleted_at: null };
+    if (activeOnly) {
+      where.is_active = true;
+    }
+
     const users = await this.prisma.users.findMany({
-      where: { deleted_at: null },
+      where,
       select: USER_SELECT,
       orderBy: { created_at: 'desc' },
     });
 
+    console.log("Users from Prisma:", users);
     return users.map((user) => this.toUserResponse(user));
   }
 

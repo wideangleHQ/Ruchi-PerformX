@@ -678,8 +678,8 @@ model Visitor {
   fullName               String         @db.VarChar(255)
   email                  String?        @db.VarChar(255)
   mobileNumber           String?        @db.VarChar(20)
-  alternateMobileNumber  String?        @db.VarChar(20)
-  aadhaarLast4           String?        @db.VarChar(4)
+  companyName            String         @db.VarChar(255) @default("Unknown Company")
+  address                String         @db.Text @default("N/A")
   status                 VisitorStatus  @default(ACTIVE)
   blacklistReason        String?
   blacklistedAt          DateTime?      @db.Timestamptz(6)

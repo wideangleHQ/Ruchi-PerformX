@@ -41,20 +41,18 @@ export class UpdateVisitorDto extends PartialType(CreateVisitorDto) {
   @Matches(/^(?:\+91[-\s]?)?[6-9]\d{9}$/)
   declare mobileNumber: string;
 
-  @ApiPropertyOptional({ example: '9123456789' })
+  @ApiPropertyOptional({ example: 'PerformX Inc.', maxLength: 255 })
   @Expose()
   @IsOptional()
   @IsString()
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @Matches(/^(?:\+91[-\s]?)?[6-9]\d{9}$/)
-  declare alternateMobileNumber: string;
+  @MaxLength(255)
+  declare companyName: string;
 
-  @ApiPropertyOptional({ example: '1234', minLength: 4, maxLength: 4 })
+  @ApiPropertyOptional({ example: '123 Business St, Tech Park', maxLength: 1000 })
   @Expose()
   @IsOptional()
   @IsString()
-  @Length(4, 4)
-  declare aadhaarLast4: string;
+  declare address: string;
 
   @ApiPropertyOptional({ default: false })
   @Expose()

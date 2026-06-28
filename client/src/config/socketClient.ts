@@ -23,14 +23,6 @@ export const initializeSocket = (token: string): Socket => {
     transports: ['websocket'],
   });
 
-  socket.on('connect', () => {
-    console.log('[Socket.IO] Connected');
-  });
-
-  socket.on('disconnect', () => {
-    console.log('[Socket.IO] Disconnected');
-  });
-
   socket.on('connect_error', (error) => {
     console.error('[Socket.IO] Connection error:', error);
   });

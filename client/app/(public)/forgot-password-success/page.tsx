@@ -20,8 +20,8 @@ export default function ForgotPasswordSuccessPage() {
           Please contact your HOD for approval.
         </p>
 
-        <Button asChild className="mt-6 w-full bg-green-600 hover:bg-green-700">
-          <Link href="/login">Back to Login</Link>
+        <Button render={<Link href="/login" />} className="mt-6 w-full bg-green-600 hover:bg-green-700">
+          Back to Login
         </Button>
       </div>
     </main>

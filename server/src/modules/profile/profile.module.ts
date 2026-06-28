@@ -1,14 +1,10 @@
 import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
 import { ProfileController } from './profile.controller';
 import { ProfileService } from './profile.service';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [
-    JwtModule.register({
-      secret: process.env.JWT_SECRET!,
-    }),
-  ],
+  imports: [AuthModule],
   controllers: [ProfileController],
   providers: [ProfileService],
 })

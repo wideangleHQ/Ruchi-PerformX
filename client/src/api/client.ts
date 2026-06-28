@@ -1,7 +1,6 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ;
-console.log('API_URL =', API_URL);
 
 
 const axiosClient: AxiosInstance = axios.create({
@@ -14,17 +13,25 @@ const axiosClient: AxiosInstance = axios.create({
 axiosClient.interceptors.request.use(
   (config) => {
     if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('accessToken');
+      const requestUrl = config.url ?? '';
+      const isVmsPage = window.location.pathname.startsWith('/vms');
+      const isVmsRequest = requestUrl.includes('/vms/') || isVmsPage;
+      const token = isVmsRequest
+        ? (localStorage.getItem('vmsAccessToken') || localStorage.getItem('accessToken'))
+        : localStorage.getItem('accessToken');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
     }
     if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
-      const headers = config.headers as any;
+      const headers = config.headers;
       if (headers) {
-        delete headers['Content-Type'];
-        if (headers.common) {
-          delete headers.common['Content-Type'];
+        if ('delete' in headers && typeof headers.delete === 'function') {
+          headers.delete('Content-Type');
+          headers.delete('content-type');
+        } else {
+          delete (headers as Record<string, unknown>)['Content-Type'];
+          delete (headers as Record<string, unknown>)['content-type'];
         }
       }
     }
@@ -39,6 +46,18 @@ axiosClient.interceptors.response.use(
   async (error: AxiosError) => {
     if (error.response?.status === 401) {
       if (typeof window !== 'undefined') {
+        const requestUrl = error.config?.url ?? '';
+        const isVmsPage = window.location.pathname.startsWith('/vms');
+        const isVmsRequest = requestUrl.includes('/vms/') || isVmsPage;
+        if (isVmsRequest) {
+          localStorage.removeItem('vmsAccessToken');
+          localStorage.removeItem('vmsAccessType');
+          if (isVmsPage) {
+            window.location.href = '/vms';
+          }
+          return Promise.reject(error);
+        }
+
         localStorage.removeItem('accessToken');
         localStorage.removeItem('user');
         // Only redirect if not already on a public page

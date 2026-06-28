@@ -45,9 +45,11 @@ export class UsersController {
   // ─── CRUD ─────────────────────────────────────────────────────────────────────
 
   @Get()
-  @Roles(role_enum.MD, role_enum.ADMIN)
-  findAll() {
-    return this.usersService.findAll();
+  @Roles(role_enum.MD, role_enum.ADMIN, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD, role_enum.EMPLOYEE)
+  async findAll(@Query('active') active?: string) {
+    const users = await this.usersService.findAll(active === 'true');
+    console.log("Users API Response:", users);
+    return users;
   }
 
   @Get('assignable')

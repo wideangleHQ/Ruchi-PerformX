@@ -31,18 +31,15 @@ export const useSocket = () => {
 
     // Listen for real-time events
     socket.on('notification:new', () => {
-      console.log('[Socket.IO] Notification received');
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     });
 
     socket.on('task:updated', () => {
-      console.log('[Socket.IO] Task updated');
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     });
 
     socket.on('comment:new', () => {
-      console.log('[Socket.IO] Comment received');
       // Invalidate all task-related queries
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
     });

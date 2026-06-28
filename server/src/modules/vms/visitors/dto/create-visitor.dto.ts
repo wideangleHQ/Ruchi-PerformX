@@ -7,6 +7,7 @@ import {
   Length,
   MaxLength,
   Matches,
+  IsNotEmpty,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from './swagger-compat';
 
@@ -38,20 +39,18 @@ export class CreateVisitorDto {
   @Matches(/^(?:\+91[-\s]?)?[6-9]\d{9}$/)
   mobileNumber!: string;
 
-  @ApiPropertyOptional({ example: '9123456789' })
+  @ApiProperty({ example: 'PerformX Inc.', maxLength: 255 })
   @Expose()
-  @IsOptional()
   @IsString()
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @Matches(/^(?:\+91[-\s]?)?[6-9]\d{9}$/)
-  alternateMobileNumber?: string;
+  @IsNotEmpty()
+  @MaxLength(255)
+  companyName!: string;
 
-  @ApiPropertyOptional({ example: '1234', minLength: 4, maxLength: 4 })
+  @ApiProperty({ example: '123 Business St, Tech Park', maxLength: 1000 })
   @Expose()
-  @IsOptional()
   @IsString()
-  @Length(4, 4)
-  aadhaarLast4?: string;
+  @IsNotEmpty()
+  address!: string;
 
   @ApiPropertyOptional({ default: false })
   @Expose()
