@@ -25,16 +25,31 @@ import { VisitorImageType } from '../../common/enums/visitor-image-type.enum';
 @Injectable()
 export class VisitorService implements VisitorServiceContract {
   private readonly supabase: SupabaseClient;
-  private readonly bucket = process.env.SUPABASE_VMS_BUCKET || 'vms-files';
+  private readonly bucket: string;
 
   constructor(
     private readonly prisma: PrismaService,
     @Inject(VISITOR_DOMAIN_SERVICE)
     private readonly visitorDomainService: VisitorDomainService,
   ) {
-    const supabaseUrl = process.env.SUPABASE_URL || 'https://example.supabase.co';
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || 'fake-key';
+    const sanitize = (val: string | undefined): string => (val || '').trim().replace(/^["']|["']$/g, '');
+
+    // Railway has SUPABASE_URL="https://...supabase.co/rest/v1/" which breaks the storage API.
+    // We must strip /rest/v1 and any trailing slashes.
+    let rawUrl = sanitize(process.env.SUPABASE_URL) || 'https://example.supabase.co';
+    rawUrl = rawUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
+    
+    const supabaseUrl = rawUrl;
+    const supabaseKey = sanitize(process.env.SUPABASE_SERVICE_ROLE_KEY) || sanitize(process.env.SUPABASE_SERVICE_KEY) || 'fake-key';
+    this.bucket = sanitize(process.env.SUPABASE_VMS_BUCKET) || 'vms-files';
+
     this.supabase = createClient(supabaseUrl, supabaseKey);
+
+    console.log('[VMS] Supabase initialized:', {
+      url: supabaseUrl.substring(0, 30) + '...',
+      bucket: this.bucket,
+      hasKey: supabaseKey.length > 10,
+    });
   }
 
   async uploadPhoto(visitorId: string, file: Express.Multer.File, actorId: string): Promise<any> {
@@ -46,26 +61,45 @@ export class VisitorService implements VisitorServiceContract {
     try {
       const ext = file.mimetype.split('/')[1] || 'jpg';
       const fileName = `${randomUUID()}.${ext}`;
-      const path = `visitors/photos/${visitorId}/${fileName}`;
+      const uploadPath = `visitors/photos/${visitorId}/${fileName}`;
 
-      const { data, error } = await this.supabase.storage.from(this.bucket).upload(path, file.buffer, {
+      console.log('===== SUPABASE UPLOAD DEBUG =====');
+      console.log({
+        visitorId,
+        bucket: this.bucket,
+        uploadPath,
+        fileName: file.originalname,
+        mimeType: file.mimetype,
+        fileSize: file.size,
+        hasBuffer: !!file.buffer,
+        bufferLength: file.buffer?.length,
+      });
+      console.log('=================================');
+
+      const { data, error } = await this.supabase.storage.from(this.bucket).upload(uploadPath, file.buffer, {
         contentType: file.mimetype,
-        upsert: false
+        upsert: false,
       });
 
-      let fileUrl = '';
       if (error) {
-        console.error('Supabase upload error:', error);
+        console.error('Supabase upload error:', {
+          message: error.message,
+          name: error.name,
+          status: (error as any).status,
+          statusCode: (error as any).statusCode,
+        });
         throw new BadRequestException('Supabase upload failed: ' + error.message);
-      } else {
-        const { data: publicUrlData } = this.supabase.storage.from(this.bucket).getPublicUrl(path);
-        fileUrl = publicUrlData.publicUrl;
       }
+
+      console.log('Supabase upload success:', data);
+
+      const { data: publicUrlData } = this.supabase.storage.from(this.bucket).getPublicUrl(uploadPath);
+      const fileUrl = publicUrlData.publicUrl;
 
       // Mark other images as not primary
       await this.prisma.visitorImage.updateMany({
         where: { visitorId },
-        data: { isPrimary: false }
+        data: { isPrimary: false },
       });
 
       const visitorImage = await this.prisma.visitorImage.create({
@@ -75,21 +109,22 @@ export class VisitorService implements VisitorServiceContract {
           imageSource: VisitorImageSource.UPLOADED,
           fileName,
           fileUrl,
-          storagePath: path,
+          storagePath: uploadPath,
           mimeType: file.mimetype,
           fileSizeKb: Math.round(file.size / 1024),
           isPrimary: true,
           createdById: actorId,
-        }
+        },
       });
 
       return {
         success: true,
         imageUrl: fileUrl,
-        visitorImageId: visitorImage.id
+        visitorImageId: visitorImage.id,
       };
     } catch (err) {
       console.error('Failed to upload image:', err);
+      if (err instanceof BadRequestException) throw err;
       throw new BadRequestException('Failed to upload image');
     }
   }
