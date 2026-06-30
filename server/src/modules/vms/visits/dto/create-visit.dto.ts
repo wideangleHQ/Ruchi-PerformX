@@ -1,5 +1,5 @@
 import { Exclude, Expose, Transform } from 'class-transformer';
-import { IsDateString, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsDateString, IsOptional, IsString, IsUUID, MaxLength, IsInt, Min, Max, Matches } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from './swagger-compat';
 
 @Exclude()
@@ -11,7 +11,7 @@ export class CreateVisitDto {
 
   @ApiProperty({ format: 'uuid' })
   @Expose()
-  @IsUUID()
+  @Matches(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/, { message: 'hostEmployeeId must be a UUID' })
   hostEmployeeId!: string;
 
   @ApiProperty({ maxLength: 255 })
@@ -19,6 +19,14 @@ export class CreateVisitDto {
   @IsString()
   @MaxLength(255)
   purpose!: string;
+
+  @ApiPropertyOptional({ minimum: 1, maximum: 50, default: 1 })
+  @Expose()
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  peopleCount?: number;
 
   @ApiPropertyOptional()
   @Expose()

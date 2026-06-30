@@ -8,6 +8,7 @@ import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.in
 import { PaginatedResponse } from '../../common/interfaces/paginated-response.interface';
 import { plainToInstance } from 'class-transformer';
 import { VisitStatus } from '../../common/enums/visit-status.enum';
+import * as ExcelJS from 'exceljs';
 
 @Injectable()
 export class DashboardServiceImpl implements DashboardService {
@@ -209,5 +210,73 @@ export class DashboardServiceImpl implements DashboardService {
       weekly,
       monthly,
     });
+  }
+
+  async exportTodaysVisitors(user: AuthenticatedUser): Promise<Buffer> {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    // Fetch today's visits to get the visitors who checked in today
+    const visits = await this.prisma.visit.findMany({
+      where: {
+        checkInTime: { gte: todayStart, lte: todayEnd },
+        deletedAt: null,
+      },
+      include: {
+        visitor: true,
+      },
+      orderBy: { checkInTime: 'desc' },
+    });
+
+    // Map to distinct visitors to preserve original behavior (in case of multiple visits by same person today, though unlikely)
+    const visitors = Array.from(
+      new Map(visits.map(v => [v.visitorId, v.visitor])).values()
+    );
+
+    // Create workbook
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Today\'s Visitors');
+
+    // Define columns
+    worksheet.columns = [
+      { header: 'Full Name', key: 'fullName', width: 25 },
+      { header: 'Email', key: 'email', width: 30 },
+      { header: 'Mobile Number', key: 'mobileNumber', width: 18 },
+      { header: 'Status', key: 'status', width: 15 },
+      { header: 'Face Consent', key: 'faceRecognitionConsent', width: 15 },
+      { header: 'Notes', key: 'notes', width: 35 },
+      { header: 'Company Name', key: 'companyName', width: 25 },
+      { header: 'Address', key: 'address', width: 35 },
+      { header: 'Registered At', key: 'createdAt', width: 20 },
+    ];
+
+    // Style header row
+    worksheet.getRow(1).font = { bold: true };
+    worksheet.getRow(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0E0E0' },
+    };
+
+    // Add data rows
+    visitors.forEach((visitor) => {
+      worksheet.addRow({
+        fullName: visitor.fullName,
+        email: visitor.email || 'N/A',
+        mobileNumber: visitor.mobileNumber || 'N/A',
+        status: visitor.status,
+        faceRecognitionConsent: visitor.faceRecognitionConsent ? 'Yes' : 'No',
+        notes: visitor.notes || 'N/A',
+        companyName: visitor.companyName || 'N/A',
+        address: visitor.address || 'N/A',
+        createdAt: visitor.createdAt.toLocaleString(),
+      });
+    });
+
+    // Generate buffer
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
   }
 }

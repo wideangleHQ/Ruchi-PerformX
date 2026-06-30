@@ -3,12 +3,19 @@
 import Link from 'next/link';
 import type { LucideIcon } from 'lucide-react';
 import { useDashboardSummary } from '../hooks/useDashboardSummary';
+import { useExportTodayVisitors } from '../hooks/useExportTodayVisitors';
 import { StatisticsCard } from './StatisticsCard';
 import { TodayVisitorsTable } from './TodayVisitorsTable';
-import { Users, UserPlus, ClipboardList, CalendarDays, Activity, AlertCircle } from 'lucide-react';
+import { Users, UserPlus, ClipboardList, CalendarDays, Activity, AlertCircle, Download, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export function DashboardScreen() {
   const { summary, isLoading, error, refetch } = useDashboardSummary();
+  const { mutate: exportVisitors, isPending: isExporting } = useExportTodayVisitors();
+
+  const handleExport = () => {
+    exportVisitors();
+  };
 
   if (isLoading) {
     return (
@@ -38,6 +45,30 @@ export function DashboardScreen() {
 
   return (
     <div className="flex flex-col gap-8">
+      {/* Header with Actions */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900 font-poppins">Dashboard</h1>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => refetch()}
+            disabled={isLoading}
+            className="flex items-center gap-2 font-poppins"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button
+            onClick={handleExport}
+            disabled={isExporting}
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-poppins"
+          >
+            <Download className="h-4 w-4" />
+            {isExporting ? 'Downloading...' : 'Download Excel'}
+          </Button>
+        </div>
+      </div>
+
       <section>
         <h2 className="text-lg font-semibold text-gray-900 mb-4 font-poppins">Quick Actions</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

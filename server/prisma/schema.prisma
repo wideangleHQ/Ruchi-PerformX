@@ -711,6 +711,7 @@ model Visit {
   visitCode            String?        @unique @db.VarChar(50)
   appointmentReference String?        @db.VarChar(100)
   purpose              String         @db.VarChar(255)
+  peopleCount          Int            @default(1)
   meetingDetails       String?
   scheduledAt          DateTime?      @db.Timestamptz(6)
   checkInTime          DateTime?      @db.Timestamptz(6)

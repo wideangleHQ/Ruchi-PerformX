@@ -32,6 +32,7 @@ export function QuickEntryCard() {
       visitorId: '', 
       hostEmployeeId: '',
       purpose: '',
+      peopleCount: 1,
     }
   });
 
@@ -144,6 +145,43 @@ export function QuickEntryCard() {
                 />
               )}
             />
+
+            <Controller
+              name="peopleCount"
+              control={control}
+              render={({ field }) => (
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">People Entering *</label>
+                  <div className="flex items-center space-x-4 mt-2">
+                    <button
+                      type="button"
+                      onClick={() => field.onChange(Math.max(1, field.value - 1))}
+                      className="w-12 h-12 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg text-2xl font-semibold text-gray-700 transition-colors disabled:opacity-50"
+                      disabled={field.value <= 1}
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={field.value}
+                      onChange={(e) => field.onChange(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
+                      className="w-20 h-12 text-center text-xl font-bold rounded-lg border border-input focus:ring-2 focus:ring-ring focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => field.onChange(Math.min(50, field.value + 1))}
+                      className="w-12 h-12 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg text-2xl font-semibold text-gray-700 transition-colors disabled:opacity-50"
+                      disabled={field.value >= 50}
+                    >
+                      +
+                    </button>
+                  </div>
+                  {errors.peopleCount && <p className="text-xs text-red-500 mt-1">{errors.peopleCount.message}</p>}
+                </div>
+              )}
+            />
           </form>
         </div>
 
@@ -164,6 +202,7 @@ export function QuickEntryCard() {
           visitorName={selectedVisitor?.fullName} 
           hostName={watchAll.hostEmployeeId ? 'Selected Host (ID: ' + watchAll.hostEmployeeId.slice(0, 8) + '...)' : undefined}
           purpose={watchAll.purpose}
+          peopleCount={watchAll.peopleCount}
         />
 
         {step === 2 && (

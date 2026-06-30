@@ -18,5 +18,8 @@ export class UpdateVisitDto extends PartialType(CreateVisitDto) {
 
   @Expose()
   scheduledAt?: string;
+
+  @Expose()
+  peopleCount?: number;
 }
 

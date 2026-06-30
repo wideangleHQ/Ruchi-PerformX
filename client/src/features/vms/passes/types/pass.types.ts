@@ -30,6 +30,7 @@ export interface PassResponse {
   checkInTime?: string;
   checkOutTime?: string;
   purpose?: string;
+  peopleCount: number;
   status: string;
   printedAt?: string;
   printedBy?: string;

@@ -1,5 +1,5 @@
 import { Exclude, Expose, Transform } from 'class-transformer';
-import { IsDateString, IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import { IsDateString, IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, Matches } from 'class-validator';
 import { VisitStatus } from '../../common/enums/visit-status.enum';
 import { ApiPropertyOptional } from './swagger-compat';
 
@@ -52,7 +52,7 @@ export class SearchVisitDto {
   @ApiPropertyOptional({ format: 'uuid' })
   @Expose()
   @IsOptional()
-  @IsUUID()
+  @Matches(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/, { message: 'hostEmployeeId must be a UUID' })
   hostEmployeeId?: string;
 
   @ApiPropertyOptional({ enum: VisitStatus })

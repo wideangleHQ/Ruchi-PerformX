@@ -15,4 +15,5 @@ export interface DashboardService {
   getInsideVisitors(params: DashboardSearchParams, user: AuthenticatedUser): Promise<PaginatedResponse<RecentVisitorDto>>;
   getRecentVisitors(user: AuthenticatedUser): Promise<RecentVisitorDto[]>;
   getStatistics(user: AuthenticatedUser): Promise<StatisticsResponseDto>;
+  exportTodaysVisitors(user: AuthenticatedUser): Promise<Buffer>;
 }

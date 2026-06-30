@@ -28,6 +28,7 @@ export interface ReportRow {
   employeeName: string;
   department?: string;
   purpose: string;
+  peopleCount: number;
   checkIn?: string;
   checkOut?: string;
   duration?: string;

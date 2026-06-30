@@ -10,6 +10,7 @@ export const VISIT_BASE_SELECT = {
   status: true,
   visitCode: true,
   purpose: true,
+  peopleCount: true,
   meetingDetails: true,
   scheduledAt: true,
   checkInTime: true,

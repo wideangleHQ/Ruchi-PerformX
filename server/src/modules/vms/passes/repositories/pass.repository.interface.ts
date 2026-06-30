@@ -11,6 +11,8 @@ export const PASS_SELECT = {
   checkInTime: true,
   qrPassIssuedAt: true,
   qrPassExpiresAt: true,
+  purpose: true,
+  peopleCount: true,
   visitor: {
     select: {
       id: true,

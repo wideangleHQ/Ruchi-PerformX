@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { PassResponse } from '../types/pass.types';
 import {
   Dialog,
@@ -16,11 +17,16 @@ interface PrintPermissionSlipDialogProps {
 }
 
 export function PrintPermissionSlipDialog({ slip, onClose }: PrintPermissionSlipDialogProps) {
+  const [paperSize, setPaperSize] = useState('a5');
+  const [copies, setCopies] = useState(1);
+
   if (!slip) return null;
 
   const handlePrint = () => {
-    // Future: Connect to specific printer drivers
+    // Apply paper size to the document before printing
+    document.documentElement.setAttribute('data-print-size', paperSize);
     window.print();
+    document.documentElement.removeAttribute('data-print-size');
     onClose();
   };
 
@@ -41,30 +47,41 @@ export function PrintPermissionSlipDialog({ slip, onClose }: PrintPermissionSlip
               </DialogTitle>
               <div className="flex gap-4 mt-4 pb-4 border-b text-sm">
                 <div>
-                  <span className="font-semibold text-gray-700">Printer: </span>
-                  <select className="border rounded px-2 py-1 bg-white">
-                    <option>A4 Office Printer</option>
-                    <option>80mm Thermal Printer</option>
-                    <option>Export to PDF</option>
+                  <span className="font-semibold text-gray-700">Paper Size: </span>
+                  <select 
+                    value={paperSize} 
+                    onChange={(e) => setPaperSize(e.target.value)}
+                    className="border rounded px-2 py-1 bg-white"
+                  >
+                    <option value="a5">A5 (148mm × 210mm)</option>
+                    <option value="a4">A4 (210mm × 297mm)</option>
+                    <option value="thermal">80mm Thermal</option>
                   </select>
                 </div>
                 <div>
                   <span className="font-semibold text-gray-700">Copies: </span>
-                  <input type="number" defaultValue={1} min={1} max={5} className="border rounded px-2 py-1 w-16 bg-white" />
+                  <input 
+                    type="number" 
+                    value={copies}
+                    onChange={(e) => setCopies(Math.max(1, Math.min(5, parseInt(e.target.value) || 1)))}
+                    min={1}
+                    max={5} 
+                    className="border rounded px-2 py-1 w-16 bg-white" 
+                  />
                 </div>
               </div>
             </DialogHeader>
 
             <div className="flex-1 overflow-y-auto p-8 flex justify-center">
               <div className="w-full max-w-2xl bg-white shadow-xl">
-                <PermissionSlipDocument slip={slip} />
+                <PermissionSlipDocument slip={slip} paperSize={paperSize} />
               </div>
             </div>
         </DialogContent>
       </Dialog>
 
-      <PrintPortal>
-        <PermissionSlipDocument slip={slip} />
+      <PrintPortal paperSize={paperSize as 'a5' | 'a4' | 'thermal'}>
+        <PermissionSlipDocument slip={slip} paperSize={paperSize as 'a5' | 'a4' | 'thermal'} />
       </PrintPortal>
     </>
   );

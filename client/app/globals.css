@@ -597,6 +597,12 @@ button, a, [role="button"] {
     background: white !important;
     color: black !important;
   }
+  
+  /* A5 Paper Size for Visitor Pass Printing */
+  @page {
+    size: A5 portrait;
+    margin: 8mm;
+  }
 }
 
 @media screen {

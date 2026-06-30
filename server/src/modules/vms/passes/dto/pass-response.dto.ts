@@ -82,4 +82,12 @@ export class PassResponseDto {
   @ApiProperty()
   @Expose()
   status!: string;
+
+  @ApiPropertyOptional()
+  @Expose()
+  purpose?: string;
+
+  @ApiPropertyOptional({ default: 1 })
+  @Expose()
+  peopleCount!: number;
 }

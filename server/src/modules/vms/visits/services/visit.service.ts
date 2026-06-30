@@ -194,6 +194,7 @@ export class VisitService implements VisitServiceContract {
           branchId,
           hostEmployeeId: dto.hostEmployeeId,
           purpose: dto.purpose,
+          peopleCount: dto.peopleCount ?? 1,
           status: VisitStatus.SCHEDULED,
           visitCode,
           createdById: actorId,
@@ -229,6 +230,7 @@ export class VisitService implements VisitServiceContract {
     const data: Prisma.VisitUncheckedUpdateInput = { updatedById: actorId };
 
     if (dto.purpose !== undefined) data.purpose = dto.purpose;
+    if (dto.peopleCount !== undefined) data.peopleCount = dto.peopleCount;
     if (dto.meetingDetails !== undefined) data.meetingDetails = dto.meetingDetails;
     if (dto.scheduledAt !== undefined) data.scheduledAt = dto.scheduledAt ? new Date(dto.scheduledAt) : null;
 
@@ -257,6 +259,8 @@ export class VisitService implements VisitServiceContract {
         });
         newBranchId = fallbackDept?.id;
       }
+
+      
         
       data.branchId = newBranchId ?? visit.branchId;
     }
@@ -288,6 +292,7 @@ export class VisitService implements VisitServiceContract {
       status: true,
       visitCode: true,
       purpose: true,
+      peopleCount: true,
       meetingDetails: true,
       scheduledAt: true,
       checkInTime: true,
@@ -332,6 +337,7 @@ export class VisitService implements VisitServiceContract {
       status: true,
       visitCode: true,
       purpose: true,
+      peopleCount: true,
       meetingDetails: true,
       scheduledAt: true,
       checkInTime: true,
@@ -367,6 +373,7 @@ export class VisitService implements VisitServiceContract {
       status: true,
       visitCode: true,
       purpose: true,
+      peopleCount: true,
       meetingDetails: true,
       scheduledAt: true,
       checkInTime: true,
@@ -400,6 +407,7 @@ export class VisitService implements VisitServiceContract {
       status: true,
       visitCode: true,
       purpose: true,
+      peopleCount: true,
       meetingDetails: true,
       scheduledAt: true,
       checkInTime: true,

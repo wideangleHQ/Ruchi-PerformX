@@ -139,6 +139,8 @@ export class PassServiceImpl implements PassService {
       visitId: record.id,
       checkInTime: record.checkInTime,
       status: record.status,
+      purpose: record.purpose,
+      peopleCount: record.peopleCount,
     });
   }
 }

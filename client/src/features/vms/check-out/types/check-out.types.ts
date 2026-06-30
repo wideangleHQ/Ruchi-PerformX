@@ -21,6 +21,7 @@ export interface VisitInsideResponse {
   visitor: VisitorInfo;
   employee: EmployeeInfo;
   purpose: string;
+  peopleCount: number;
   checkInTime: string;
   passNumber?: string;
   status: VisitStatus;
