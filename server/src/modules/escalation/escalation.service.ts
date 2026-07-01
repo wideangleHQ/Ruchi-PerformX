@@ -20,6 +20,7 @@ export class EscalationService {
         status: {
           notIn: [
             task_status_enum.COMPLETED,
+            task_status_enum.REVIEWED,
             task_status_enum.CLOSED,
             task_status_enum.REJECTED,
           ],

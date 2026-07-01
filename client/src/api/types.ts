@@ -11,7 +11,9 @@ export type TaskStatus =
   | 'REJECTED'
   | 'PENDING'
   | 'REVIEWED'
-  | 'CLOSED';
+  | 'CLOSED'
+  | 'HOD_VERIFIED_PENDING'
+  | 'HOD_VERIFIED';
 
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
@@ -102,6 +104,7 @@ export interface Task {
   title: string;
   description: string;
   status: TaskStatus;
+  task_type?: 'OFFICIAL' | 'EMPLOYEE_SHARED';
   priority: TaskPriority;
   category?: TaskCategory;
   dueDate?: string;
@@ -315,6 +318,7 @@ export interface DashboardData {
     completion: string;
     status: string;
   }>;
+  employeeSharedTasks: number;
 }
 
 // ─── API Error ────────────────────────────────────────────────────────────────

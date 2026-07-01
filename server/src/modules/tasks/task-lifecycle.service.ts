@@ -13,56 +13,60 @@ const TRANSITIONS: Transition[] = [
   {
     from: [task_status_enum.CREATED],
     to: task_status_enum.ASSIGNED,
-    allowedRoles: [role_enum.MD],
+    allowedRoles: [role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD],
   },
   {
-    from: [task_status_enum.ASSIGNED],
+    from: [task_status_enum.CREATED, task_status_enum.ASSIGNED],
     to: task_status_enum.ACCEPTED,
-    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE],
+    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE, role_enum.HOD, role_enum.EA, role_enum.PA],
   },
   {
-    from: [task_status_enum.ASSIGNED],
-    to: task_status_enum.REJECTED,
-    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE],
-    requiresReason: true,
-  },
-  {
-    from: [task_status_enum.ACCEPTED],
+    from: [task_status_enum.ACCEPTED, task_status_enum.CREATED, task_status_enum.ASSIGNED],
     to: task_status_enum.IN_PROGRESS,
-    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE],
+    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE, role_enum.HOD, role_enum.EA, role_enum.PA],
   },
   {
     from: [task_status_enum.IN_PROGRESS],
     to: task_status_enum.COMPLETED,
-    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE],
-  },
-  {
-    from: [task_status_enum.IN_PROGRESS],
-    to: task_status_enum.PENDING,
-    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE],
-    requiresReason: true,
-  },
-  {
-    from: [task_status_enum.PENDING],
-    to: task_status_enum.IN_PROGRESS,
-    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE],
+    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE, role_enum.HOD, role_enum.EA, role_enum.PA],
   },
   {
     from: [task_status_enum.COMPLETED],
+    to: task_status_enum.HOD_VERIFIED_PENDING,
+    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE, role_enum.HOD, role_enum.EA, role_enum.PA],
+  },
+  {
+    from: [task_status_enum.HOD_VERIFIED_PENDING],
+    to: task_status_enum.HOD_VERIFIED,
+    allowedRoles: [role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD],
+  },
+  {
+    from: [task_status_enum.HOD_VERIFIED],
     to: task_status_enum.REVIEWED,
-    allowedRoles: [role_enum.MD, role_enum.HOD],
+    allowedRoles: [role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD],
   },
   {
     from: [task_status_enum.REVIEWED],
     to: task_status_enum.CLOSED,
-    allowedRoles: [role_enum.MD, role_enum.HOD],
+    allowedRoles: [role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD],
   },
   {
-    from: [task_status_enum.REVIEWED],
-    to: task_status_enum.IN_PROGRESS,
-    allowedRoles: [role_enum.MD, role_enum.HOD],
+    from: [task_status_enum.CREATED, task_status_enum.ASSIGNED, task_status_enum.ACCEPTED, task_status_enum.IN_PROGRESS],
+    to: task_status_enum.REJECTED,
+    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE, role_enum.HOD, role_enum.EA, role_enum.PA],
     requiresReason: true,
   },
+  {
+    from: [task_status_enum.COMPLETED, task_status_enum.HOD_VERIFIED_PENDING, task_status_enum.HOD_VERIFIED, task_status_enum.REVIEWED],
+    to: task_status_enum.IN_PROGRESS,
+    allowedRoles: [role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD],
+    requiresReason: true,
+  },
+  {
+    from: [task_status_enum.CLOSED],
+    to: task_status_enum.REJECTED,
+    allowedRoles: [role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD],
+  }
 ];
 
 @Injectable()

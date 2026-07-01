@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   ClipboardList,
   Clock3,
-  Coins,
   LayoutDashboard,
   ArrowRightLeft,
 } from 'lucide-react';
@@ -29,9 +28,9 @@ const actionToneStyles: Record<string, string> = {
 
 const kpiConfig = [
   { key: 'activeTasks' as const, title: 'Active Tasks', subtitle: 'Across all departments', icon: ClipboardList, suffix: '' },
+  { key: 'employeeSharedTasks' as const, title: 'Shared Tasks', subtitle: 'Active employee tasks', icon: ClipboardList, suffix: '' },
   { key: 'pendingRequests' as const, title: 'Pending Requests', subtitle: 'Awaiting review', icon: Bell, suffix: '' },
   { key: 'completionRate' as const, title: 'Completion Rate', subtitle: 'Current month', icon: CheckCircle2, suffix: '%' },
-  { key: 'incentives' as const, title: 'Incentives', subtitle: 'Approved this cycle', icon: Coins, prefix: '$' },
 ];
 
 const criticalActionConfig = [
@@ -103,7 +102,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── KPI Cards ── */}
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {kpis.map(({ title, value, subtitle, icon: Icon }) => (
           <div
             key={title}

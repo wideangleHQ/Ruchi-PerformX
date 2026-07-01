@@ -4,6 +4,7 @@ import {
   request_status_enum,
   role_enum,
   task_status_enum,
+  task_type_enum,
   transfer_status_enum,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -15,15 +16,13 @@ export class DashboardService {
 
   private readonly terminalStatuses = [
     task_status_enum.COMPLETED,
-    task_status_enum.REVIEWED,
-    task_status_enum.CLOSED,
+    task_status_enum.HOD_VERIFIED,
     task_status_enum.REJECTED,
   ];
 
   private readonly completedStatuses = [
     task_status_enum.COMPLETED,
-    task_status_enum.REVIEWED,
-    task_status_enum.CLOSED,
+    task_status_enum.HOD_VERIFIED,
   ];
 
   async getDashboard(user: JwtPayload) {
@@ -49,6 +48,7 @@ export class DashboardService {
       weeklyCompleted,
       departmentGroups,
       completedDepartmentGroups,
+      employeeSharedTasks,
     ] = await Promise.all([
       this.prisma.tasks.count({ where: activeTaskWhere }),
       this.prisma.task_requests.count({ where: this.requestScope(user) }),
@@ -89,6 +89,9 @@ export class DashboardService {
         where: completedTaskWhere,
         _count: { id: true },
       }),
+      this.prisma.tasks.count({
+        where: { ...activeTaskWhere, task_type: task_type_enum.EMPLOYEE_SHARED },
+      }),
     ]);
 
     const departments = await this.prisma.departments.findMany({
@@ -125,6 +128,7 @@ export class DashboardService {
       overdueTasks,
       chartData: this.weeklyChart(weeklyCompleted, weekStart),
       departmentSummary: departmentSummary.map(({ sortOrder, ...rest }) => rest),
+      employeeSharedTasks,
     };
   }
 
@@ -139,7 +143,19 @@ export class DashboardService {
       const deptIds = this.hodDeptIds(user);
       return deptIds.length ? { ...base, ...this.departmentVisibility(deptIds) } : { id: { in: [] } };
     }
-    return user.departmentId ? { ...base, ...this.departmentVisibility([user.departmentId]) } : { id: { in: [] } };
+    
+    const conditions: Prisma.tasksWhereInput[] = [
+      { OR: [{ assigned_to_id: user.sub }, { assigned_by_id: user.sub }] }
+    ];
+    
+    if (user.departmentId) {
+      conditions.push(this.departmentVisibility([user.departmentId]));
+    }
+    
+    return {
+      ...base,
+      AND: conditions,
+    };
   }
 
   private requestScope(user: JwtPayload): Prisma.task_requestsWhereInput {

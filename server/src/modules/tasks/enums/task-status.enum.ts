@@ -1,29 +1,25 @@
 export enum TaskStatus {
-  CREATED = 'CREATED',
-  ASSIGNED = 'ASSIGNED',
-  ACCEPTED = 'ACCEPTED',
-  IN_PROGRESS = 'IN_PROGRESS',
+  OPEN = 'CREATED',
+  ONGOING = 'IN_PROGRESS',
   COMPLETED = 'COMPLETED',
-  REJECTED = 'REJECTED',
-  PENDING = 'PENDING',
-  REVIEWED = 'REVIEWED',
-  CLOSED = 'CLOSED',
+  ABORTED = 'REJECTED',
+  HOD_VERIFIED_PENDING = 'REVIEWED',
+  HOD_VERIFIED = 'CLOSED',
 }
 
 export const ACTIVE_TASK_STATUSES: TaskStatus[] = [
-  TaskStatus.ASSIGNED,
-  TaskStatus.ACCEPTED,
-  TaskStatus.IN_PROGRESS,
-  TaskStatus.PENDING,
+  TaskStatus.OPEN,
+  TaskStatus.ONGOING,
+  TaskStatus.HOD_VERIFIED_PENDING,
 ];
 
 export const TERMINAL_TASK_STATUSES: TaskStatus[] = [
-  TaskStatus.REJECTED,
-  TaskStatus.CLOSED,
+  TaskStatus.ABORTED,
+  TaskStatus.HOD_VERIFIED,
 ];
 
 export const COMPLETED_TASK_STATUSES: TaskStatus[] = [
   TaskStatus.COMPLETED,
-  TaskStatus.REVIEWED,
-  TaskStatus.CLOSED,
+  TaskStatus.HOD_VERIFIED_PENDING,
+  TaskStatus.HOD_VERIFIED,
 ];

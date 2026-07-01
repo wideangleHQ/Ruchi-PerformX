@@ -1,6 +1,6 @@
 import { ArrayNotEmpty, ArrayUnique, IsArray, IsBoolean, IsDateString, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { task_priority_enum } from '@prisma/client';
+import { task_priority_enum, task_type_enum } from '@prisma/client';
 
 export class CreateTaskDto {
   @IsNotEmpty()
@@ -54,4 +54,8 @@ export class CreateTaskDto {
   @IsOptional()
   @IsUUID()
   parentTaskId?: string;
+
+  @IsOptional()
+  @IsEnum(task_type_enum)
+  taskType?: task_type_enum;
 }

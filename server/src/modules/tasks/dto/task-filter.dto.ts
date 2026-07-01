@@ -1,5 +1,5 @@
 import { IsEnum, IsOptional, IsString, IsUUID, IsDateString, IsInt, Min, Max } from 'class-validator';
-import { task_status_enum , task_priority_enum } from '@prisma/client';
+import { task_status_enum , task_priority_enum, task_type_enum } from '@prisma/client';
 import { Type } from 'class-transformer';
 
 export class TaskFilterDto {
@@ -10,6 +10,10 @@ export class TaskFilterDto {
   @IsOptional()
   @IsEnum(task_priority_enum)
   priority?: task_priority_enum;
+
+  @IsOptional()
+  @IsEnum(task_type_enum)
+  taskType?: task_type_enum;
 
   @IsOptional()
   @IsString()

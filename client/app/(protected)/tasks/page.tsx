@@ -16,7 +16,11 @@ export default function TasksPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const userRole = user?.role;
-  const canCreate = Boolean(userRole) && userRole !== 'EMPLOYEE';
+  const canCreateOfficial = Boolean(userRole) && userRole !== 'EMPLOYEE';
+  const canCreateShared = Boolean(userRole) && userRole === 'EMPLOYEE';
+  
+  const [activeTab, setActiveTab] = useState<'OFFICIAL' | 'EMPLOYEE_SHARED'>('OFFICIAL');
+  const canCreate = activeTab === 'OFFICIAL' ? canCreateOfficial : canCreateShared;
   const canDeleteTask = user?.role === 'HOD';
 
   const [showFilters, setShowFilters] = useState(false);
@@ -30,6 +34,7 @@ export default function TasksPage() {
     title:    search   || undefined,
     status:   status   || undefined,
     priority: priority || undefined,
+    taskType: activeTab,
   } as any;
 
   const { data: tasksData, isLoading } = useTasks(filters);
@@ -68,13 +73,33 @@ export default function TasksPage() {
           <p className="mt-1 text-gray-500">Manage and track all your tasks in one place</p>
         </div>
         {canCreate && (
-          <Link href="/tasks/new">
+          <Link href={`/tasks/new?taskType=${activeTab}`}>
             <Button className="gap-2 bg-green-600 hover:bg-green-700">
               <Plus size={18} />
               New Task
             </Button>
           </Link>
         )}
+      </div>
+
+      {/* Tabs */}
+      <div className="mb-6 flex space-x-1 rounded-xl bg-gray-100 p-1 w-fit">
+        <button
+          onClick={() => setActiveTab('OFFICIAL')}
+          className={`flex-1 rounded-lg px-6 py-2 text-sm font-medium transition-all ${
+            activeTab === 'OFFICIAL' ? 'bg-white text-gray-900 shadow' : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Official Tasks
+        </button>
+        <button
+          onClick={() => setActiveTab('EMPLOYEE_SHARED')}
+          className={`flex-1 rounded-lg px-6 py-2 text-sm font-medium transition-all ${
+            activeTab === 'EMPLOYEE_SHARED' ? 'bg-white text-gray-900 shadow' : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Employee Task Sharing
+        </button>
       </div>
 
       {/* Search + Filter bar */}
@@ -126,11 +151,13 @@ export default function TasksPage() {
               <option value="ASSIGNED">Assigned</option>
               <option value="ACCEPTED">Accepted</option>
               <option value="IN_PROGRESS">In Progress</option>
-              <option value="PENDING">Pending</option>
               <option value="COMPLETED">Completed</option>
+              <option value="REJECTED">Rejected</option>
+              <option value="PENDING">Pending</option>
               <option value="REVIEWED">Reviewed</option>
               <option value="CLOSED">Closed</option>
-              <option value="REJECTED">Rejected</option>
+              <option value="HOD_VERIFIED_PENDING">HOD Verified Pending</option>
+              <option value="HOD_VERIFIED">HOD Verified</option>
             </select>
           </div>
 

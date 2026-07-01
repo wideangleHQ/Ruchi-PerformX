@@ -10,7 +10,7 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { TaskFilterDto } from './dto/task-filter.dto';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
-import { Prisma, task_status_enum, role_enum, notification_type_enum } from '@prisma/client';
+import { Prisma, task_status_enum, role_enum, notification_type_enum, task_type_enum } from '@prisma/client';
 import { AttachmentsService } from '../attachments/attachments.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UploadedFile } from '../../common/types/uploaded-file.type';
@@ -74,22 +74,25 @@ export class TasksService {
 
   async findAll(filters: TaskFilterDto, user: JwtPayload) {
     const baseWhere = this.buildWhereFromFilters(filters);
-    let where: Prisma.tasksWhereInput;
+    const conditions: Prisma.tasksWhereInput[] = [baseWhere];
 
     if (user.role === role_enum.MD || user.role === role_enum.ADMIN) {
-      where = baseWhere;
+      // no-op
     } else if (user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA || user.role === role_enum.PURCHASE_HEAD) {
-      where = {
-        ...baseWhere,
-        ...this.departmentVisibility(this.mappedDepts(user)),
-      };
+      conditions.push(this.departmentVisibility(this.mappedDepts(user)));
     } else {
-      where = {
-        ...baseWhere,
-        assigned_to_id: user.sub,
-        ...this.departmentVisibility(user.departmentId ? [user.departmentId] : []),
-      };
+      conditions.push({
+        OR: [
+          { assigned_to_id: user.sub },
+          { assigned_by_id: user.sub },
+        ],
+      });
+      if (user.departmentId) {
+        conditions.push(this.departmentVisibility([user.departmentId]));
+      }
     }
+
+    const where: Prisma.tasksWhereInput = { AND: conditions };
 
     const page = filters.page ?? 1;
     const limit = filters.limit ?? 20;
@@ -292,14 +295,24 @@ export class TasksService {
   }
 
   async getPending(user: JwtPayload) {
-    const where: any = { status: task_status_enum.PENDING, deleted_at: null };
+    const baseWhere: Prisma.tasksWhereInput = { status: task_status_enum.REVIEWED, deleted_at: null };
+    const conditions: Prisma.tasksWhereInput[] = [baseWhere];
 
     if (user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA || user.role === role_enum.PURCHASE_HEAD) {
-      Object.assign(where, this.departmentVisibility(this.mappedDepts(user)));
+      conditions.push(this.departmentVisibility(this.mappedDepts(user)));
     } else if (user.role === role_enum.EMPLOYEE) {
-      Object.assign(where, this.departmentVisibility(user.departmentId ? [user.departmentId] : []));
-      where.assigned_to_id = user.sub;
+      conditions.push({
+        OR: [
+          { assigned_to_id: user.sub },
+          { assigned_by_id: user.sub },
+        ],
+      });
+      if (user.departmentId) {
+        conditions.push(this.departmentVisibility([user.departmentId]));
+      }
     }
+
+    const where: Prisma.tasksWhereInput = { AND: conditions };
 
     return this.prisma.tasks.findMany({
       where,
@@ -316,15 +329,30 @@ export class TasksService {
       task_status_enum.REJECTED,
     ];
 
-    const where: any = {
+    const baseWhere: Prisma.tasksWhereInput = {
       due_date: { lt: new Date() },
       status: { notIn: terminalStatuses },
       deleted_at: null,
     };
+    const conditions: Prisma.tasksWhereInput[] = [baseWhere];
 
-    if (user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA || user.role === role_enum.PURCHASE_HEAD) {
-      Object.assign(where, this.departmentVisibility(this.mappedDepts(user)));
+    if (user.role === role_enum.MD || user.role === role_enum.ADMIN) {
+      // no-op
+    } else if (user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA || user.role === role_enum.PURCHASE_HEAD) {
+      conditions.push(this.departmentVisibility(this.mappedDepts(user)));
+    } else if (user.role === role_enum.EMPLOYEE) {
+      conditions.push({
+        OR: [
+          { assigned_to_id: user.sub },
+          { assigned_by_id: user.sub },
+        ],
+      });
+      if (user.departmentId) {
+        conditions.push(this.departmentVisibility([user.departmentId]));
+      }
     }
+
+    const where: Prisma.tasksWhereInput = { AND: conditions };
 
     return this.prisma.tasks.findMany({
       where,
@@ -385,6 +413,39 @@ export class TasksService {
     }));
   }
 
+  async getEmployeeSharedAssignees(departmentId: string, excludeUserId: string) {
+    const users = await this.prisma.users.findMany({
+      where: {
+        role: role_enum.EMPLOYEE,
+        is_active: true,
+        deleted_at: null,
+        pending_approval: false,
+        department_id: departmentId,
+        id: { not: excludeUserId },
+      },
+      select: {
+        id: true,
+        username: true,
+        full_name: true,
+        email: true,
+        role: true,
+        department_id: true,
+        departments: { select: { id: true, name: true } },
+      },
+      orderBy: { full_name: 'asc' },
+    });
+
+    return users.map((assignee) => ({
+      id: assignee.id,
+      username: assignee.username,
+      fullName: assignee.full_name,
+      email: assignee.email,
+      role: assignee.role,
+      departmentId: assignee.department_id,
+      department: assignee.departments,
+    }));
+  }
+
   private async getTaskOrFail(id: string) {
     const task = await this.prisma.tasks.findFirst({
       where: { id, deleted_at: null } as any,
@@ -397,7 +458,12 @@ export class TasksService {
   private assertAccess(task: any, user: JwtPayload) {
     if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return;
     if ((user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA || user.role === role_enum.PURCHASE_HEAD) && this.hasDepartmentAccess(task, this.mappedDepts(user))) return;
-    if (user.role === role_enum.EMPLOYEE && this.hasDepartmentAccess(task, user.departmentId ? [user.departmentId] : [])) return;
+    
+    if (user.role === role_enum.EMPLOYEE) {
+      const isOwner = task.assigned_to_id === user.sub || task.assigned_by_id === user.sub;
+      if (isOwner && this.hasDepartmentAccess(task, user.departmentId ? [user.departmentId] : [])) return;
+    }
+    
     throw new ForbiddenException('Access denied to this task');
   }
 
@@ -405,6 +471,7 @@ export class TasksService {
     const where: any = { deleted_at: null };
     if (filters.status) where.status = filters.status;
     if (filters.priority) where.priority = filters.priority;
+    if (filters.taskType) where.task_type = filters.taskType;
     if (filters.title) where.title = { contains: filters.title, mode: 'insensitive' };
     if (filters.assignedToId) where.assigned_to_id = filters.assignedToId;
     if (filters.departmentId) {
@@ -421,10 +488,11 @@ export class TasksService {
   private resolveTimestamps(toStatus: task_status_enum): Record<string, Date | null> {
     const now = new Date();
     switch (toStatus) {
-      case task_status_enum.ACCEPTED: return { accepted_at: now };
+      case task_status_enum.IN_PROGRESS: return { accepted_at: now };
       case task_status_enum.COMPLETED: return { completed_at: now };
-      case task_status_enum.REVIEWED: return { reviewed_at: now };
-      case task_status_enum.CLOSED: return { closed_at: now };
+      case task_status_enum.REVIEWED: return { completed_at: now };
+      case task_status_enum.CLOSED: return { reviewed_at: now };
+      case task_status_enum.REJECTED: return { closed_at: now };
       default: return {};
     }
   }
@@ -435,7 +503,16 @@ export class TasksService {
     to: task_status_enum,
     actor: JwtPayload,
     assignedById: string,
-  ) {}
+  ) {
+    if (to === task_status_enum.HOD_VERIFIED_PENDING) {
+      await this.notificationsService.createNotification({
+        recipientId: assignedById,
+        type: 'TASK_VERIFICATION_PENDING' as any,
+        title: 'Task Verification Required',
+        message: `Task "${task.title}" has been completed and is awaiting your verification.`,
+      });
+    }
+  }
 
   private resolveDepartmentIds(dto: CreateTaskDto) {
     const departmentIds = dto.departmentIds?.length ? dto.departmentIds : dto.departmentId ? [dto.departmentId] : [];
@@ -445,13 +522,23 @@ export class TasksService {
     return [...new Set(departmentIds)];
   }
 
-  private async assertCreateAccess(departmentIds: string[], user: JwtPayload) {
+  private async assertCreateAccess(departmentIds: string[], user: JwtPayload, taskType: task_type_enum = task_type_enum.OFFICIAL) {
     const activeDepartments = await this.prisma.departments.count({
       where: { id: { in: departmentIds }, is_active: true },
     });
 
     if (activeDepartments !== departmentIds.length) {
       throw new ForbiddenException('Invalid department selection');
+    }
+
+    if (taskType === task_type_enum.EMPLOYEE_SHARED) {
+      if (user.role !== role_enum.EMPLOYEE) {
+        throw new ForbiddenException('Only employees can create Employee Shared Tasks');
+      }
+      if (departmentIds.length > 1 || !user.departmentId || departmentIds[0] !== user.departmentId) {
+        throw new ForbiddenException('Cross-department assignment is not allowed for Employee Shared Tasks');
+      }
+      return;
     }
 
     if (user.role === role_enum.EMPLOYEE) {
@@ -593,7 +680,8 @@ export class TasksService {
 
   private async createTaskRecords(db: any, dto: CreateTaskDto, user: JwtPayload) {
     const departmentIds = this.resolveDepartmentIds(dto);
-    await this.assertCreateAccess(departmentIds, user);
+    const taskType = dto.taskType ?? task_type_enum.OFFICIAL;
+    await this.assertCreateAccess(departmentIds, user, taskType);
 
     const assigneeIds = dto.assignAllEmployees
       ? await this.resolveAllEmployeeIds(departmentIds)
@@ -613,7 +701,8 @@ export class TasksService {
             assigned_by_id: user.sub,
             department_id: departmentIds[0]!,
             parent_task_id: dto.parentTaskId ?? null,
-            status: task_status_enum.ASSIGNED,
+            status: task_status_enum.CREATED,
+            task_type: taskType,
           },
         });
 
@@ -629,7 +718,7 @@ export class TasksService {
           data: {
             task_id: created.id,
             from_status: null,
-            to_status: task_status_enum.ASSIGNED,
+            to_status: task_status_enum.CREATED,
             changed_by_id: user.sub,
           },
         });
@@ -647,6 +736,7 @@ export class TasksService {
               description: dto.description,
               assignedToId: assigneeId,
               departmentIds,
+              taskType,
             }),
           },
         });
@@ -674,6 +764,7 @@ export class TasksService {
           department_id: departmentIds[0]!,
           parent_task_id: dto.parentTaskId ?? null,
           status: task_status_enum.CREATED,
+          task_type: taskType,
         },
       });
 
@@ -706,6 +797,7 @@ export class TasksService {
             title: dto.title,
             description: dto.description,
             departmentIds,
+            taskType,
           }),
         },
       });

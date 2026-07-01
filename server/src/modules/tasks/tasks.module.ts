@@ -7,9 +7,11 @@ import { AuthModule } from '../auth/auth.module';
 import { AttachmentsModule } from '../attachments/attachments.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
+import { EmployeeSharingController } from './employee-sharing.controller';
+
 @Module({
   imports: [PrismaModule, AuthModule, AttachmentsModule, NotificationsModule],
-  controllers: [TasksController],
+  controllers: [EmployeeSharingController, TasksController],
   providers: [TasksService, TaskLifecycleService],
   exports: [TasksService],
 })

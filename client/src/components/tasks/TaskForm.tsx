@@ -15,16 +15,17 @@ import { Input } from '@/components/ui/input';
 
 interface TaskFormProps {
   onSuccess?: () => void;
+  taskType?: string;
 }
 
-export function TaskForm({ onSuccess }: TaskFormProps) {
+export function TaskForm({ onSuccess, taskType = 'OFFICIAL' }: TaskFormProps) {
   const router = useRouter();
   const { user } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<File[]>([]);
   const userRole = user?.role;
 
-  const canCreateTask = Boolean(userRole) && userRole !== 'EMPLOYEE';
+  const canCreateTask = Boolean(userRole) && (userRole !== 'EMPLOYEE' || taskType === 'EMPLOYEE_SHARED');
 
   const form = useForm<CreateTaskFormData>({
     resolver: zodResolver(createTaskSchema),
@@ -36,24 +37,29 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
       assignedToId: '',
       assignedToIds: [],
       assignAllEmployees: false,
-      departmentId: '',
-      departmentIds: [],
+      departmentId: taskType === 'EMPLOYEE_SHARED' && user?.departmentId ? user.departmentId : '',
+      departmentIds: taskType === 'EMPLOYEE_SHARED' && user?.departmentId ? [user.departmentId] : [],
     },
   });
 
   const { data: departments = [] } = useQuery<TaskDepartment[]>({
     queryKey: ['task-departments'],
     queryFn: () => tasksApi.getDepartments(),
-    enabled: canCreateTask,
+    enabled: canCreateTask && taskType !== 'EMPLOYEE_SHARED',
   });
   const selectedDepartmentIds = form.watch('departmentIds') ?? [];
   const selectedAssigneeIds = form.watch('assignedToIds') ?? [];
   const selectAllEmployees = form.watch('assignAllEmployees') ?? false;
 
   const { data: assignees = [] } = useQuery<User[]>({
-    queryKey: ['task-assignees', selectedDepartmentIds],
-    queryFn: () => tasksApi.getAssignees(selectedDepartmentIds),
-    enabled: canCreateTask && selectedDepartmentIds.length > 0,
+    queryKey: ['task-assignees', selectedDepartmentIds, taskType],
+    queryFn: () => {
+      if (taskType === 'EMPLOYEE_SHARED') {
+        return tasksApi.employeeSharing.getAssignees();
+      }
+      return tasksApi.getAssignees(selectedDepartmentIds);
+    },
+    enabled: canCreateTask && (taskType === 'EMPLOYEE_SHARED' || selectedDepartmentIds.length > 0),
   });
 
   useEffect(() => {
@@ -71,8 +77,8 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
   }, [assignees, form, selectAllEmployees, selectedAssigneeIds]);
 
   const createTaskMutation = useMutation({
-    mutationFn: (data: CreateTaskFormData & { attachments?: File[] }) =>
-      tasksApi.createTask({
+    mutationFn: (data: CreateTaskFormData & { attachments?: File[] }) => {
+      const payload = {
         title: data.title,
         description: data.description,
         priority: data.priority,
@@ -83,7 +89,14 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
         departmentId: data.departmentId || undefined,
         departmentIds: data.departmentIds?.length ? data.departmentIds : undefined,
         attachments: data.attachments,
-      }),
+        taskType,
+      };
+      
+      if (taskType === 'EMPLOYEE_SHARED') {
+        return tasksApi.employeeSharing.createTask(payload);
+      }
+      return tasksApi.createTask(payload);
+    },
     onSuccess: (task) => {
       onSuccess?.();
       router.push(`/tasks/${task.id}`);
@@ -168,9 +181,10 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Department Selection</label>
-        <div className="mt-2 grid gap-2 rounded-lg border border-gray-200 p-3">
+      {taskType !== 'EMPLOYEE_SHARED' && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Department Selection</label>
+          <div className="mt-2 grid gap-2 rounded-lg border border-gray-200 p-3">
           {departments.map((department) => (
             <label key={department.id} className="flex items-center gap-2 text-sm text-gray-700">
               <input
@@ -196,7 +210,8 @@ export function TaskForm({ onSuccess }: TaskFormProps) {
         {form.formState.errors.departmentIds && (
           <p className="mt-1 text-sm text-red-600">{form.formState.errors.departmentIds.message}</p>
         )}
-      </div>
+        </div>
+      )}
 
       <div>
         <div className="flex items-center justify-between">

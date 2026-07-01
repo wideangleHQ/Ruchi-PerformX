@@ -407,6 +407,7 @@ model tasks {
   title                             String              @db.VarChar(255)
   description                       String
   status                            task_status_enum?   @default(CREATED)
+  task_type                         task_type_enum?     @default(OFFICIAL)
   priority                          task_priority_enum? @default(MEDIUM)
   category                          task_category_enum?
   due_date                          DateTime            @db.Timestamptz(6)
@@ -596,6 +597,11 @@ enum task_priority_enum {
   CRITICAL
 }
 
+enum task_type_enum {
+  OFFICIAL
+  EMPLOYEE_SHARED
+}
+
 enum task_status_enum {
   CREATED
   ASSIGNED
@@ -606,6 +612,8 @@ enum task_status_enum {
   PENDING
   REVIEWED
   CLOSED
+  HOD_VERIFIED_PENDING
+  HOD_VERIFIED
 }
 
 enum transfer_status_enum {

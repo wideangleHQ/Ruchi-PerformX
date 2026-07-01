@@ -25,10 +25,16 @@ export const useTasks = (filters?: {
   assigneeId?: string;
   page?: number;
   limit?: number;
+  taskType?: string;
 }) => {
   return useQuery({
     queryKey: ['tasks', filters],
-    queryFn: () => tasksApi.getTasks(filters),
+    queryFn: () => {
+      if (filters?.taskType === 'EMPLOYEE_SHARED') {
+        return tasksApi.employeeSharing.getTasks(filters);
+      }
+      return tasksApi.getTasks(filters);
+    },
   });
 };
 

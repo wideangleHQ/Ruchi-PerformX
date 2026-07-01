@@ -8,6 +8,20 @@ export interface TaskDepartment {
   is_active?: boolean;
 }
 
+export interface CreateTaskData {
+  title: string;
+  description: string;
+  priority: string;
+  dueDate: string;
+  assignedToId?: string;
+  assignedToIds?: string[];
+  assignAllEmployees?: boolean;
+  departmentId?: string;
+  departmentIds?: string[];
+  attachments?: File[];
+  taskType?: string;
+}
+
 export const tasksApi = {
   getTasks: async (filters?: {
     status?: string;
@@ -38,23 +52,13 @@ export const tasksApi = {
     return response.data;
   },
 
-  createTask: async (data: {
-    title: string;
-    description: string;
-    priority: string;
-    dueDate: string;
-    assignedToId?: string;
-    assignedToIds?: string[];
-    assignAllEmployees?: boolean;
-    departmentId?: string;
-    departmentIds?: string[];
-    attachments?: File[];
-  }): Promise<Task> => {
+  createTask: async (data: CreateTaskData): Promise<Task> => {
     const formData = new FormData();
     formData.append('title', data.title);
     formData.append('description', data.description);
     formData.append('priority', data.priority);
     formData.append('dueDate', data.dueDate);
+    if (data.taskType) formData.append('taskType', data.taskType);
     if (data.assignedToId) formData.append('assignedToId', data.assignedToId);
     if (data.assignedToIds?.length) {
       data.assignedToIds.forEach((assignedToId) => formData.append('assignedToIds', assignedToId));
@@ -117,10 +121,56 @@ export const tasksApi = {
     return response.data;
   },
 
+  updateStatus: async (id: string, status: string, reason?: string): Promise<Task> => {
+    const response = await axiosClient.patch<Task>(`/tasks/${id}/status`, { status, reason });
+    return response.data;
+  },
+
   // Comments
   getComments: async (taskId: string): Promise<Comment[]> => {
     const response = await axiosClient.get<Comment[]>(`/tasks/${taskId}/comments`);
     return response.data;
+  },
+
+  employeeSharing: {
+    getTasks: async (filters?: {
+      status?: string;
+      priority?: string;
+      title?: string;
+      assigneeId?: string;
+      page?: number;
+      limit?: number;
+    }): Promise<PaginatedResponse<Task>> => {
+      const response = await axiosClient.get<PaginatedResponse<Task>>('/tasks/employee-sharing', { params: filters });
+      return response.data;
+    },
+    getAssignees: async (): Promise<User[]> => {
+      const response = await axiosClient.get<User[]>('/tasks/employee-sharing/assignees');
+      return response.data;
+    },
+    createTask: async (data: CreateTaskData): Promise<Task> => {
+      const formData = new FormData();
+      formData.append('title', data.title);
+      formData.append('description', data.description);
+      formData.append('priority', data.priority);
+      formData.append('dueDate', data.dueDate);
+      if (data.assignedToId) formData.append('assignedToId', data.assignedToId);
+      if (data.assignedToIds?.length) {
+        data.assignedToIds.forEach((assignedToId) => formData.append('assignedToIds', assignedToId));
+      }
+      if (data.assignAllEmployees) formData.append('assignAllEmployees', 'true');
+      data.attachments?.forEach((file) => formData.append('attachments', file));
+      
+      const response = await axiosClient.post<Task>('/tasks/employee-sharing', formData);
+      return response.data;
+    },
+    updateStatus: async (id: string, status: string, reason?: string): Promise<Task> => {
+      const response = await axiosClient.patch<Task>(`/tasks/employee-sharing/${id}/status`, { status, reason });
+      return response.data;
+    },
+    deleteTask: async (id: string, reason: string): Promise<void> => {
+      await axiosClient.delete(`/tasks/employee-sharing/${id}`, { data: { reason } });
+    }
   },
 
   addComment: async (

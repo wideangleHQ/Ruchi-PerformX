@@ -118,7 +118,7 @@ export class TasksController {
   @Patch(':id/accept')
   @Roles(role_enum.MD, role_enum.EMPLOYEE, role_enum.EA, role_enum.PA)
   accept(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
-    return this.tasksService.transition(id, task_status_enum.ACCEPTED, user);
+    return this.tasksService.transition(id, task_status_enum.IN_PROGRESS, user);
   }
 
   @Patch(':id/reject')
@@ -146,13 +146,13 @@ export class TasksController {
   @Patch(':id/review')
   @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD)
   review(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
-    return this.tasksService.transition(id, task_status_enum.REVIEWED, user);
+    return this.tasksService.transition(id, task_status_enum.CLOSED, user);
   }
 
   @Patch(':id/close')
   @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA)
   close(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
-    return this.tasksService.transition(id, task_status_enum.CLOSED, user);
+    return this.tasksService.transition(id, task_status_enum.REJECTED, user);
   }
 
   @Patch(':id/return')
@@ -163,5 +163,15 @@ export class TasksController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.tasksService.transition(id, task_status_enum.IN_PROGRESS, user, reason);
+  }
+  @Patch(':id/status')
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD, role_enum.EMPLOYEE)
+  updateStatus(
+    @Param('id') id: string,
+    @Body('status') status: task_status_enum,
+    @Body('reason') reason: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.tasksService.transition(id, status, user, reason);
   }
 }

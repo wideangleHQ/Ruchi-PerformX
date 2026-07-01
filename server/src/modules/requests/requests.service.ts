@@ -369,7 +369,7 @@ export class RequestsService {
 
     if (!task) throw new NotFoundException('Task not found');
     if (task.assigned_to_id !== user.sub || dto.currentAssigneeId !== user.sub) throw new ForbiddenException('You can only request reassignment for your own task');
-    if (task.status === task_status_enum.COMPLETED || task.status === task_status_enum.CLOSED) throw new ForbiddenException('Task is not active');
+    if (task.status === task_status_enum.COMPLETED || task.status === task_status_enum.REJECTED || task.status === task_status_enum.CLOSED || task.status === task_status_enum.REVIEWED) throw new ForbiddenException('Task is not active');
 
     const duplicate = await this.prisma.task_requests.findFirst({
       where: { type: 'TASK_REASSIGNMENT' as any, status: request_status_enum.PENDING, task_id: task.id },

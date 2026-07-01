@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
 import { TaskForm } from '@/components/tasks/TaskForm';
 import { useAuth } from '@/context/AuthContext';
@@ -10,14 +10,16 @@ import { ArrowLeft } from 'lucide-react';
 export default function NewTaskPage() {
   const { user, isLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const taskType = searchParams.get('taskType') || 'OFFICIAL';
 
   useEffect(() => {
-    if (!isLoading && user?.role === 'EMPLOYEE') {
+    if (!isLoading && user?.role === 'EMPLOYEE' && taskType !== 'EMPLOYEE_SHARED') {
       router.replace('/tasks');
     }
-  }, [user, isLoading, router]);
+  }, [user, isLoading, router, taskType]);
 
-  if (isLoading || user?.role === 'EMPLOYEE') return null;
+  if (isLoading || (user?.role === 'EMPLOYEE' && taskType !== 'EMPLOYEE_SHARED')) return null;
 
   return (
     <div>
@@ -35,7 +37,7 @@ export default function NewTaskPage() {
       </div>
 
       <div className="max-w-2xl">
-        <TaskForm onSuccess={() => {}} />
+        <TaskForm onSuccess={() => {}} taskType={taskType} />
       </div>
     </div>
   );

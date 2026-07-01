@@ -64,7 +64,7 @@ export class ScoringService {
       where: {
         assigned_to_id: userId,
         status: {
-          notIn: [task_status_enum.COMPLETED, task_status_enum.CLOSED, task_status_enum.REJECTED],
+          notIn: [task_status_enum.COMPLETED, task_status_enum.REVIEWED, task_status_enum.CLOSED, task_status_enum.REJECTED],
         },
         due_date: { lt: now, gte: start },
       },
@@ -134,6 +134,7 @@ export class ScoringService {
             status: {
               notIn: [
                 task_status_enum.COMPLETED,
+                task_status_enum.REVIEWED,
                 task_status_enum.CLOSED,
                 task_status_enum.REJECTED,
               ],

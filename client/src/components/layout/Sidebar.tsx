@@ -13,7 +13,6 @@ import {
   Bell,
   Trophy,
   BarChart3,
-  Coins,
   Users,
   LogOut,
   Menu,
@@ -37,7 +36,6 @@ const navItems: NavItem[] = [
   { href: '/notifications', label: 'Notifications', icon: <Bell size={20} /> },
   { href: '/scoring', label: 'Scoring', icon: <Trophy size={20} /> },
   { href: '/analytics', label: 'Analytics', icon: <BarChart3 size={20} /> },
-  { href: '/incentives', label: 'Incentives', icon: <Coins size={20} /> },
   { href: '/profile', label: 'Profile', icon: <UserCircle2 size={20} /> },
   { href: '/admin', label: 'Admin', icon: <Users size={20} />, roles: ['ADMIN'] },
 ];

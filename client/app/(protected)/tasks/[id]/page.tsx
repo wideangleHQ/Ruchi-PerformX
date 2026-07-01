@@ -16,14 +16,16 @@ import { TaskStatus } from '@/api/types';
 
 const statusIcons: Record<TaskStatus, ReactNode> = {
   CREATED: <Clock size={20} className="text-gray-500" />,
-  ASSIGNED: <Clock size={20} className="text-purple-500" />,
-  ACCEPTED: <CheckCircle2 size={20} className="text-cyan-500" />,
+  ASSIGNED: <Clock size={20} className="text-yellow-500" />,
+  ACCEPTED: <Clock size={20} className="text-blue-400" />,
   IN_PROGRESS: <AlertCircle size={20} className="text-blue-500" />,
   COMPLETED: <CheckCircle2 size={20} className="text-green-500" />,
   REJECTED: <XCircle size={20} className="text-red-500" />,
-  PENDING: <Pause size={20} className="text-yellow-500" />,
-  REVIEWED: <CheckCircle2 size={20} className="text-teal-500" />,
+  PENDING: <Pause size={20} className="text-orange-500" />,
+  REVIEWED: <CheckCircle2 size={20} className="text-purple-500" />,
   CLOSED: <CheckCircle2 size={20} className="text-gray-500" />,
+  HOD_VERIFIED_PENDING: <Pause size={20} className="text-orange-500" />,
+  HOD_VERIFIED: <CheckCircle2 size={20} className="text-purple-500" />,
 };
   
 function formatDate(date?: string | null) {
@@ -56,6 +58,18 @@ export default function TaskDetailPage() {
 
   const mutation = useMutation({
     mutationFn: (action: 'accept' | 'progress' | 'complete' | 'review' | 'close') => {
+      if (task?.task_type === 'EMPLOYEE_SHARED') {
+        const statusMap = {
+          accept: 'ACCEPTED',
+          progress: 'IN_PROGRESS',
+          complete: 'COMPLETED',
+          hod_verify_pending: 'HOD_VERIFIED_PENDING',
+          review: 'REVIEWED',
+          close: 'CLOSED'
+        };
+        return tasksApi.employeeSharing.updateStatus(taskId, statusMap[action]);
+      }
+
       if (action === 'accept') return tasksApi.acceptTask(taskId);
       if (action === 'progress') return tasksApi.markInProgress(taskId);
       if (action === 'complete') return tasksApi.completeTask(taskId);
@@ -73,7 +87,12 @@ export default function TaskDetailPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => tasksApi.deleteTask(taskId, deleteReason.trim()),
+    mutationFn: () => {
+      if (task?.task_type === 'EMPLOYEE_SHARED') {
+        return tasksApi.employeeSharing.deleteTask(taskId, deleteReason.trim());
+      }
+      return tasksApi.deleteTask(taskId, deleteReason.trim());
+    },
     onSuccess: async () => {
       setError(null);
       setShowDelete(false);
@@ -221,20 +240,36 @@ export default function TaskDetailPage() {
           <div className="rounded-lg bg-white p-6 shadow">
             <h3 className="text-sm font-semibold text-gray-900">Actions</h3>
             <div className="mt-4 grid gap-2">
-              {(isEmployeeOwner || isMD) && task.status === 'ASSIGNED' && (
-                <Button disabled={mutation.isPending} onClick={() => mutation.mutate('accept')}>Accept</Button>
+              {task.task_type === 'EMPLOYEE_SHARED' ? (
+                <>
+                  {(isEmployeeOwner || isMD) && (task.status === 'CREATED' || task.status === 'ASSIGNED') && (
+                    <Button disabled={mutation.isPending} onClick={() => mutation.mutate('accept')}>Accept Task</Button>
+                  )}
+                  {(isEmployeeOwner || isMD) && task.status === 'ACCEPTED' && (
+                    <Button disabled={mutation.isPending} onClick={() => mutation.mutate('progress')}>Start Progress</Button>
+                  )}
+                  {(isEmployeeOwner || isMD) && task.status === 'IN_PROGRESS' && (
+                    <Button disabled={mutation.isPending} onClick={() => mutation.mutate('complete')}>Complete</Button>
+                  )}
+                  {(isEmployeeOwner || isMD) && task.status === 'COMPLETED' && (
+                    <Button disabled={mutation.isPending} onClick={() => mutation.mutate('hod_verify_pending' as any)}>Request HOD Verification</Button>
+                  )}
+                </>
+              ) : (
+                <>
+                  {(isEmployeeOwner || isMD) && task.status === 'CREATED' && (
+                    <Button disabled={mutation.isPending} onClick={() => mutation.mutate('progress')}>Start Progress</Button>
+                  )}
+                  {(isEmployeeOwner || isMD) && task.status === 'IN_PROGRESS' && (
+                    <Button disabled={mutation.isPending} onClick={() => mutation.mutate('complete')}>Complete</Button>
+                  )}
+                </>
               )}
-              {(isEmployeeOwner || isMD) && (task.status === 'ACCEPTED' || task.status === 'PENDING') && (
-                <Button disabled={mutation.isPending} onClick={() => mutation.mutate('progress')}>Start Progress</Button>
+              {isReviewer && (task.status === 'COMPLETED' || task.status === 'HOD_VERIFIED_PENDING') && (
+                <Button disabled={mutation.isPending} onClick={() => mutation.mutate('review')}>Verify</Button>
               )}
-              {(isEmployeeOwner || isMD) && task.status === 'IN_PROGRESS' && (
-                <Button disabled={mutation.isPending} onClick={() => mutation.mutate('complete')}>Complete</Button>
-              )}
-              {isReviewer && task.status === 'COMPLETED' && (
-                <Button disabled={mutation.isPending} onClick={() => mutation.mutate('review')}>Review</Button>
-              )}
-              {isReviewer && task.status === 'REVIEWED' && (
-                <Button disabled={mutation.isPending} onClick={() => mutation.mutate('close')}>Close</Button>
+              {isReviewer && task.status === 'HOD_VERIFIED' && (
+                <Button disabled={mutation.isPending} onClick={() => mutation.mutate('close')}>Abort</Button>
               )}
               {canRequestReassignment && !hasPendingReassignment && (
                 <Button variant="outline" onClick={() => setShowReassign((value) => !value)}>
