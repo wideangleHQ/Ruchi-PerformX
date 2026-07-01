@@ -23,7 +23,6 @@ const SELECT = {
   priority: true,
   status: true,
   created_by_id: true,
-  department_id: true,
   completed_at: true,
   created_at: true,
   updated_at: true,
@@ -36,10 +35,15 @@ const SELECT = {
       department_id: true,
     },
   },
-  departments: {
+  self_action_departments: {
     select: {
-      id: true,
-      name: true,
+      department_id: true,
+      departments: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
     },
   },
   task_attachments: {
@@ -75,34 +79,40 @@ export class SelfActionsService {
     }
 
     try {
-      let departmentId: string | undefined | null = dto.department_id;
+      let departmentIds: string[] = dto.department_ids || [];
 
-      if (!departmentId) {
+      if (!departmentIds.length && dto.department_id) {
+        departmentIds = [dto.department_id];
+      }
+
+      if (!departmentIds.length) {
         const userDept = await this.prisma.users.findUnique({
           where: { id: user.sub },
           select: { department_id: true },
         });
-        departmentId = userDept?.department_id;
+        if (userDept?.department_id) departmentIds.push(userDept.department_id);
       }
 
-      if (!departmentId && user.departmentId) {
-        departmentId = user.departmentId;
+      if (!departmentIds.length && user.departmentId) {
+        departmentIds.push(user.departmentId);
       }
 
-      if (!departmentId && user.departmentIds && user.departmentIds.length > 0) {
-        departmentId = user.departmentIds[0];
+      if (!departmentIds.length && user.departmentIds && user.departmentIds.length > 0) {
+        departmentIds = user.departmentIds;
       }
+
+      departmentIds = [...new Set(departmentIds)].filter(Boolean);
 
       this.logger.log(
         `create self-action payload=${JSON.stringify(dto)} user=${JSON.stringify({
           sub: user?.sub,
           username: user?.username,
           role: user?.role,
-          department_id: departmentId,
+          departmentIds,
         })}`,
       );
 
-      if (!departmentId) {
+      if (!departmentIds.length) {
         throw new BadRequestException('User must belong to a department');
       }
 
@@ -114,9 +124,16 @@ export class SelfActionsService {
             priority: dto.priority ?? 'MEDIUM',
             status: 'OPEN',
             created_by_id: user.sub,
-            department_id: departmentId as string,
           },
-          select: SELECT,
+          select: { id: true },
+        });
+
+        await tx.self_action_departments.createMany({
+          data: departmentIds.map((deptId) => ({
+            self_action_id: created.id,
+            department_id: deptId,
+          })),
+          skipDuplicates: true,
         });
 
         await tx.self_action_logs.create({
@@ -185,7 +202,7 @@ export class SelfActionsService {
     const visible = this.getVisibilityFilter(user);
     if (visible) clauses.push(visible);
 
-    if (filter.departmentId) clauses.push({ department_id: filter.departmentId });
+    if (filter.departmentId) clauses.push({ self_action_departments: { some: { department_id: filter.departmentId } } });
     if (filter.createdById) clauses.push({ created_by_id: filter.createdById });
 
     const where = clauses.length === 1 ? clauses[0] : { AND: clauses };
@@ -232,8 +249,8 @@ export class SelfActionsService {
         description: true,
         priority: true,
         created_by_id: true,
-        department_id: true,
         status: true,
+        self_action_departments: { select: { department_id: true } },
         users: { select: { role: true, department_id: true } },
       },
     });
@@ -284,7 +301,7 @@ export class SelfActionsService {
   async changeStatus(id: string, dto: ChangeStatusDto, user: JwtPayload) {
     const action = await this.prisma.self_actions.findUnique({
       where: { id },
-      select: { id: true, created_by_id: true, status: true, department_id: true, users: { select: { role: true, department_id: true } } },
+      select: { id: true, created_by_id: true, status: true, self_action_departments: { select: { department_id: true } }, users: { select: { role: true, department_id: true } } },
     });
 
     if (!action) throw new NotFoundException('Self action not found');
@@ -296,7 +313,7 @@ export class SelfActionsService {
       user.role === role_enum.PA ||
       user.role === role_enum.PURCHASE_HEAD ||
       action.created_by_id === user.sub ||
-      (user.role === role_enum.HOD && user.departmentIds?.includes(action.department_id));
+      (user.role === role_enum.HOD && action.self_action_departments.some((dept: any) => user.departmentIds?.includes(dept.department_id)));
     if (!canEdit) throw new ForbiddenException('Not authorized');
 
     this.validateStatusTransition(action.status as self_action_status_enum, dto.status);
@@ -409,8 +426,8 @@ export class SelfActionsService {
       select: {
         id: true,
         created_by_id: true,
-        department_id: true,
         deleted_at: true,
+        self_action_departments: { select: { department_id: true } },
         users: { select: { id: true, role: true, department_id: true } },
       },
     });
@@ -451,7 +468,7 @@ export class SelfActionsService {
         OR: [
           { created_by_id: user.sub },
           {
-            department_id: { in: user.departmentIds || [] },
+            self_action_departments: { some: { department_id: { in: user.departmentIds || [] } } },
             users: { role: role_enum.EMPLOYEE },
           },
         ],
@@ -463,7 +480,7 @@ export class SelfActionsService {
         OR: [
           { created_by_id: user.sub },
           {
-            department_id: { in: user.departmentIds || [] },
+            self_action_departments: { some: { department_id: { in: user.departmentIds || [] } } },
             users: { role: role_enum.EMPLOYEE },
           },
         ],
@@ -481,7 +498,7 @@ export class SelfActionsService {
     if (user.role === role_enum.HOD) {
       if (action.users?.id === user.sub) return;
       if (
-        user.departmentIds?.includes(action.department_id) &&
+        action.self_action_departments?.some((dept: any) => user.departmentIds?.includes(dept.department_id)) &&
         action.users?.role === role_enum.EMPLOYEE
       )
         return;
@@ -498,7 +515,7 @@ export class SelfActionsService {
     if (action.created_by_id === user.sub) return true;
     if (user.role === role_enum.EA || user.role === role_enum.PA) return true;
 
-    if (user.role === role_enum.HOD && user.departmentIds?.includes(action.department_id)) {
+    if (user.role === role_enum.HOD && action.self_action_departments?.some((dept: any) => user.departmentIds?.includes(dept.department_id))) {
       return action.users?.role === role_enum.EMPLOYEE || action.created_by_id === user.sub;
     }
 
@@ -526,6 +543,10 @@ export class SelfActionsService {
   private async mapAction(action: any): Promise<any> {
     return {
       ...action,
+      department_id: action.self_action_departments?.[0]?.department_id,
+      departments: action.self_action_departments?.[0]?.departments,
+      departmentIds: action.self_action_departments?.map((d: any) => d.department_id) || [],
+      departmentsList: action.self_action_departments?.map((d: any) => d.departments) || [],
       task_attachments: await this.attachmentsService.decorateTaskAttachments(action.task_attachments),
     };
   }

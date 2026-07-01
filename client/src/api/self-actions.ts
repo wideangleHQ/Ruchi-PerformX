@@ -89,11 +89,15 @@ export const selfActionsApi = {
     description: string;
     priority?: SelfActionPriority;
     attachments?: File[];
+    department_ids?: string[];
   }): Promise<SelfAction> => {
     const formData = new FormData();
     formData.append('title', data.title);
     formData.append('description', data.description);
     if (data.priority) formData.append('priority', data.priority);
+    if (data.department_ids?.length) {
+      data.department_ids.forEach((id) => formData.append('department_ids[]', id));
+    }
     appendAttachments(formData, data.attachments);
     const response = await axiosClient.post<SelfAction>('/self-actions', formData);
     return response.data;

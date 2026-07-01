@@ -165,6 +165,7 @@ export function SelfActionsClient() {
     description: string;
     priority: SelfActionPriority;
     attachments: File[];
+    department_ids?: string[];
   }) => {
     try {
       setDialogError(null);

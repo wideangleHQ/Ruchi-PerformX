@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsEnum, MaxLength } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsEnum, MaxLength, IsArray } from 'class-validator';
 import { self_action_priority_enum } from '@prisma/client';
 import { UploadedFile } from '../../../common/types/uploaded-file.type';
 
@@ -22,4 +22,9 @@ export class CreateSelfActionDto {
   @IsOptional()
   @IsString()
   department_id?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  department_ids?: string[];
 }

@@ -51,9 +51,9 @@ export class ScoringService {
     // Completed self actions in period
     const selfActions = await this.prisma.self_actions.count({
       where: {
-        user_id: userId,
-        status: action_status_enum.COMPLETED,
-        action_date: { gte: start, lt: end },
+        created_by_id: userId,
+        status: 'COMPLETED',
+        completed_at: { gte: start, lt: end },
       },
     });
     score += selfActions * POINTS.SELF_ACTION_COMPLETED;
@@ -123,9 +123,9 @@ export class ScoringService {
         }),
         this.prisma.self_actions.count({
           where: {
-            user_id: user.id,
-            status: action_status_enum.COMPLETED,
-            action_date: { gte: periodStart, lt: periodEnd },
+            created_by_id: user.id,
+            status: 'COMPLETED',
+            completed_at: { gte: periodStart, lt: periodEnd },
           },
         }),
         this.prisma.tasks.count({
