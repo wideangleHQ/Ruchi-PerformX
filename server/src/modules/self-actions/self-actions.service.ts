@@ -477,13 +477,7 @@ export class SelfActionsService {
 
     if (user.role === role_enum.HOD) {
       return {
-        OR: [
-          { created_by_id: user.sub },
-          {
-            self_action_departments: { some: { department_id: { in: user.departmentIds || [] } } },
-            users: { role: role_enum.EMPLOYEE },
-          },
-        ],
+        self_action_departments: { some: { department_id: { in: user.departmentIds || [] } } },
       };
     }
 
@@ -496,10 +490,8 @@ export class SelfActionsService {
     if (user.role === role_enum.PURCHASE_HEAD) return;
 
     if (user.role === role_enum.HOD) {
-      if (action.users?.id === user.sub) return;
       if (
-        action.self_action_departments?.some((dept: any) => user.departmentIds?.includes(dept.department_id)) &&
-        action.users?.role === role_enum.EMPLOYEE
+        action.self_action_departments?.some((dept: any) => user.departmentIds?.includes(dept.department_id))
       )
         return;
       throw new ForbiddenException('Access denied');
@@ -516,7 +508,7 @@ export class SelfActionsService {
     if (user.role === role_enum.EA || user.role === role_enum.PA) return true;
 
     if (user.role === role_enum.HOD && action.self_action_departments?.some((dept: any) => user.departmentIds?.includes(dept.department_id))) {
-      return action.users?.role === role_enum.EMPLOYEE || action.created_by_id === user.sub;
+      return true;
     }
 
     return false;
