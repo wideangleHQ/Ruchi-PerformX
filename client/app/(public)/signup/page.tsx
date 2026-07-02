@@ -14,7 +14,7 @@ const signupSchema = z.object({
   username: z.string().min(1, 'Username is required'),
   password: z.string().min(6, 'Minimum 6 characters'),
   confirmPassword: z.string().min(1, 'Password confirmation is required'),
-  role: z.enum(['MD', 'EA', 'PA', 'PURCHASE_HEAD', 'HOD', 'EMPLOYEE'], { error: 'Please select a role' }),
+  role: z.enum(['MD', 'EA', 'PA', 'PURCHASE_HEAD', 'DEPARTMENT_CONTROLLER', 'HOD', 'EMPLOYEE'], { error: 'Please select a role' }),
   departments: z.array(z.string()),
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Passwords do not match',
@@ -22,7 +22,7 @@ const signupSchema = z.object({
 }).refine((data) => {
   if (['MD', 'EA', 'PA', 'PURCHASE_HEAD'].includes(data.role)) return true;
   if (data.role === 'EMPLOYEE') return data.departments.length === 1;
-  if (data.role === 'HOD') return data.departments.length >= 1;
+  if (data.role === 'HOD' || data.role === 'DEPARTMENT_CONTROLLER') return data.departments.length >= 1;
   return true;
 }, {
   message: 'Invalid department selection for the chosen role',
@@ -89,7 +89,7 @@ export default function SignupPage() {
     });
   }, [selectedDepts, selectedRole, hodTakenDepts]);
 
-  const isMultiDeptRole = selectedRole === 'HOD';
+  const isMultiDeptRole = selectedRole === 'HOD' || selectedRole === 'DEPARTMENT_CONTROLLER';
   const anyHodBlocked = selectedRole === 'HOD' && selectedDepts.some((id) => hodTakenDepts.has(id));
 
   const onSubmit = async (data: SignupFormData) => {
@@ -97,7 +97,7 @@ export default function SignupPage() {
     try {
       setError(null);
       setIsLoading(true);
-      const noDepRole = ['MD', 'EA', 'PA'].includes(data.role);
+      const noDepRole = ['MD', 'EA', 'PA', 'PURCHASE_HEAD'].includes(data.role);
       await authApi.register({
         username: data.username,
         email: data.email,
@@ -209,6 +209,7 @@ export default function SignupPage() {
                     <option value="EA" disabled={eaExists}>Executive Assistant{eaExists ? ' (position filled)' : ''}</option>
                     <option value="PA" disabled={paExists}>Personal Assistant{paExists ? ' (position filled)' : ''}</option>
                     <option value="PURCHASE_HEAD">Purchase Head</option>
+                    <option value="DEPARTMENT_CONTROLLER">Department Controller</option>
                     <option value="HOD">Head of Department</option>
                     <option value="EMPLOYEE">Employee</option>
                   </select>

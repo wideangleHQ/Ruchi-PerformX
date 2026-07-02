@@ -75,6 +75,8 @@ export function UserTable({
                         ? 'bg-purple-100 text-purple-800'
                         : user.role === 'PURCHASE_HEAD'
                           ? 'bg-indigo-100 text-indigo-800'
+                          : user.role === 'DEPARTMENT_CONTROLLER'
+                            ? 'bg-teal-100 text-teal-800'
                           : user.role === 'HOD'
                             ? 'bg-blue-100 text-blue-800'
                             : user.role === 'EA'
@@ -117,4 +119,3 @@ export function UserTable({
     </div>
   );
 }
-

@@ -55,7 +55,7 @@ const getValidNextStatuses = (currentStatus: string, userRole: string, isAssigne
     }
   }
   
-  if (['HOD', 'EA', 'PA', 'PURCHASE_HEAD', 'MD'].includes(userRole)) {
+  if (['HOD', 'EA', 'PA', 'PURCHASE_HEAD', 'DEPARTMENT_CONTROLLER', 'MD'].includes(userRole)) {
     switch (currentStatus) {
       case 'CREATED':
       case 'ASSIGNED': return ['ACCEPTED'];

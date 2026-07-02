@@ -12,6 +12,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
 import { UploadedFile } from '../../common/types/uploaded-file.type';
 
+const ASSISTANT_ROLES: role_enum[] = [role_enum.EA, role_enum.PA, role_enum.DEPARTMENT_CONTROLLER];
+
 type AttachmentRecord = Prisma.task_attachmentsGetPayload<{
   select: {
     id: true;
@@ -436,7 +438,7 @@ export class AttachmentsService {
 
     const departmentIds = this.taskDepartmentIds(task);
     if (user.role === role_enum.EMPLOYEE && user.departmentId && departmentIds.includes(user.departmentId)) return;
-    if ((user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA) && this.hasOverlap(departmentIds, user.departmentIds || [])) return;
+    if ((user.role === role_enum.HOD || ASSISTANT_ROLES.includes(user.role)) && this.hasOverlap(departmentIds, user.departmentIds || [])) return;
 
     throw new ForbiddenException('Access denied to this task');
   }
@@ -465,7 +467,7 @@ export class AttachmentsService {
     }
 
     const departmentIds = user.departmentIds?.length ? user.departmentIds : user.departmentId ? [user.departmentId] : [];
-    if ((user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA || user.role === role_enum.PURCHASE_HEAD) && departmentIds.includes(departmentId)) {
+    if ((user.role === role_enum.HOD || ASSISTANT_ROLES.includes(user.role) || user.role === role_enum.PURCHASE_HEAD) && departmentIds.includes(departmentId)) {
       return;
     }
 
@@ -497,7 +499,7 @@ export class AttachmentsService {
       throw new NotFoundException('Self action not found');
     }
 
-    if (user.role === role_enum.MD || user.role === role_enum.ADMIN || user.role === role_enum.EA || user.role === role_enum.PA) return;
+    if (user.role === role_enum.MD || user.role === role_enum.ADMIN || ASSISTANT_ROLES.includes(user.role)) return;
     if (action.created_by_id === user.sub) return;
     if (user.role === role_enum.HOD && user.departmentIds?.includes(action.department_id)) return;
     if (user.role === role_enum.EMPLOYEE && user.departmentId === action.department_id) return;

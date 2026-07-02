@@ -8,6 +8,8 @@ import { UpdateCommentDto } from './dto/update-comment.dto';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
 import { UploadedFile } from '../../common/types/uploaded-file.type';
 
+const ASSISTANT_ROLES: role_enum[] = [role_enum.EA, role_enum.PA, role_enum.DEPARTMENT_CONTROLLER];
+
 @Injectable()
 export class CommentsService {
   constructor(
@@ -103,7 +105,7 @@ export class CommentsService {
 
     const departmentIds = [...new Set([task.department_id, ...task.task_departments.map((item) => item.department_id)].filter(Boolean))];
     if (user.role === role_enum.EMPLOYEE && user.departmentId && departmentIds.includes(user.departmentId)) return;
-    if ((user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA) && user.departmentIds?.some((id) => departmentIds.includes(id))) return;
+    if ((user.role === role_enum.HOD || ASSISTANT_ROLES.includes(user.role)) && user.departmentIds?.some((id) => departmentIds.includes(id))) return;
 
     throw new ForbiddenException('Access denied to this task');
   }

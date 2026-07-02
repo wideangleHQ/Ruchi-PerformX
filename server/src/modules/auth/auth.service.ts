@@ -151,7 +151,7 @@ export class AuthService {
       departmentIds = hodDepts.map((d) => d.department_id);
     } else if (user.role === role_enum.PURCHASE_HEAD) {
       departmentIds = await this.getPurchaseDepartmentIds();
-    } else if (user.role === role_enum.EA || user.role === role_enum.PA) {
+    } else if (user.role === role_enum.EA || user.role === role_enum.PA || user.role === role_enum.DEPARTMENT_CONTROLLER) {
       const asstDepts = await this.prisma.assistant_departments.findMany({
         where: { assistant_id: user.id },
         select: { department_id: true },
@@ -209,17 +209,17 @@ export class AuthService {
           },
         });
 
-        if (dto.role === role_enum.HOD && departmentIds.length > 0) {
-          await tx.hod_departments.createMany({
-            data: departmentIds.map((department_id) => ({
-              hod_id: createdUser.id,
-              department_id,
-            })),
-            skipDuplicates: true,
-          });
-        }
+    if (dto.role === role_enum.HOD && departmentIds.length > 0) {
+      await tx.hod_departments.createMany({
+        data: departmentIds.map((department_id) => ({
+          hod_id: createdUser.id,
+          department_id,
+        })),
+        skipDuplicates: true,
+      });
+    }
 
-        if ((dto.role === role_enum.EA || dto.role === role_enum.PA) && departmentIds.length > 0) {
+        if ((dto.role === role_enum.EA || dto.role === role_enum.PA || dto.role === role_enum.DEPARTMENT_CONTROLLER) && departmentIds.length > 0) {
           await tx.assistant_departments.createMany({
             data: departmentIds.map((department_id) => ({
               assistant_id: createdUser.id,
@@ -460,6 +460,24 @@ async resetPassword(dto: ResetPasswordDto) {
         if (department.name !== 'Purchase Non Agro' && (await this.checkHodExists(department.id))) {
           throw new ConflictException('HOD already exists for this department.');
         }
+      }
+
+      return departmentIds;
+    }
+
+    if (dto.role === role_enum.EA || dto.role === role_enum.PA || dto.role === role_enum.DEPARTMENT_CONTROLLER) {
+      const departmentIds = [...new Set(dto.departmentIds ?? [])];
+      if (!departmentIds.length) {
+        throw new BadRequestException('Department Controller must be assigned at least one department');
+      }
+
+      const departments = await this.prisma.departments.findMany({
+        where: { id: { in: departmentIds }, is_active: true },
+        select: { id: true },
+      });
+
+      if (departments.length !== departmentIds.length) {
+        throw new BadRequestException('Invalid department selection');
       }
 
       return departmentIds;

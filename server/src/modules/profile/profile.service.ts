@@ -124,7 +124,7 @@ export class ProfileService {
         departmentId = departmentIds[0] ?? null;
         departmentName = departmentNames[0] ?? null;
       }
-    } else if (user.role === role_enum.EA || user.role === role_enum.PA) {
+    } else if (user.role === role_enum.EA || user.role === role_enum.PA || user.role === role_enum.DEPARTMENT_CONTROLLER) {
       const assistantDepts = await this.prisma.assistant_departments.findMany({
         where: { assistant_id: user.id },
         select: { 

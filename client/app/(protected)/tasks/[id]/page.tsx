@@ -129,10 +129,10 @@ export default function TaskDetailPage() {
   const dueDate = task.due_date ?? task.dueDate;
   const createdAt = task.created_at ?? task.createdAt;
   const isEmployeeOwner = user?.role === 'EMPLOYEE' && task.assigned_to_id === user.id;
-  const isReviewer = user?.role === 'MD' || user?.role === 'HOD';
+  const isReviewer = user?.role === 'MD' || user?.role === 'HOD' || user?.role === 'EA' || user?.role === 'PA' || user?.role === 'PURCHASE_HEAD' || user?.role === 'DEPARTMENT_CONTROLLER';
   const isMD = user?.role === 'MD';
   const taskDepartmentIds = task.task_departments?.map((item) => item.departments?.id).filter(Boolean) ?? [];
-  const canDeleteTask = user?.role === 'HOD' && Boolean(user.departmentIds?.some((departmentId) => taskDepartmentIds.includes(departmentId)));
+  const canDeleteTask = ['HOD', 'EA', 'PA', 'PURCHASE_HEAD', 'DEPARTMENT_CONTROLLER'].includes(user?.role || '') && Boolean(user.departmentIds?.some((departmentId) => taskDepartmentIds.includes(departmentId)));
   const canRequestReassignment = isEmployeeOwner && task.status !== 'COMPLETED' && task.status !== 'CLOSED';
   const hasPendingReassignment = Boolean(requests.some((request) => request.status === 'PENDING'));
 

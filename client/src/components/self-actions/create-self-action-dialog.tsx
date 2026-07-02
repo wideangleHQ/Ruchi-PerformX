@@ -26,7 +26,7 @@ export function CreateSelfActionDialog({ open, onClose, onSubmit, isPending, err
   const [attachments, setAttachments] = useState<File[]>([]);
   const [departmentIds, setDepartmentIds] = useState<string[]>([]);
 
-  const showDepartmentSelection = user?.role && ['HOD', 'PURCHASE_HEAD', 'EA', 'PA', 'MD', 'ADMIN'].includes(user.role);
+  const showDepartmentSelection = user?.role && ['HOD', 'PURCHASE_HEAD', 'DEPARTMENT_CONTROLLER', 'EA', 'PA', 'MD', 'ADMIN'].includes(user.role);
 
   const { data: departments = [] } = useQuery<TaskDepartment[]>({
     queryKey: ['task-departments'],
@@ -40,7 +40,7 @@ export function CreateSelfActionDialog({ open, onClose, onSubmit, isPending, err
       setDescription('');
       setPriority('MEDIUM');
       setAttachments([]);
-      setDepartmentIds(user?.departmentId ? [user.departmentId] : []);
+      setDepartmentIds(user?.departmentIds?.length ? user.departmentIds : user?.departmentId ? [user.departmentId] : []);
     }
   }, [open, user]);
 

@@ -9,6 +9,9 @@ import { notification_type_enum, request_status_enum, role_enum, task_priority_e
 import { TasksService } from '../tasks/tasks.service';
 import { AttachmentsService } from '../attachments/attachments.service';
 
+const ASSISTANT_ROLES: role_enum[] = [role_enum.EA, role_enum.PA, role_enum.DEPARTMENT_CONTROLLER];
+const DEPARTMENT_SCOPED_ROLES: role_enum[] = [role_enum.HOD, role_enum.PURCHASE_HEAD, ...ASSISTANT_ROLES];
+
 @Injectable()
 export class RequestsService {
   constructor(
@@ -95,7 +98,7 @@ export class RequestsService {
 
     if (user.role === role_enum.EMPLOYEE) {
       where.requested_by_id = user.sub;
-    } else if (user.role === role_enum.HOD || user.role === role_enum.PURCHASE_HEAD) {
+    } else if (DEPARTMENT_SCOPED_ROLES.includes(user.role)) {
       const deptIds = this.getManagedDepartmentIds(user);
       if (!deptIds.length) {
         where.id = { in: [] };
@@ -335,17 +338,17 @@ export class RequestsService {
   }
 
   private assertAccess(request: any, user: JwtPayload) {
-    if (user.role === role_enum.MD || user.role === role_enum.EA || user.role === role_enum.PA) return;
-    if ((user.role === role_enum.HOD || user.role === role_enum.PURCHASE_HEAD) && this.hasDepartmentAccess(request, this.getManagedDepartmentIds(user))) return;
+    if (user.role === role_enum.MD || ASSISTANT_ROLES.includes(user.role)) return;
+    if (DEPARTMENT_SCOPED_ROLES.includes(user.role) && this.hasDepartmentAccess(request, this.getManagedDepartmentIds(user))) return;
     if (user.role === role_enum.EMPLOYEE && request.requested_by_id === user.sub) return;
     throw new ForbiddenException('Access denied');
   }
 
   private assertReviewAccess(request: any, user: JwtPayload) {
     if (request.status !== request_status_enum.PENDING) throw new ForbiddenException('Request has already been reviewed');
-    if (user.role === role_enum.MD || user.role === role_enum.EA || user.role === role_enum.PA) return;
-    if ((user.role === role_enum.HOD || user.role === role_enum.PURCHASE_HEAD) && this.hasDepartmentAccess(request, this.getManagedDepartmentIds(user))) return;
-    throw new ForbiddenException('Only HOD, MD, EA, PA, or PURCHASE_HEAD can review requests');
+    if (user.role === role_enum.MD || ASSISTANT_ROLES.includes(user.role)) return;
+    if (DEPARTMENT_SCOPED_ROLES.includes(user.role) && this.hasDepartmentAccess(request, this.getManagedDepartmentIds(user))) return;
+    throw new ForbiddenException('Only HOD, MD, EA, PA, PURCHASE_HEAD, or DEPARTMENT_CONTROLLER can review requests');
   }
 
   private async createTaskReassignment(dto: CreateRequestDto, user: JwtPayload) {
@@ -402,7 +405,7 @@ export class RequestsService {
 
     const hods = await this.prisma.users.findMany({
       where: {
-        role: { in: [role_enum.HOD, role_enum.PURCHASE_HEAD] },
+        role: { in: [role_enum.HOD, role_enum.PURCHASE_HEAD, role_enum.DEPARTMENT_CONTROLLER] },
         is_active: true,
         deleted_at: null,
         hod_departments: { some: { department_id: task.department_id } },
@@ -430,7 +433,7 @@ export class RequestsService {
       select: { id: true, title: true, department_id: true, assigned_to_id: true },
     });
     if (!task) throw new NotFoundException('Task not found');
-    if ((user.role === role_enum.HOD || user.role === role_enum.PURCHASE_HEAD) && !this.getManagedDepartmentIds(user).includes(task.department_id)) throw new ForbiddenException('Not authorized to review this task');
+    if (DEPARTMENT_SCOPED_ROLES.includes(user.role) && !this.getManagedDepartmentIds(user).includes(task.department_id)) throw new ForbiddenException('Not authorized to review this task');
     if (request.current_assignee_id && task.assigned_to_id && task.assigned_to_id !== request.current_assignee_id) {
       throw new ConflictException('Task assignment has changed');
     }
@@ -607,7 +610,7 @@ export class RequestsService {
       return;
     }
 
-    if ((user.role === role_enum.HOD || user.role === role_enum.PURCHASE_HEAD || user.role === role_enum.EA || user.role === role_enum.PA) && allowedDepartments.length && !allowedDepartments.includes(departmentId)) {
+    if (DEPARTMENT_SCOPED_ROLES.includes(user.role) && allowedDepartments.length && !allowedDepartments.includes(departmentId)) {
       throw new ForbiddenException('You are not authorized for this department');
     }
   }
@@ -660,7 +663,7 @@ export class RequestsService {
 
     const assistant = await this.prisma.users.findFirst({
       where: {
-        role: { in: [role_enum.EA, role_enum.PA] },
+        role: { in: [role_enum.EA, role_enum.PA, role_enum.DEPARTMENT_CONTROLLER] },
         is_active: true,
         deleted_at: null,
         ...(requesterId ? { id: { not: requesterId } } : {}),
@@ -753,3 +756,4 @@ export class RequestsService {
     };
   }
 }
+

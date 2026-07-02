@@ -21,7 +21,7 @@ export default function TasksPage() {
   
   const [activeTab, setActiveTab] = useState<'OFFICIAL' | 'EMPLOYEE_SHARED'>('OFFICIAL');
   const canCreate = activeTab === 'OFFICIAL' ? canCreateOfficial : canCreateShared;
-  const canDeleteTask = user?.role === 'HOD';
+  const canDeleteTask = ['HOD', 'EA', 'PA', 'PURCHASE_HEAD', 'DEPARTMENT_CONTROLLER'].includes(user?.role || '');
 
   const [showFilters, setShowFilters] = useState(false);
   const [search, setSearch]   = useState('');

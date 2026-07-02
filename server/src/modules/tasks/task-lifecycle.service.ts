@@ -2,6 +2,8 @@ import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/com
 import { task_status_enum , role_enum } from '@prisma/client';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
 
+const ASSISTANT_ROLES: role_enum[] = [role_enum.EA, role_enum.PA, role_enum.DEPARTMENT_CONTROLLER];
+
 type Transition = {
   from: task_status_enum[];
   to: task_status_enum;
@@ -13,59 +15,59 @@ const TRANSITIONS: Transition[] = [
   {
     from: [task_status_enum.CREATED],
     to: task_status_enum.ASSIGNED,
-    allowedRoles: [role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD],
+    allowedRoles: [role_enum.MD, role_enum.HOD, ...ASSISTANT_ROLES, role_enum.PURCHASE_HEAD],
   },
   {
     from: [task_status_enum.CREATED, task_status_enum.ASSIGNED],
     to: task_status_enum.ACCEPTED,
-    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE, role_enum.HOD, role_enum.EA, role_enum.PA],
+    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE, role_enum.HOD, ...ASSISTANT_ROLES],
   },
   {
     from: [task_status_enum.ACCEPTED, task_status_enum.CREATED, task_status_enum.ASSIGNED],
     to: task_status_enum.IN_PROGRESS,
-    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE, role_enum.HOD, role_enum.EA, role_enum.PA],
+    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE, role_enum.HOD, ...ASSISTANT_ROLES],
   },
   {
     from: [task_status_enum.IN_PROGRESS],
     to: task_status_enum.COMPLETED,
-    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE, role_enum.HOD, role_enum.EA, role_enum.PA],
+    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE, role_enum.HOD, ...ASSISTANT_ROLES],
   },
   {
     from: [task_status_enum.COMPLETED],
     to: task_status_enum.HOD_VERIFIED_PENDING,
-    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE, role_enum.HOD, role_enum.EA, role_enum.PA],
+    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE, role_enum.HOD, ...ASSISTANT_ROLES],
   },
   {
     from: [task_status_enum.HOD_VERIFIED_PENDING],
     to: task_status_enum.HOD_VERIFIED,
-    allowedRoles: [role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD],
+    allowedRoles: [role_enum.MD, role_enum.HOD, ...ASSISTANT_ROLES, role_enum.PURCHASE_HEAD],
   },
   {
     from: [task_status_enum.HOD_VERIFIED],
     to: task_status_enum.REVIEWED,
-    allowedRoles: [role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD],
+    allowedRoles: [role_enum.MD, role_enum.HOD, ...ASSISTANT_ROLES, role_enum.PURCHASE_HEAD],
   },
   {
     from: [task_status_enum.REVIEWED],
     to: task_status_enum.CLOSED,
-    allowedRoles: [role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD],
+    allowedRoles: [role_enum.MD, role_enum.HOD, ...ASSISTANT_ROLES, role_enum.PURCHASE_HEAD],
   },
   {
     from: [task_status_enum.CREATED, task_status_enum.ASSIGNED, task_status_enum.ACCEPTED, task_status_enum.IN_PROGRESS],
     to: task_status_enum.REJECTED,
-    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE, role_enum.HOD, role_enum.EA, role_enum.PA],
+    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE, role_enum.HOD, ...ASSISTANT_ROLES],
     requiresReason: true,
   },
   {
     from: [task_status_enum.COMPLETED, task_status_enum.HOD_VERIFIED_PENDING, task_status_enum.HOD_VERIFIED, task_status_enum.REVIEWED],
     to: task_status_enum.IN_PROGRESS,
-    allowedRoles: [role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD],
+    allowedRoles: [role_enum.MD, role_enum.HOD, ...ASSISTANT_ROLES, role_enum.PURCHASE_HEAD],
     requiresReason: true,
   },
   {
     from: [task_status_enum.CLOSED],
     to: task_status_enum.REJECTED,
-    allowedRoles: [role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD],
+    allowedRoles: [role_enum.MD, role_enum.HOD, ...ASSISTANT_ROLES, role_enum.PURCHASE_HEAD],
   }
 ];
 

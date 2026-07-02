@@ -56,11 +56,10 @@ export class NotificationsGateway
       // Personal Room
       client.join(`user:${payload.sub}`);
 
-      // Department Room
-      if (payload.departmentId) {
-        client.join(
-          `department:${payload.departmentId}`,
-        );
+      // Department Rooms
+      const departmentIds = [...new Set([payload.departmentId, ...(payload.departmentIds || [])].filter(Boolean))];
+      for (const departmentId of departmentIds) {
+        client.join(`department:${departmentId}`);
       }
 
       // Role Room

@@ -21,6 +21,7 @@ export enum Role {
   MD = 'MD',
   EA = 'EA',
   PA = 'PA',
+  DEPARTMENT_CONTROLLER = 'DEPARTMENT_CONTROLLER',
   HOD = 'HOD',
   ADMIN = 'ADMIN',
 }
@@ -31,13 +32,13 @@ export class DepartmentsController {
   constructor(private readonly departmentsService: DepartmentsService) {}
 
   @Get()
-  @Roles(Role.MD, Role.EA, Role.PA, Role.HOD, Role.ADMIN)
+  @Roles(Role.MD, Role.EA, Role.PA, Role.DEPARTMENT_CONTROLLER, Role.HOD, Role.ADMIN)
   findAll(@CurrentUser() user: JwtPayload) {
     return this.departmentsService.findAll(user);
   }
 
   @Get(':id')
-  @Roles(Role.MD, Role.EA, Role.PA, Role.HOD, Role.ADMIN)
+  @Roles(Role.MD, Role.EA, Role.PA, Role.DEPARTMENT_CONTROLLER, Role.HOD, Role.ADMIN)
   findOne(@Param('id') id: string) {
     return this.departmentsService.findOne(id);
   }

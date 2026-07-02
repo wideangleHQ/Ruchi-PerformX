@@ -87,7 +87,7 @@ export function SelfActionsClient() {
   const filters = useMemo(() => parseFilters(searchParams), [searchParams]);
 
   const { user } = useAuth();
-  const canUseDepartmentLookup = !!user && (user.role === 'MD' || user.role === 'HOD' || user.role === 'ADMIN');
+  const canUseDepartmentLookup = !!user && (user.role === 'MD' || user.role === 'HOD' || user.role === 'EA' || user.role === 'PA' || user.role === 'PURCHASE_HEAD' || user.role === 'DEPARTMENT_CONTROLLER' || user.role === 'ADMIN');
   const canUseCreatorLookup = !!user && user.role === 'ADMIN';
 
   const { data, isLoading, isError, refetch } = useSelfActions(filters);

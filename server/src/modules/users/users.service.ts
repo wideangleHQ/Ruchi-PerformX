@@ -48,6 +48,8 @@ type SelectedUser = {
   created_at: Date | null;
 };
 
+const ASSISTANT_ROLES: role_enum[] = [role_enum.EA, role_enum.PA, role_enum.DEPARTMENT_CONTROLLER];
+
 @Injectable()
 export class UsersService {
   private readonly BCRYPT_ROUNDS = 12;
@@ -185,33 +187,13 @@ export class UsersService {
       pending_approval: false,
     };
 
-    if (caller.role === role_enum.HOD || caller.role === role_enum.PURCHASE_HEAD) {
+    if (caller.role === role_enum.HOD || caller.role === role_enum.PURCHASE_HEAD || ASSISTANT_ROLES.includes(caller.role)) {
       // HOD: only employees in any of their assigned departments
       const deptIds = caller.role === role_enum.PURCHASE_HEAD
         ? await this.getPurchaseDepartmentIds()
         : caller.departmentIds ?? (caller.departmentId ? [caller.departmentId] : []);
       where.department_id = { in: deptIds };
       where.role = role_enum.EMPLOYEE;
-    } else if (caller.role === role_enum.EA || caller.role === role_enum.PA) {
-      // EA/PA: HOD or EMPLOYEE across selected departments only
-      const allowedDepts = caller.departmentIds ?? [];
-      const depts = departmentId ? [departmentId] : allowedDepts;
-      const targetDepts = depts.filter(d => allowedDepts.includes(d));
-
-      where.OR = [
-        {
-          role: role_enum.EMPLOYEE,
-          department_id: { in: targetDepts },
-        },
-        {
-          role: role_enum.HOD,
-          hod_departments: { some: { department_id: { in: targetDepts } } },
-        }
-      ];
-
-      if (role) {
-        where.role = role;
-      }
     } else {
       // MD/ADMIN: filter by department and/or role if provided
       if (departmentId && role) {
@@ -220,7 +202,7 @@ export class UsersService {
           where.department_id = departmentId;
         } else if (role === role_enum.HOD) {
           where.hod_departments = { some: { department_id: departmentId } };
-        } else if (role === role_enum.EA || role === role_enum.PA) {
+        } else if (ASSISTANT_ROLES.includes(role)) {
           where.assistant_departments = { some: { department_id: departmentId } };
         }
       } else if (departmentId) {
@@ -261,8 +243,8 @@ export class UsersService {
         email: dto.email ?? null,
         password_hash: passwordHash,
         role: dto.role,
-        department_id: (dto.role !== role_enum.HOD && dto.role !== role_enum.EA && dto.role !== role_enum.PA && dto.role !== role_enum.PURCHASE_HEAD) ? (dto.departmentId ?? null) : null,
-        is_active: dto.role === role_enum.MD || dto.role === role_enum.HOD || dto.role === role_enum.EA || dto.role === role_enum.PA || dto.role === role_enum.PURCHASE_HEAD,
+        department_id: (dto.role !== role_enum.HOD && !ASSISTANT_ROLES.includes(dto.role) && dto.role !== role_enum.PURCHASE_HEAD) ? (dto.departmentId ?? null) : null,
+        is_active: dto.role === role_enum.MD || dto.role === role_enum.HOD || ASSISTANT_ROLES.includes(dto.role) || dto.role === role_enum.PURCHASE_HEAD,
       },
     });
 
@@ -291,7 +273,7 @@ export class UsersService {
     }
 
     // EA/PA: create assistant_departments junction rows
-    if ((dto.role === role_enum.EA || dto.role === role_enum.PA) && dto.departmentIds && dto.departmentIds.length > 0) {
+    if ((dto.role === role_enum.EA || dto.role === role_enum.PA || dto.role === role_enum.DEPARTMENT_CONTROLLER) && dto.departmentIds && dto.departmentIds.length > 0) {
       await this.prisma.assistant_departments.createMany({
         data: dto.departmentIds.map((department_id) => ({
           assistant_id: user.id,
@@ -313,8 +295,8 @@ export class UsersService {
 
     const role = dto.role !== undefined ? dto.role : existing.role;
 
-    // Clear single department_id for HOD / EA / PA
-    const resolvedDeptId = (role === role_enum.HOD || role === role_enum.EA || role === role_enum.PA || role === role_enum.PURCHASE_HEAD)
+    // Clear single department_id for HOD / assistant roles / PURCHASE_HEAD
+    const resolvedDeptId = (role === role_enum.HOD || ASSISTANT_ROLES.includes(role) || role === role_enum.PURCHASE_HEAD)
       ? null
       : dto.departmentId !== undefined ? departmentId : undefined;
 
@@ -338,7 +320,7 @@ export class UsersService {
       if (dto.role !== role_enum.HOD) {
         await this.prisma.hod_departments.deleteMany({ where: { hod_id: id } });
       }
-      if (dto.role !== role_enum.EA && dto.role !== role_enum.PA && dto.role !== role_enum.PURCHASE_HEAD) {
+      if (!ASSISTANT_ROLES.includes(dto.role) && dto.role !== role_enum.PURCHASE_HEAD) {
         await this.prisma.assistant_departments.deleteMany({ where: { assistant_id: id } });
       }
     }
@@ -368,7 +350,7 @@ export class UsersService {
             skipDuplicates: true,
           });
         }
-      } else if (user.role === role_enum.EA || user.role === role_enum.PA) {
+      } else if (ASSISTANT_ROLES.includes(user.role)) {
         await this.prisma.assistant_departments.deleteMany({ where: { assistant_id: id } });
         if (dto.departmentIds.length > 0) {
           await this.prisma.assistant_departments.createMany({
@@ -574,7 +556,7 @@ export class UsersService {
       departmentIds = user.hod_departments.map((hd: any) => hd.department_id);
     } else if (user.role === role_enum.PURCHASE_HEAD) {
       departmentName = 'Purchase Agro, Purchase Non Agro';
-    } else if ((user.role === role_enum.EA || user.role === role_enum.PA) && user.assistant_departments) {
+    } else if (ASSISTANT_ROLES.includes(user.role) && user.assistant_departments) {
       departmentName = user.assistant_departments
         .map((ad: any) => ad.departments?.name)
         .filter(Boolean)

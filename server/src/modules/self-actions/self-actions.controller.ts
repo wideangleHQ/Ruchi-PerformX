@@ -32,7 +32,7 @@ export class SelfActionsController {
   constructor(private readonly selfActionsService: SelfActionsService) {}
 
   @Post()
-  @Roles(role_enum.EMPLOYEE, role_enum.HOD, role_enum.MD, role_enum.EA, role_enum.PA)
+  @Roles(role_enum.EMPLOYEE, role_enum.HOD, role_enum.MD, role_enum.EA, role_enum.PA, role_enum.DEPARTMENT_CONTROLLER)
   @UseInterceptors(FilesInterceptor('attachments'))
   create(
     @Body() dto: CreateSelfActionDto,
@@ -43,7 +43,7 @@ export class SelfActionsController {
   }
 
   @Get()
-  @Roles(role_enum.EMPLOYEE, role_enum.HOD, role_enum.MD, role_enum.EA, role_enum.PA, role_enum.ADMIN)
+  @Roles(role_enum.EMPLOYEE, role_enum.HOD, role_enum.MD, role_enum.EA, role_enum.PA, role_enum.DEPARTMENT_CONTROLLER, role_enum.ADMIN)
   findAll(
     @Query() filter: SelfActionFilterDto,
     @CurrentUser() user: JwtPayload,
@@ -52,7 +52,7 @@ export class SelfActionsController {
   }
 
   @Get(':id')
-  @Roles(role_enum.EMPLOYEE, role_enum.HOD, role_enum.MD, role_enum.EA, role_enum.PA, role_enum.ADMIN)
+  @Roles(role_enum.EMPLOYEE, role_enum.HOD, role_enum.MD, role_enum.EA, role_enum.PA, role_enum.DEPARTMENT_CONTROLLER, role_enum.ADMIN)
   findOne(
     @Param('id') id: string,
     @CurrentUser() user: JwtPayload,
@@ -61,7 +61,7 @@ export class SelfActionsController {
   }
 
   @Patch(':id')
-  @Roles(role_enum.EMPLOYEE, role_enum.HOD, role_enum.MD, role_enum.EA, role_enum.PA, role_enum.ADMIN)
+  @Roles(role_enum.EMPLOYEE, role_enum.HOD, role_enum.MD, role_enum.EA, role_enum.PA, role_enum.DEPARTMENT_CONTROLLER, role_enum.ADMIN)
   update(
     @Param('id') id: string,
     @Body() dto: UpdateSelfActionDto,
@@ -71,7 +71,7 @@ export class SelfActionsController {
   }
 
   @Patch(':id/status')
-  @Roles(role_enum.EMPLOYEE, role_enum.HOD, role_enum.MD, role_enum.EA, role_enum.PA, role_enum.ADMIN)
+  @Roles(role_enum.EMPLOYEE, role_enum.HOD, role_enum.MD, role_enum.EA, role_enum.PA, role_enum.DEPARTMENT_CONTROLLER, role_enum.ADMIN)
   changeStatus(
     @Param('id') id: string,
     @Body() dto: ChangeStatusDto,
@@ -81,7 +81,7 @@ export class SelfActionsController {
   }
 
   @Delete(':id')
-  @Roles(role_enum.EMPLOYEE, role_enum.HOD, role_enum.MD, role_enum.EA, role_enum.PA, role_enum.ADMIN)
+  @Roles(role_enum.EMPLOYEE, role_enum.HOD, role_enum.MD, role_enum.EA, role_enum.PA, role_enum.DEPARTMENT_CONTROLLER, role_enum.ADMIN)
   remove(
     @Param('id') id: string,
     @CurrentUser() user: JwtPayload,
@@ -90,7 +90,7 @@ export class SelfActionsController {
   }
 
   @Get(':id/comments')
-  @Roles(role_enum.EMPLOYEE, role_enum.HOD, role_enum.MD, role_enum.EA, role_enum.PA, role_enum.ADMIN)
+  @Roles(role_enum.EMPLOYEE, role_enum.HOD, role_enum.MD, role_enum.EA, role_enum.PA, role_enum.DEPARTMENT_CONTROLLER, role_enum.ADMIN)
   findComments(
     @Param('id') id: string,
     @CurrentUser() user: JwtPayload,
@@ -99,7 +99,7 @@ export class SelfActionsController {
   }
 
   @Post(':id/comments')
-  @Roles(role_enum.EMPLOYEE, role_enum.HOD, role_enum.MD, role_enum.EA, role_enum.PA, role_enum.ADMIN)
+  @Roles(role_enum.EMPLOYEE, role_enum.HOD, role_enum.MD, role_enum.EA, role_enum.PA, role_enum.DEPARTMENT_CONTROLLER, role_enum.ADMIN)
   @UseInterceptors(FilesInterceptor('attachments'))
   addComment(
     @Param('id') id: string,
@@ -110,3 +110,4 @@ export class SelfActionsController {
     return this.selfActionsService.addComment(id, dto, user, attachments ?? []);
   }
 }
+

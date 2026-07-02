@@ -12,6 +12,7 @@ const jwtToUser = (jwt: JwtUser): User => ({
   fullName: jwt.fullName,
   role: jwt.role,
   departmentId: jwt.departmentId,
+  departmentIds: jwt.departmentIds,
 });
 
 interface AuthContextType {

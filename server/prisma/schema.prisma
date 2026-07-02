@@ -580,6 +580,7 @@ enum role_enum {
   MD
   EA
   PA
+  DEPARTMENT_CONTROLLER
   PURCHASE_HEAD
   HOD
   EMPLOYEE

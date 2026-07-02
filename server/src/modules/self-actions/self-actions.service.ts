@@ -16,6 +16,9 @@ import { Prisma, role_enum, self_action_status_enum } from '@prisma/client';
 import { AttachmentsService } from '../attachments/attachments.service';
 import { UploadedFile } from '../../common/types/uploaded-file.type';
 
+const ASSISTANT_ROLES: role_enum[] = [role_enum.EA, role_enum.PA, role_enum.DEPARTMENT_CONTROLLER];
+const DEPARTMENT_SCOPED_ROLES: role_enum[] = [role_enum.HOD, ...ASSISTANT_ROLES, role_enum.PURCHASE_HEAD];
+
 const SELECT = {
   id: true,
   title: true,
@@ -309,9 +312,7 @@ export class SelfActionsService {
     const canEdit =
       user.role === role_enum.MD ||
       user.role === role_enum.ADMIN ||
-      user.role === role_enum.EA ||
-      user.role === role_enum.PA ||
-      user.role === role_enum.PURCHASE_HEAD ||
+      ASSISTANT_ROLES.includes(user.role) ||
       action.created_by_id === user.sub ||
       (user.role === role_enum.HOD && action.self_action_departments.some((dept: any) => user.departmentIds?.includes(dept.department_id)));
     if (!canEdit) throw new ForbiddenException('Not authorized');
@@ -356,6 +357,7 @@ export class SelfActionsService {
     const canDelete =
       user.role === role_enum.MD ||
       user.role === role_enum.ADMIN ||
+      ASSISTANT_ROLES.includes(user.role) ||
       action.created_by_id === user.sub;
     if (!canDelete) throw new ForbiddenException('Not authorized to delete');
 
@@ -462,20 +464,7 @@ export class SelfActionsService {
 
   private getVisibilityFilter(user: JwtPayload) {
     if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return null;
-    if (user.role === role_enum.EA || user.role === role_enum.PA) return null;
-    if (user.role === role_enum.PURCHASE_HEAD) {
-      return {
-        OR: [
-          { created_by_id: user.sub },
-          {
-            self_action_departments: { some: { department_id: { in: user.departmentIds || [] } } },
-            users: { role: role_enum.EMPLOYEE },
-          },
-        ],
-      };
-    }
-
-    if (user.role === role_enum.HOD) {
+    if (DEPARTMENT_SCOPED_ROLES.includes(user.role)) {
       return {
         self_action_departments: { some: { department_id: { in: user.departmentIds || [] } } },
       };
@@ -486,7 +475,7 @@ export class SelfActionsService {
 
   private checkReadAccess(action: any, user: JwtPayload) {
     if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return;
-    if (user.role === role_enum.EA || user.role === role_enum.PA) return;
+    if (ASSISTANT_ROLES.includes(user.role)) return;
     if (user.role === role_enum.PURCHASE_HEAD) return;
 
     if (user.role === role_enum.HOD) {
@@ -505,7 +494,7 @@ export class SelfActionsService {
   private canEditAction(action: any, user: JwtPayload): boolean {
     if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return true;
     if (action.created_by_id === user.sub) return true;
-    if (user.role === role_enum.EA || user.role === role_enum.PA) return true;
+    if (ASSISTANT_ROLES.includes(user.role)) return true;
 
     if (user.role === role_enum.HOD && action.self_action_departments?.some((dept: any) => user.departmentIds?.includes(dept.department_id))) {
       return true;
@@ -641,3 +630,4 @@ export class SelfActionsService {
     };
   }
 }
+

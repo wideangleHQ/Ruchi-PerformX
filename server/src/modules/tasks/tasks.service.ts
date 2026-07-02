@@ -15,6 +15,9 @@ import { AttachmentsService } from '../attachments/attachments.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UploadedFile } from '../../common/types/uploaded-file.type';
 
+const ASSISTANT_ROLES: role_enum[] = [role_enum.EA, role_enum.PA, role_enum.DEPARTMENT_CONTROLLER];
+const DEPARTMENT_SCOPED_ROLES: role_enum[] = [role_enum.HOD, role_enum.PURCHASE_HEAD, ...ASSISTANT_ROLES];
+
 @Injectable()
 export class TasksService {
   constructor(
@@ -78,7 +81,7 @@ export class TasksService {
 
     if (user.role === role_enum.MD || user.role === role_enum.ADMIN) {
       // no-op
-    } else if (user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA || user.role === role_enum.PURCHASE_HEAD) {
+    } else if (DEPARTMENT_SCOPED_ROLES.includes(user.role)) {
       conditions.push(this.departmentVisibility(this.mappedDepts(user)));
     } else {
       conditions.push({
@@ -195,7 +198,7 @@ export class TasksService {
       throw new ForbiddenException('Delete reason is required');
     }
 
-    if ((user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA || user.role === role_enum.PURCHASE_HEAD) && !this.hasDepartmentAccess(task, this.mappedDepts(user))) {
+    if (DEPARTMENT_SCOPED_ROLES.includes(user.role) && !this.hasDepartmentAccess(task, this.mappedDepts(user))) {
       throw new ForbiddenException();
     }
 
@@ -255,7 +258,7 @@ export class TasksService {
   ) {
     const task = await this.getTaskOrFail(id);
 
-    if ((user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA || user.role === role_enum.PURCHASE_HEAD) && !this.hasDepartmentAccess(task, this.mappedDepts(user))) {
+    if (DEPARTMENT_SCOPED_ROLES.includes(user.role) && !this.hasDepartmentAccess(task, this.mappedDepts(user))) {
       throw new ForbiddenException('Cannot act on tasks outside mapped departments');
     }
 
@@ -298,7 +301,7 @@ export class TasksService {
     const baseWhere: Prisma.tasksWhereInput = { status: task_status_enum.REVIEWED, deleted_at: null };
     const conditions: Prisma.tasksWhereInput[] = [baseWhere];
 
-    if (user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA || user.role === role_enum.PURCHASE_HEAD) {
+    if (DEPARTMENT_SCOPED_ROLES.includes(user.role)) {
       conditions.push(this.departmentVisibility(this.mappedDepts(user)));
     } else if (user.role === role_enum.EMPLOYEE) {
       conditions.push({
@@ -338,7 +341,7 @@ export class TasksService {
 
     if (user.role === role_enum.MD || user.role === role_enum.ADMIN) {
       // no-op
-    } else if (user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA || user.role === role_enum.PURCHASE_HEAD) {
+    } else if (DEPARTMENT_SCOPED_ROLES.includes(user.role)) {
       conditions.push(this.departmentVisibility(this.mappedDepts(user)));
     } else if (user.role === role_enum.EMPLOYEE) {
       conditions.push({
@@ -369,6 +372,8 @@ export class TasksService {
           ? { hod_departments: { some: { hod_id: user.sub } } }
           : user.role === role_enum.PURCHASE_HEAD
             ? { name: { in: ['Purchase Agro', 'Purchase Non Agro'] } }
+            : DEPARTMENT_SCOPED_ROLES.includes(user.role)
+              ? { id: { in: this.mappedDepts(user) } }
               : {}),
       },
       select: { id: true, name: true, description: true, is_active: true },
@@ -457,7 +462,7 @@ export class TasksService {
 
   private assertAccess(task: any, user: JwtPayload) {
     if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return;
-    if ((user.role === role_enum.HOD || user.role === role_enum.EA || user.role === role_enum.PA || user.role === role_enum.PURCHASE_HEAD) && this.hasDepartmentAccess(task, this.mappedDepts(user))) return;
+    if (DEPARTMENT_SCOPED_ROLES.includes(user.role) && this.hasDepartmentAccess(task, this.mappedDepts(user))) return;
     
     if (user.role === role_enum.EMPLOYEE) {
       const isOwner = task.assigned_to_id === user.sub || task.assigned_by_id === user.sub;
@@ -549,6 +554,20 @@ export class TasksService {
       const allowed = await this.prisma.hod_departments.count({
         where: {
           hod_id: user.sub,
+          department_id: { in: departmentIds },
+          departments: { is_active: true },
+        },
+      });
+
+      if (allowed !== departmentIds.length) {
+        throw new ForbiddenException('Cannot assign tasks outside mapped departments');
+      }
+    }
+
+    if (ASSISTANT_ROLES.includes(user.role)) {
+      const allowed = await this.prisma.assistant_departments.count({
+        where: {
+          assistant_id: user.sub,
           department_id: { in: departmentIds },
           departments: { is_active: true },
         },

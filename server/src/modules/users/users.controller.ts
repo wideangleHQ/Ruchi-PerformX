@@ -53,7 +53,7 @@ export class UsersController {
   }
 
   @Get('assignable')
-  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.DEPARTMENT_CONTROLLER, role_enum.PURCHASE_HEAD)
   findAssignable(
     @CurrentUser() user: JwtPayload,
     @Query('departmentId') departmentId?: string,

@@ -10,6 +10,9 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
 
+const ASSISTANT_ROLES: role_enum[] = [role_enum.EA, role_enum.PA, role_enum.DEPARTMENT_CONTROLLER];
+const DEPARTMENT_SCOPED_ROLES: role_enum[] = [role_enum.HOD, role_enum.PURCHASE_HEAD, ...ASSISTANT_ROLES];
+
 @Injectable()
 export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
@@ -139,7 +142,7 @@ export class DashboardService {
   private taskScope(user: JwtPayload): Prisma.tasksWhereInput {
     const base = { deleted_at: null };
     if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return base;
-    if (user.role === role_enum.HOD || user.role === role_enum.PURCHASE_HEAD) {
+    if (DEPARTMENT_SCOPED_ROLES.includes(user.role)) {
       const deptIds = this.hodDeptIds(user);
       return deptIds.length ? { ...base, ...this.departmentVisibility(deptIds) } : { id: { in: [] } };
     }
@@ -161,7 +164,7 @@ export class DashboardService {
   private requestScope(user: JwtPayload): Prisma.task_requestsWhereInput {
     const base = { status: request_status_enum.PENDING };
     if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return base;
-    if (user.role === role_enum.HOD || user.role === role_enum.PURCHASE_HEAD) {
+    if (DEPARTMENT_SCOPED_ROLES.includes(user.role)) {
       const deptIds = this.hodDeptIds(user);
       return deptIds.length
         ? { ...base, users_task_requests_requested_by_idTousers: { department_id: { in: deptIds } } }
@@ -172,7 +175,7 @@ export class DashboardService {
 
   private transferScope(user: JwtPayload): Prisma.task_transfersWhereInput {
     if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return {};
-    if (user.role === role_enum.HOD || user.role === role_enum.PURCHASE_HEAD) {
+    if (DEPARTMENT_SCOPED_ROLES.includes(user.role)) {
       const deptIds = this.hodDeptIds(user);
       return deptIds.length ? { OR: [{ from_dept_id: { in: deptIds } }, { to_dept_id: { in: deptIds } }] } : { id: { in: [] } };
     }
@@ -181,7 +184,7 @@ export class DashboardService {
 
   private escalationScope(user: JwtPayload): Prisma.task_escalationsWhereInput {
     if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return {};
-    if (user.role === role_enum.HOD || user.role === role_enum.PURCHASE_HEAD) {
+    if (DEPARTMENT_SCOPED_ROLES.includes(user.role)) {
       const deptIds = this.hodDeptIds(user);
       return deptIds.length
         ? {
@@ -199,7 +202,7 @@ export class DashboardService {
 
   private incentiveScope(user: JwtPayload): Prisma.incentivesWhereInput {
     if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return {};
-    if (user.role === role_enum.HOD || user.role === role_enum.PURCHASE_HEAD) {
+    if (DEPARTMENT_SCOPED_ROLES.includes(user.role)) {
       const deptIds = this.hodDeptIds(user);
       return deptIds.length
         ? { users_incentives_employee_idTousers: { department_id: { in: deptIds } } }

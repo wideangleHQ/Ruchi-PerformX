@@ -25,6 +25,8 @@ import { JwtPayload } from '../../common/types/jwt-payload.type';
 import { role_enum, task_type_enum } from '@prisma/client';
 import { UploadedFile } from '../../common/types/uploaded-file.type';
 
+const ASSISTANT_ROLES = [role_enum.EA, role_enum.PA, role_enum.DEPARTMENT_CONTROLLER];
+
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('tasks/employee-sharing')
 export class EmployeeSharingController {
@@ -50,14 +52,14 @@ export class EmployeeSharingController {
   }
 
   @Get()
-  @Roles(role_enum.MD, role_enum.HOD, role_enum.EMPLOYEE, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EMPLOYEE, ...ASSISTANT_ROLES, role_enum.PURCHASE_HEAD)
   findAll(@Query() filters: TaskFilterDto, @CurrentUser() user: JwtPayload) {
     filters.taskType = task_type_enum.EMPLOYEE_SHARED;
     return this.tasksService.findAll(filters, user);
   }
 
   @Get('assignees')
-  @Roles(role_enum.MD, role_enum.HOD, role_enum.EMPLOYEE, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EMPLOYEE, ...ASSISTANT_ROLES, role_enum.PURCHASE_HEAD)
   getAssignees(
     @CurrentUser() user: JwtPayload,
   ) {
@@ -69,7 +71,7 @@ export class EmployeeSharingController {
   }
 
   @Patch(':id/status')
-  @Roles(role_enum.MD, role_enum.HOD, role_enum.EMPLOYEE, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD)
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EMPLOYEE, ...ASSISTANT_ROLES, role_enum.PURCHASE_HEAD)
   updateStatus(
     @Param('id') id: string,
     @Body('status') status: any,
@@ -80,7 +82,7 @@ export class EmployeeSharingController {
   }
 
   @Delete(':id')
-  @Roles(role_enum.HOD, role_enum.MD)
+  @Roles(role_enum.HOD, role_enum.MD, role_enum.DEPARTMENT_CONTROLLER)
   remove(
     @Param('id') id: string,
     @Body('reason') reason: string,

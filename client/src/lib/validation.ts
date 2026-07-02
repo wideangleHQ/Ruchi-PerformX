@@ -13,7 +13,7 @@ export const signupSchema = z.object({
   username: z.string().min(1, 'Username is required'),
   password: z.string().min(1, 'Password is required'),
   confirmPassword: z.string().min(1, 'Password confirmation is required'),
-  role: z.enum(['MD', 'EA', 'PA', 'PURCHASE_HEAD', 'HOD', 'EMPLOYEE'], {
+  role: z.enum(['MD', 'EA', 'PA', 'PURCHASE_HEAD', 'DEPARTMENT_CONTROLLER', 'HOD', 'EMPLOYEE'], {
     error: 'Please select a role',
   }),
   departments: z.array(z.string()),
@@ -27,7 +27,7 @@ export const signupSchema = z.object({
   if (data.role === 'EMPLOYEE') {
     return data.departments.length === 1;
   }
-  if (data.role === 'HOD') {
+  if (data.role === 'HOD' || data.role === 'DEPARTMENT_CONTROLLER') {
     return data.departments.length >= 1;
   }
   return false;
@@ -54,5 +54,4 @@ export const resetPasswordSchema = z.object({
 });
 
 export type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
-
 
