@@ -108,6 +108,8 @@ model notifications {
 
   @@index([is_read], map: "idx_notifications_read")
   @@index([user_id], map: "idx_notifications_user")
+  @@index([user_id, created_at], map: "idx_notifications_user_created")
+  @@index([user_id, is_read], map: "idx_notifications_user_read")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -195,6 +197,8 @@ model self_actions {
   @@index([status], map: "idx_self_actions_status")
   @@index([created_at], map: "idx_self_actions_created")
   @@index([deleted_at], map: "idx_self_actions_deleted")
+  @@index([created_by_id, deleted_at, created_at], map: "idx_self_actions_creator_deleted_created")
+  @@index([status, deleted_at, created_at], map: "idx_self_actions_status_deleted_created")
 }
 
 model self_action_departments {
@@ -344,6 +348,9 @@ model task_requests {
   @@index([requested_by_id], map: "idx_task_requests_user")
   @@index([task_id], map: "idx_task_requests_task")
   @@index([department_id], map: "idx_task_requests_department")
+  @@index([requested_by_id, status, created_at], map: "idx_task_requests_user_status_created")
+  @@index([department_id, status, created_at], map: "idx_task_requests_dept_status_created")
+  @@index([type, status, task_id], map: "idx_task_requests_type_status_task")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -359,6 +366,7 @@ model task_status_logs {
   users         users             @relation(fields: [changed_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_status_log_user")
 
   @@index([task_id], map: "idx_task_status_logs_task")
+  @@index([task_id, created_at], map: "idx_task_status_logs_task_created")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -382,6 +390,8 @@ model task_transfers {
 
   @@index([status], map: "idx_task_transfers_status")
   @@index([task_id], map: "idx_task_transfers_task")
+  @@index([status, from_dept_id], map: "idx_task_transfers_status_from_dept")
+  @@index([status, to_dept_id], map: "idx_task_transfers_status_to_dept")
 }
 
 model task_departments {
@@ -451,6 +461,15 @@ model tasks {
   departments                       departments         @relation(fields: [department_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   tasks                             tasks?              @relation("tasksTotasks", fields: [parent_task_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   other_tasks                       tasks[]             @relation("tasksTotasks")
+
+  @@index([deleted_at, due_date], map: "idx_tasks_deleted_due")
+  @@index([department_id, deleted_at, status], map: "idx_tasks_department_deleted_status")
+  @@index([assigned_to_id, deleted_at, status], map: "idx_tasks_assigned_to_deleted_status")
+  @@index([assigned_by_id, deleted_at, status], map: "idx_tasks_assigned_by_deleted_status")
+  @@index([status, deleted_at, due_date], map: "idx_tasks_status_deleted_due")
+  @@index([task_type, deleted_at, status], map: "idx_tasks_type_deleted_status")
+  @@index([completed_at], map: "idx_tasks_completed_at")
+  @@index([reviewed_at], map: "idx_tasks_reviewed_at")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -506,6 +525,9 @@ model users {
   password_reset_requests                              PasswordResetRequest[]
   hod_departments                                      hod_departments[]
   assistant_departments                                assistant_departments[]
+
+  @@index([role, is_active, deleted_at, pending_approval], map: "idx_users_role_active_deleted_pending")
+  @@index([department_id, role, is_active, deleted_at, pending_approval], map: "idx_users_department_role_active")
 }
 
 enum action_status_enum {
@@ -758,6 +780,10 @@ model Visit {
   @@index([checkInTime], map: "idx_visits_check_in_time")
   @@index([visitorId], map: "idx_visits_visitor_id")
   @@index([deletedAt], map: "idx_visits_deleted_at")
+  @@index([deletedAt, status], map: "idx_visits_deleted_status")
+  @@index([deletedAt, checkInTime], map: "idx_visits_deleted_check_in")
+  @@index([deletedAt, createdAt], map: "idx_visits_deleted_created")
+  @@index([hostEmployeeId, deletedAt, createdAt], map: "idx_visits_host_deleted_created")
   @@map("visits")
 }
 
