@@ -601,7 +601,7 @@ button, a, [role="button"] {
   /* A5 Paper Size for Visitor Pass Printing */
   @page {
     size: A5 portrait;
-    margin: 8mm;
+    margin: 20mm;
   }
 }
 

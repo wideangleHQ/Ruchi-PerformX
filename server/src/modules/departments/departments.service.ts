@@ -11,20 +11,24 @@ import { CreateDepartmentDto } from './dto/create-department-dto';
 import { UpdateDepartmentDto } from './dto/update-department-dto';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
 import { role_enum } from '@prisma/client';
+import { DepartmentScopeService } from '../../common/services/department-scope.service';
 
 @Injectable()
 export class DepartmentsService {
   private readonly logger = new Logger(DepartmentsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly departmentScopeService: DepartmentScopeService,
+  ) {}
 
   async findAll(user?: JwtPayload) {
+    const scope = user ? await this.departmentScopeService.resolveDepartmentScope(user) : { unrestricted: true, departmentIds: [] };
+
     return this.prisma.departments.findMany({
       where: {
         is_active: true,
-        ...(user?.role === role_enum.HOD
-          ? { hod_departments: { some: { hod_id: user.sub } } }
-          : {}),
+        ...(scope.unrestricted ? {} : { id: { in: scope.departmentIds } }),
       },
       orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
       select: {

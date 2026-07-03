@@ -14,9 +14,8 @@ import { Prisma, task_status_enum, role_enum, notification_type_enum, task_type_
 import { AttachmentsService } from '../attachments/attachments.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UploadedFile } from '../../common/types/uploaded-file.type';
-
-const ASSISTANT_ROLES: role_enum[] = [role_enum.EA, role_enum.PA, role_enum.DEPARTMENT_CONTROLLER];
-const DEPARTMENT_SCOPED_ROLES: role_enum[] = [role_enum.HOD, role_enum.PURCHASE_HEAD, ...ASSISTANT_ROLES];
+import { DepartmentScopeService } from '../../common/services/department-scope.service';
+import { DepartmentQueryHelper } from '../../common/helpers/department-query.helper';
 
 @Injectable()
 export class TasksService {
@@ -25,15 +24,8 @@ export class TasksService {
     private readonly lifecycle: TaskLifecycleService,
     private readonly attachmentsService: AttachmentsService,
     private readonly notificationsService: NotificationsService,
+    private readonly departmentScopeService: DepartmentScopeService,
   ) {}
-
-  private mappedDepts(user: JwtPayload): string[] {
-    return user.departmentIds?.length
-      ? user.departmentIds
-      : user.departmentId
-        ? [user.departmentId]
-        : [];
-  }
 
   async create(dto: CreateTaskDto, user: JwtPayload, attachments: UploadedFile[] = []) {
     try {
@@ -76,26 +68,29 @@ export class TasksService {
   }
 
   async findAll(filters: TaskFilterDto, user: JwtPayload) {
+    // Resolve department scope once
+    const scope = await this.departmentScopeService.resolveDepartmentScope(user);
+    
     const baseWhere = this.buildWhereFromFilters(filters);
-    const conditions: Prisma.tasksWhereInput[] = [baseWhere];
+    const departmentFilter = DepartmentQueryHelper.buildTaskDepartmentFilter(scope);
+    
+    // For employees, add ownership filter
+    const ownershipFilter: Prisma.tasksWhereInput = user.role === role_enum.EMPLOYEE
+      ? {
+          OR: [
+            { assigned_to_id: user.sub },
+            { assigned_by_id: user.sub },
+          ],
+        }
+      : {};
 
-    if (user.role === role_enum.MD || user.role === role_enum.ADMIN) {
-      // no-op
-    } else if (DEPARTMENT_SCOPED_ROLES.includes(user.role)) {
-      conditions.push(this.departmentVisibility(this.mappedDepts(user)));
-    } else {
-      conditions.push({
-        OR: [
-          { assigned_to_id: user.sub },
-          { assigned_by_id: user.sub },
-        ],
-      });
-      if (user.departmentId) {
-        conditions.push(this.departmentVisibility([user.departmentId]));
-      }
-    }
-
-    const where: Prisma.tasksWhereInput = { AND: conditions };
+    const where: Prisma.tasksWhereInput = {
+      AND: [
+        baseWhere,
+        departmentFilter,
+        ownershipFilter,
+      ].filter(obj => Object.keys(obj).length > 0),
+    };
 
     const page = filters.page ?? 1;
     const limit = filters.limit ?? 20;
@@ -190,16 +185,13 @@ export class TasksService {
 
   async remove(id: string, user: JwtPayload, reason: string) {
     const task = await this.getTaskOrFail(id);
+    await this.assertAccess(task, user);
 
     if (user.role === role_enum.EMPLOYEE) {
       throw new ForbiddenException('Employees are not authorized to delete tasks');
     }
     if (!reason?.trim()) {
       throw new ForbiddenException('Delete reason is required');
-    }
-
-    if (DEPARTMENT_SCOPED_ROLES.includes(user.role) && !this.hasDepartmentAccess(task, this.mappedDepts(user))) {
-      throw new ForbiddenException();
     }
 
     const deletedAt = new Date();
@@ -257,17 +249,7 @@ export class TasksService {
     reason?: string,
   ) {
     const task = await this.getTaskOrFail(id);
-
-    if (DEPARTMENT_SCOPED_ROLES.includes(user.role) && !this.hasDepartmentAccess(task, this.mappedDepts(user))) {
-      throw new ForbiddenException('Cannot act on tasks outside mapped departments');
-    }
-
-    if (
-      user.role === role_enum.EMPLOYEE &&
-      !this.hasDepartmentAccess(task, user.departmentId ? [user.departmentId] : [])
-    ) {
-      throw new ForbiddenException('You can only update tasks in your department');
-    }
+    await this.assertAccess(task, user);
 
     if (user.role === role_enum.EMPLOYEE && task.assigned_to_id !== user.sub) {
       throw new ForbiddenException('You can only update your own task status');
@@ -298,24 +280,27 @@ export class TasksService {
   }
 
   async getPending(user: JwtPayload) {
+    const scope = await this.departmentScopeService.resolveDepartmentScope(user);
+    
     const baseWhere: Prisma.tasksWhereInput = { status: task_status_enum.REVIEWED, deleted_at: null };
-    const conditions: Prisma.tasksWhereInput[] = [baseWhere];
+    const departmentFilter = DepartmentQueryHelper.buildTaskDepartmentFilter(scope);
+    
+    const ownershipFilter: Prisma.tasksWhereInput = user.role === role_enum.EMPLOYEE
+      ? {
+          OR: [
+            { assigned_to_id: user.sub },
+            { assigned_by_id: user.sub },
+          ],
+        }
+      : {};
 
-    if (DEPARTMENT_SCOPED_ROLES.includes(user.role)) {
-      conditions.push(this.departmentVisibility(this.mappedDepts(user)));
-    } else if (user.role === role_enum.EMPLOYEE) {
-      conditions.push({
-        OR: [
-          { assigned_to_id: user.sub },
-          { assigned_by_id: user.sub },
-        ],
-      });
-      if (user.departmentId) {
-        conditions.push(this.departmentVisibility([user.departmentId]));
-      }
-    }
-
-    const where: Prisma.tasksWhereInput = { AND: conditions };
+    const where: Prisma.tasksWhereInput = {
+      AND: [
+        baseWhere,
+        departmentFilter,
+        ownershipFilter,
+      ].filter(obj => Object.keys(obj).length > 0),
+    };
 
     return this.prisma.tasks.findMany({
       where,
@@ -325,6 +310,8 @@ export class TasksService {
   }
 
   async getOverdue(user: JwtPayload) {
+    const scope = await this.departmentScopeService.resolveDepartmentScope(user);
+    
     const terminalStatuses = [
       task_status_enum.COMPLETED,
       task_status_enum.REVIEWED,
@@ -337,25 +324,25 @@ export class TasksService {
       status: { notIn: terminalStatuses },
       deleted_at: null,
     };
-    const conditions: Prisma.tasksWhereInput[] = [baseWhere];
+    
+    const departmentFilter = DepartmentQueryHelper.buildTaskDepartmentFilter(scope);
+    
+    const ownershipFilter: Prisma.tasksWhereInput = user.role === role_enum.EMPLOYEE
+      ? {
+          OR: [
+            { assigned_to_id: user.sub },
+            { assigned_by_id: user.sub },
+          ],
+        }
+      : {};
 
-    if (user.role === role_enum.MD || user.role === role_enum.ADMIN) {
-      // no-op
-    } else if (DEPARTMENT_SCOPED_ROLES.includes(user.role)) {
-      conditions.push(this.departmentVisibility(this.mappedDepts(user)));
-    } else if (user.role === role_enum.EMPLOYEE) {
-      conditions.push({
-        OR: [
-          { assigned_to_id: user.sub },
-          { assigned_by_id: user.sub },
-        ],
-      });
-      if (user.departmentId) {
-        conditions.push(this.departmentVisibility([user.departmentId]));
-      }
-    }
-
-    const where: Prisma.tasksWhereInput = { AND: conditions };
+    const where: Prisma.tasksWhereInput = {
+      AND: [
+        baseWhere,
+        departmentFilter,
+        ownershipFilter,
+      ].filter(obj => Object.keys(obj).length > 0),
+    };
 
     return this.prisma.tasks.findMany({
       where,
@@ -365,17 +352,15 @@ export class TasksService {
   }
 
   async getDepartments(user: JwtPayload) {
+    const scope = await this.departmentScopeService.resolveDepartmentScope(user);
+    
+    const where: Prisma.departmentsWhereInput = {
+      is_active: true,
+      ...(scope.unrestricted ? {} : { id: { in: scope.departmentIds } }),
+    };
+
     return this.prisma.departments.findMany({
-      where: {
-        is_active: true,
-        ...(user.role === role_enum.HOD
-          ? { hod_departments: { some: { hod_id: user.sub } } }
-          : user.role === role_enum.PURCHASE_HEAD
-            ? { name: { in: ['Purchase Agro', 'Purchase Non Agro'] } }
-            : DEPARTMENT_SCOPED_ROLES.includes(user.role)
-              ? { id: { in: this.mappedDepts(user) } }
-              : {}),
-      },
+      where,
       select: { id: true, name: true, description: true, is_active: true },
       orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
     });
@@ -385,7 +370,11 @@ export class TasksService {
     const departmentIds = this.resolveQueryDepartmentIds(departmentIdsParam);
     if (!departmentIds.length) return [];
 
-    await this.assertCreateAccess(departmentIds, user);
+    // Validate department access
+    const isValid = await this.departmentScopeService.validateDepartmentAccess(user, departmentIds);
+    if (!isValid) {
+      throw new ForbiddenException('You do not have access to the specified departments');
+    }
 
     const users = await this.prisma.users.findMany({
       where: {
@@ -460,13 +449,23 @@ export class TasksService {
     return task;
   }
 
-  private assertAccess(task: any, user: JwtPayload) {
-    if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return;
-    if (DEPARTMENT_SCOPED_ROLES.includes(user.role) && this.hasDepartmentAccess(task, this.mappedDepts(user))) return;
+  private async assertAccess(task: any, user: JwtPayload) {
+    const scope = await this.departmentScopeService.resolveDepartmentScope(user);
     
-    if (user.role === role_enum.EMPLOYEE) {
+    // Unrestricted roles have full access
+    if (scope.unrestricted) return;
+    
+    // Check department access
+    const taskDeptIds = this.taskDepartmentIds(task);
+    const hasDeptAccess = taskDeptIds.some((deptId) => scope.departmentIds.includes(deptId));
+    
+    if (hasDeptAccess) {
+      // Department-scoped roles with access
+      if (user.role !== role_enum.EMPLOYEE) return;
+      
+      // Employees need department access AND ownership
       const isOwner = task.assigned_to_id === user.sub || task.assigned_by_id === user.sub;
-      if (isOwner && this.hasDepartmentAccess(task, user.departmentId ? [user.departmentId] : [])) return;
+      if (isOwner) return;
     }
     
     throw new ForbiddenException('Access denied to this task');
@@ -480,7 +479,7 @@ export class TasksService {
     if (filters.title) where.title = { contains: filters.title, mode: 'insensitive' };
     if (filters.assignedToId) where.assigned_to_id = filters.assignedToId;
     if (filters.departmentId) {
-      Object.assign(where, this.departmentVisibility([filters.departmentId]));
+      where.task_departments = { some: { department_id: filters.departmentId } };
     }
     if (filters.dueBefore || filters.dueAfter) {
       where.due_date = {};
@@ -528,6 +527,7 @@ export class TasksService {
   }
 
   private async assertCreateAccess(departmentIds: string[], user: JwtPayload, taskType: task_type_enum = task_type_enum.OFFICIAL) {
+    // Validate departments exist and are active
     const activeDepartments = await this.prisma.departments.count({
       where: { id: { in: departmentIds }, is_active: true },
     });
@@ -536,60 +536,28 @@ export class TasksService {
       throw new ForbiddenException('Invalid department selection');
     }
 
+    // Employee Shared Task validation
     if (taskType === task_type_enum.EMPLOYEE_SHARED) {
       if (user.role !== role_enum.EMPLOYEE) {
         throw new ForbiddenException('Only employees can create Employee Shared Tasks');
       }
-      if (departmentIds.length > 1 || !user.departmentId || departmentIds[0] !== user.departmentId) {
+      
+      const scope = await this.departmentScopeService.resolveDepartmentScope(user);
+      if (departmentIds.length > 1 || !departmentIds.every(id => scope.departmentIds.includes(id))) {
         throw new ForbiddenException('Cross-department assignment is not allowed for Employee Shared Tasks');
       }
       return;
     }
 
+    // Employees cannot create official tasks
     if (user.role === role_enum.EMPLOYEE) {
       throw new ForbiddenException('Employees are not allowed to create tasks directly');
     }
 
-    if (user.role === role_enum.HOD) {
-      const allowed = await this.prisma.hod_departments.count({
-        where: {
-          hod_id: user.sub,
-          department_id: { in: departmentIds },
-          departments: { is_active: true },
-        },
-      });
-
-      if (allowed !== departmentIds.length) {
-        throw new ForbiddenException('Cannot assign tasks outside mapped departments');
-      }
-    }
-
-    if (ASSISTANT_ROLES.includes(user.role)) {
-      const allowed = await this.prisma.assistant_departments.count({
-        where: {
-          assistant_id: user.sub,
-          department_id: { in: departmentIds },
-          departments: { is_active: true },
-        },
-      });
-
-      if (allowed !== departmentIds.length) {
-        throw new ForbiddenException('Cannot assign tasks outside mapped departments');
-      }
-    }
-
-    if (user.role === role_enum.PURCHASE_HEAD) {
-      const allowed = await this.prisma.departments.count({
-        where: {
-          id: { in: departmentIds },
-          is_active: true,
-          name: { in: ['Purchase Agro', 'Purchase Non Agro'] },
-        },
-      });
-
-      if (allowed !== departmentIds.length) {
-        throw new ForbiddenException('Cannot assign tasks outside mapped departments');
-      }
+    // Validate user has access to all specified departments
+    const isValid = await this.departmentScopeService.validateDepartmentAccess(user, departmentIds);
+    if (!isValid) {
+      throw new ForbiddenException('Cannot assign tasks outside your accessible departments');
     }
   }
 
@@ -658,20 +626,6 @@ export class TasksService {
     }
 
     return employees.map((employee) => employee.id);
-  }
-
-  private departmentVisibility(departmentIds: string[]): Prisma.tasksWhereInput {
-    if (!departmentIds.length) return { id: { in: [] } };
-    return {
-      OR: [
-        { department_id: { in: departmentIds } },
-        { task_departments: { some: { department_id: { in: departmentIds } } } },
-      ],
-    };
-  }
-
-  private hasDepartmentAccess(task: any, departmentIds: string[]) {
-    return this.taskDepartmentIds(task).some((departmentId) => departmentIds.includes(departmentId));
   }
 
   private taskDepartmentIds(task: any) {

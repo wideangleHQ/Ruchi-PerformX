@@ -15,9 +15,8 @@ import { JwtPayload } from '../../common/types/jwt-payload.type';
 import { Prisma, role_enum, self_action_status_enum } from '@prisma/client';
 import { AttachmentsService } from '../attachments/attachments.service';
 import { UploadedFile } from '../../common/types/uploaded-file.type';
-
-const ASSISTANT_ROLES: role_enum[] = [role_enum.EA, role_enum.PA, role_enum.DEPARTMENT_CONTROLLER];
-const DEPARTMENT_SCOPED_ROLES: role_enum[] = [role_enum.HOD, ...ASSISTANT_ROLES, role_enum.PURCHASE_HEAD];
+import { DepartmentScopeService } from '../../common/services/department-scope.service';
+import { DepartmentQueryHelper } from '../../common/helpers/department-query.helper';
 
 const SELECT = {
   id: true,
@@ -74,6 +73,7 @@ export class SelfActionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly attachmentsService: AttachmentsService,
+    private readonly departmentScopeService: DepartmentScopeService,
   ) {}
 
   async create(dto: CreateSelfActionDto, user: JwtPayload, attachments: UploadedFile[] = []) {
@@ -82,26 +82,18 @@ export class SelfActionsService {
     }
 
     try {
+      // Resolve department scope
+      const scope = await this.departmentScopeService.resolveDepartmentScope(user);
+      
       let departmentIds: string[] = dto.department_ids || [];
 
       if (!departmentIds.length && dto.department_id) {
         departmentIds = [dto.department_id];
       }
 
+      // If no departments specified, use user's scope
       if (!departmentIds.length) {
-        const userDept = await this.prisma.users.findUnique({
-          where: { id: user.sub },
-          select: { department_id: true },
-        });
-        if (userDept?.department_id) departmentIds.push(userDept.department_id);
-      }
-
-      if (!departmentIds.length && user.departmentId) {
-        departmentIds.push(user.departmentId);
-      }
-
-      if (!departmentIds.length && user.departmentIds && user.departmentIds.length > 0) {
-        departmentIds = user.departmentIds;
+        departmentIds = scope.departmentIds;
       }
 
       departmentIds = [...new Set(departmentIds)].filter(Boolean);
@@ -117,6 +109,12 @@ export class SelfActionsService {
 
       if (!departmentIds.length) {
         throw new BadRequestException('User must belong to a department');
+      }
+
+      // Validate department access
+      const isValid = await this.departmentScopeService.validateDepartmentAccess(user, departmentIds);
+      if (!isValid) {
+        throw new ForbiddenException('You do not have access to the specified departments');
       }
 
       const action = await this.prisma.$transaction(async (tx) => {
@@ -183,7 +181,21 @@ export class SelfActionsService {
   }
 
   async findAll(user: JwtPayload, filter: SelfActionFilterDto) {
+    // Resolve department scope
+    const scope = await this.departmentScopeService.resolveDepartmentScope(user);
+    
     const clauses: any[] = [{ deleted_at: null }];
+
+    // Apply department filter using helper
+    const departmentFilter = DepartmentQueryHelper.buildSelfActionDepartmentFilter(scope);
+    if (Object.keys(departmentFilter).length > 0) {
+      clauses.push(departmentFilter);
+    }
+
+    // For employees, add ownership filter
+    if (user.role === role_enum.EMPLOYEE) {
+      clauses.push({ created_by_id: user.sub });
+    }
 
     if (filter.status) clauses.push({ status: filter.status });
     if (filter.priority) clauses.push({ priority: filter.priority });
@@ -201,9 +213,6 @@ export class SelfActionsService {
       if (filter.dateTo) createdAt.lte = new Date(filter.dateTo);
       clauses.push({ created_at: createdAt });
     }
-
-    const visible = this.getVisibilityFilter(user);
-    if (visible) clauses.push(visible);
 
     if (filter.departmentId) clauses.push({ self_action_departments: { some: { department_id: filter.departmentId } } });
     if (filter.createdById) clauses.push({ created_by_id: filter.createdById });
@@ -239,7 +248,7 @@ export class SelfActionsService {
     if (!action) throw new NotFoundException('Self action not found');
     if (action.deleted_at) throw new NotFoundException('Self action not found');
 
-    this.checkReadAccess(action, user);
+    await this.checkReadAccess(action, user);
     return this.mapAction(action);
   }
 
@@ -260,7 +269,7 @@ export class SelfActionsService {
 
     if (!action) throw new NotFoundException('Self action not found');
 
-    const canEdit = this.canEditAction(action, user);
+    const canEdit = await this.canEditAction(action, user);
     if (!canEdit) throw new ForbiddenException('Not authorized to edit this action');
 
     const updateData: any = { updated_at: new Date() };
@@ -309,12 +318,7 @@ export class SelfActionsService {
 
     if (!action) throw new NotFoundException('Self action not found');
 
-    const canEdit =
-      user.role === role_enum.MD ||
-      user.role === role_enum.ADMIN ||
-      ASSISTANT_ROLES.includes(user.role) ||
-      action.created_by_id === user.sub ||
-      (user.role === role_enum.HOD && action.self_action_departments.some((dept: any) => user.departmentIds?.includes(dept.department_id)));
+    const canEdit = await this.canEditAction(action, user);
     if (!canEdit) throw new ForbiddenException('Not authorized');
 
     this.validateStatusTransition(action.status as self_action_status_enum, dto.status);
@@ -349,16 +353,12 @@ export class SelfActionsService {
   async softDelete(id: string, user: JwtPayload) {
     const action = await this.prisma.self_actions.findUnique({
       where: { id },
-      select: { id: true, created_by_id: true },
+      select: { id: true, created_by_id: true, self_action_departments: { select: { department_id: true } } },
     });
 
     if (!action) throw new NotFoundException('Self action not found');
 
-    const canDelete =
-      user.role === role_enum.MD ||
-      user.role === role_enum.ADMIN ||
-      ASSISTANT_ROLES.includes(user.role) ||
-      action.created_by_id === user.sub;
+    const canDelete = await this.canEditAction(action, user);
     if (!canDelete) throw new ForbiddenException('Not authorized to delete');
 
     await this.prisma.$transaction(async (tx) => {
@@ -462,45 +462,38 @@ export class SelfActionsService {
     }
   }
 
-  private getVisibilityFilter(user: JwtPayload) {
-    if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return null;
-    if (DEPARTMENT_SCOPED_ROLES.includes(user.role)) {
-      return {
-        self_action_departments: { some: { department_id: { in: user.departmentIds || [] } } },
-      };
-    }
-
-    return { created_by_id: user.sub };
+  private async checkReadAccess(action: any, user: JwtPayload) {
+    const scope = await this.departmentScopeService.resolveDepartmentScope(user);
+    
+    // Unrestricted roles have full access
+    if (scope.unrestricted) return;
+    
+    // Check department access
+    const actionDeptIds = action.self_action_departments?.map((d: any) => d.department_id) || [];
+    const hasDeptAccess = actionDeptIds.some((deptId: string) => scope.departmentIds.includes(deptId));
+    
+    if (hasDeptAccess) return;
+    
+    // Employees can see their own actions even if no department match
+    if (action.created_by_id === user.sub) return;
+    
+    throw new ForbiddenException('Access denied');
   }
 
-  private checkReadAccess(action: any, user: JwtPayload) {
-    if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return;
-    if (ASSISTANT_ROLES.includes(user.role)) return;
-    if (user.role === role_enum.PURCHASE_HEAD) return;
-
-    if (user.role === role_enum.HOD) {
-      if (
-        action.self_action_departments?.some((dept: any) => user.departmentIds?.includes(dept.department_id))
-      )
-        return;
-      throw new ForbiddenException('Access denied');
-    }
-
-    if (action.users?.id !== user.sub) {
-      throw new ForbiddenException('Access denied');
-    }
-  }
-
-  private canEditAction(action: any, user: JwtPayload): boolean {
-    if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return true;
+  private async canEditAction(action: any, user: JwtPayload): Promise<boolean> {
+    const scope = await this.departmentScopeService.resolveDepartmentScope(user);
+    
+    // Unrestricted roles can edit
+    if (scope.unrestricted) return true;
+    
+    // Creator can edit own action
     if (action.created_by_id === user.sub) return true;
-    if (ASSISTANT_ROLES.includes(user.role)) return true;
-
-    if (user.role === role_enum.HOD && action.self_action_departments?.some((dept: any) => user.departmentIds?.includes(dept.department_id))) {
-      return true;
-    }
-
-    return false;
+    
+    // Check department access for department-scoped roles
+    const actionDeptIds = action.self_action_departments?.map((d: any) => d.department_id) || [];
+    const hasDeptAccess = actionDeptIds.some((deptId: string) => scope.departmentIds.includes(deptId));
+    
+    return hasDeptAccess;
   }
 
   private validateStatusTransition(

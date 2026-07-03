@@ -7,6 +7,7 @@ import { CreateTaskCommentDto } from './dto/create-task-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
 import { UploadedFile } from '../../common/types/uploaded-file.type';
+import { DepartmentScopeService } from '../../common/services/department-scope.service';
 
 const ASSISTANT_ROLES: role_enum[] = [role_enum.EA, role_enum.PA, role_enum.DEPARTMENT_CONTROLLER];
 
@@ -15,6 +16,7 @@ export class CommentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly attachmentsService: AttachmentsService,
+    private readonly departmentScopeService: DepartmentScopeService,
   ) {}
 
   async create(dto: CreateCommentDto, user: JwtPayload, attachments: UploadedFile[] = []) {
@@ -101,13 +103,15 @@ export class CommentsService {
       throw new NotFoundException('Task not found');
     }
 
-    if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return;
+    const scope = await this.departmentScopeService.resolveDepartmentScope(user);
+    if (scope.unrestricted) return;
 
     const departmentIds = [...new Set([task.department_id, ...task.task_departments.map((item) => item.department_id)].filter(Boolean))];
-    if (user.role === role_enum.EMPLOYEE && user.departmentId && departmentIds.includes(user.departmentId)) return;
-    if ((user.role === role_enum.HOD || ASSISTANT_ROLES.includes(user.role)) && user.departmentIds?.some((id) => departmentIds.includes(id))) return;
+    const hasAccess = departmentIds.some((deptId) => scope.departmentIds.includes(deptId));
 
-    throw new ForbiddenException('Access denied to this task');
+    if (!hasAccess) {
+      throw new ForbiddenException('Access denied to this task');
+    }
   }
 
   private async ensureParentCommentBelongsToTask(taskId: string, parentCommentId?: string) {

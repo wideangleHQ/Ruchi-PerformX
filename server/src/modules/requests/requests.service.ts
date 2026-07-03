@@ -8,9 +8,8 @@ import { JwtPayload } from '../../common/types/jwt-payload.type';
 import { notification_type_enum, request_status_enum, role_enum, task_priority_enum, task_status_enum } from '@prisma/client';
 import { TasksService } from '../tasks/tasks.service';
 import { AttachmentsService } from '../attachments/attachments.service';
-
-const ASSISTANT_ROLES: role_enum[] = [role_enum.EA, role_enum.PA, role_enum.DEPARTMENT_CONTROLLER];
-const DEPARTMENT_SCOPED_ROLES: role_enum[] = [role_enum.HOD, role_enum.PURCHASE_HEAD, ...ASSISTANT_ROLES];
+import { DepartmentScopeService } from '../../common/services/department-scope.service';
+import { DepartmentQueryHelper } from '../../common/helpers/department-query.helper';
 
 @Injectable()
 export class RequestsService {
@@ -19,6 +18,7 @@ export class RequestsService {
     private readonly notifications: NotificationsService,
     private readonly tasksService: TasksService,
     private readonly attachmentsService: AttachmentsService,
+    private readonly departmentScopeService: DepartmentScopeService,
   ) {}
 
   async create(dto: CreateRequestDto, user: JwtPayload, attachments: any[] = []) {
@@ -91,28 +91,26 @@ export class RequestsService {
   }
 
   async findAll(filters: RequestFilterDto, user: JwtPayload) {
+    // Resolve department scope
+    const scope = await this.departmentScopeService.resolveDepartmentScope(user);
+    
     const where: any = {};
     if (filters.status) where.status = filters.status;
     if (filters.type) where.type = filters.type as any;
     if (filters.taskId) where.task_id = filters.taskId;
 
+    // Apply department filtering
     if (user.role === role_enum.EMPLOYEE) {
       where.requested_by_id = user.sub;
-    } else if (DEPARTMENT_SCOPED_ROLES.includes(user.role)) {
-      const deptIds = this.getManagedDepartmentIds(user);
-      if (!deptIds.length) {
-        where.id = { in: [] };
-      }
+    } else if (!scope.unrestricted) {
+      // Department-scoped roles
       where.OR = [
-        { department_id: { in: deptIds } },
-        { users_task_requests_requested_by_idTousers: { department_id: { in: deptIds } } },
+        { department_id: { in: scope.departmentIds } },
+        { users_task_requests_requested_by_idTousers: { department_id: { in: scope.departmentIds } } },
         {
           task_id: { not: null },
           task: {
-            OR: [
-              { department_id: { in: deptIds } },
-              { task_departments: { some: { department_id: { in: deptIds } } } },
-            ],
+            task_departments: { some: { department_id: { in: scope.departmentIds } } },
           },
         },
       ];
@@ -337,20 +335,6 @@ export class RequestsService {
     return this.decorateRequestAttachments(request);
   }
 
-  private assertAccess(request: any, user: JwtPayload) {
-    if (user.role === role_enum.MD || ASSISTANT_ROLES.includes(user.role)) return;
-    if (DEPARTMENT_SCOPED_ROLES.includes(user.role) && this.hasDepartmentAccess(request, this.getManagedDepartmentIds(user))) return;
-    if (user.role === role_enum.EMPLOYEE && request.requested_by_id === user.sub) return;
-    throw new ForbiddenException('Access denied');
-  }
-
-  private assertReviewAccess(request: any, user: JwtPayload) {
-    if (request.status !== request_status_enum.PENDING) throw new ForbiddenException('Request has already been reviewed');
-    if (user.role === role_enum.MD || ASSISTANT_ROLES.includes(user.role)) return;
-    if (DEPARTMENT_SCOPED_ROLES.includes(user.role) && this.hasDepartmentAccess(request, this.getManagedDepartmentIds(user))) return;
-    throw new ForbiddenException('Only HOD, MD, EA, PA, PURCHASE_HEAD, or DEPARTMENT_CONTROLLER can review requests');
-  }
-
   private async createTaskReassignment(dto: CreateRequestDto, user: JwtPayload) {
     if (!dto.taskId || !dto.currentAssigneeId || !dto.requestReason) {
       throw new BadRequestException('Task reassignment request requires task and reason');
@@ -430,10 +414,25 @@ export class RequestsService {
 
     const task = await this.prisma.tasks.findUnique({
       where: { id: request.task_id },
-      select: { id: true, title: true, department_id: true, assigned_to_id: true },
+      select: { 
+        id: true, 
+        title: true, 
+        department_id: true, 
+        assigned_to_id: true, 
+        task_departments: { select: { department_id: true } } 
+      },
     });
     if (!task) throw new NotFoundException('Task not found');
-    if (DEPARTMENT_SCOPED_ROLES.includes(user.role) && !this.getManagedDepartmentIds(user).includes(task.department_id)) throw new ForbiddenException('Not authorized to review this task');
+    
+    // Verify user has access to task's department
+    const scope = await this.departmentScopeService.resolveDepartmentScope(user);
+    const taskDeptIds = [task.department_id, ...task.task_departments.map((d: any) => d.department_id)].filter(Boolean);
+    const hasAccess = scope.unrestricted || taskDeptIds.some((deptId: string) => scope.departmentIds.includes(deptId));
+    
+    if (!hasAccess) {
+      throw new ForbiddenException('Not authorized to review this task');
+    }
+    
     if (request.current_assignee_id && task.assigned_to_id && task.assigned_to_id !== request.current_assignee_id) {
       throw new ConflictException('Task assignment has changed');
     }
@@ -549,18 +548,63 @@ export class RequestsService {
     return updated;
   }
 
-  private getManagedDepartmentIds(user: JwtPayload) {
-    return user.departmentIds?.length ? user.departmentIds : user.departmentId ? [user.departmentId] : [];
+  private async assertAccess(request: any, user: JwtPayload) {
+    const scope = await this.departmentScopeService.resolveDepartmentScope(user);
+    
+    // Unrestricted roles have full access
+    if (scope.unrestricted) return;
+    
+    // Check if request is accessible based on departments
+    const requestDeptIds = this.requestDepartmentIds(request);
+    const hasAccess = requestDeptIds.some((deptId) => scope.departmentIds.includes(deptId));
+    
+    if (hasAccess) return;
+    
+    // Employees can access their own requests
+    if (user.role === role_enum.EMPLOYEE && request.requested_by_id === user.sub) return;
+    
+    throw new ForbiddenException('Access denied');
   }
 
-  private hasDepartmentAccess(request: any, departmentIds: string[]) {
-    if (!departmentIds.length) return false;
-    return this.requestDepartmentIds(request).some((departmentId) => departmentIds.includes(departmentId));
+  private async assertReviewAccess(request: any, user: JwtPayload) {
+    if (request.status !== request_status_enum.PENDING) {
+      throw new ForbiddenException('Request has already been reviewed');
+    }
+    
+    const scope = await this.departmentScopeService.resolveDepartmentScope(user);
+    
+    // Unrestricted roles can review
+    if (scope.unrestricted) return;
+    
+    // Check department access
+    const requestDeptIds = this.requestDepartmentIds(request);
+    const hasAccess = requestDeptIds.some((deptId) => scope.departmentIds.includes(deptId));
+    
+    if (hasAccess) return;
+    
+    throw new ForbiddenException('Only HOD, MD, EA, PA, PURCHASE_HEAD, or DEPARTMENT_CONTROLLER can review requests');
   }
 
   private requestDepartmentIds(request: any) {
     const taskDepartments = request.task?.task_departments?.map((item: { department_id: string }) => item.department_id) ?? [];
     return [...new Set([request.department_id, request.task?.department_id, request.users_task_requests_requested_by_idTousers?.department_id, ...taskDepartments].filter(Boolean))];
+  }
+
+  private async assertRequestDepartmentAccess(departmentId: string, user: JwtPayload) {
+    const department = await this.prisma.departments.findUnique({
+      where: { id: departmentId },
+      select: { id: true, is_active: true },
+    });
+
+    if (!department?.is_active) {
+      throw new BadRequestException('Invalid department selection');
+    }
+
+    // Validate access using department scope
+    const isValid = await this.departmentScopeService.validateDepartmentAccess(user, [departmentId]);
+    if (!isValid) {
+      throw new ForbiddenException('You do not have access to this department');
+    }
   }
 
   private mapRequest(request: any) {
@@ -589,30 +633,6 @@ export class RequestsService {
       ...request,
       request_attachments: await this.attachmentsService.decorateTaskAttachments(request.request_attachments),
     };
-  }
-
-  private async assertRequestDepartmentAccess(departmentId: string, user: JwtPayload) {
-    const department = await this.prisma.departments.findUnique({
-      where: { id: departmentId },
-      select: { id: true, is_active: true },
-    });
-
-    if (!department?.is_active) {
-      throw new BadRequestException('Invalid department selection');
-    }
-
-    const allowedDepartments = this.getManagedDepartmentIds(user);
-
-    if (user.role === role_enum.EMPLOYEE) {
-      if (user.departmentId !== departmentId) {
-        throw new ForbiddenException('You can only submit requests for your own department');
-      }
-      return;
-    }
-
-    if (DEPARTMENT_SCOPED_ROLES.includes(user.role) && allowedDepartments.length && !allowedDepartments.includes(departmentId)) {
-      throw new ForbiddenException('You are not authorized for this department');
-    }
   }
 
   private async assertNoDuplicatePendingRequest(requestedById: string, type: any, departmentId: string, title: string) {

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { CommonModule } from './common/common.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { EmailModule } from './modules/email/email.module';
@@ -21,6 +22,7 @@ import { VmsModule } from './modules/vms/vms.module';
 
 @Module({
   imports: [
+    CommonModule,
     PrismaModule,
     DepartmentsModule,
     AuthModule,

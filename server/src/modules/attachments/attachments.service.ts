@@ -11,6 +11,7 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
 import { UploadedFile } from '../../common/types/uploaded-file.type';
+import { DepartmentScopeService } from '../../common/services/department-scope.service';
 
 const ASSISTANT_ROLES: role_enum[] = [role_enum.EA, role_enum.PA, role_enum.DEPARTMENT_CONTROLLER];
 
@@ -55,7 +56,10 @@ export class AttachmentsService {
   private readonly maxImageSize = 10 * 1024 * 1024;
   private readonly maxDocumentSize = 25 * 1024 * 1024;
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly departmentScopeService: DepartmentScopeService,
+  ) {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 
@@ -434,13 +438,15 @@ export class AttachmentsService {
       throw new NotFoundException('Task not found');
     }
 
-    if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return;
+    const scope = await this.departmentScopeService.resolveDepartmentScope(user);
+    if (scope.unrestricted) return;
 
     const departmentIds = this.taskDepartmentIds(task);
-    if (user.role === role_enum.EMPLOYEE && user.departmentId && departmentIds.includes(user.departmentId)) return;
-    if ((user.role === role_enum.HOD || ASSISTANT_ROLES.includes(user.role)) && this.hasOverlap(departmentIds, user.departmentIds || [])) return;
+    const hasAccess = departmentIds.some((deptId) => scope.departmentIds.includes(deptId));
 
-    throw new ForbiddenException('Access denied to this task');
+    if (!hasAccess) {
+      throw new ForbiddenException('Access denied to this task');
+    }
   }
 
   private async ensureRequestVisible(requestId: string, user: JwtPayload) {
@@ -458,20 +464,19 @@ export class AttachmentsService {
       throw new NotFoundException('Request not found');
     }
 
-    if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return;
     if (request.requested_by_id === user.sub) return;
+
+    const scope = await this.departmentScopeService.resolveDepartmentScope(user);
+    if (scope.unrestricted) return;
 
     const departmentId = request.department_id ?? request.users_task_requests_requested_by_idTousers?.department_id;
     if (!departmentId) {
       throw new ForbiddenException('Access denied to this request');
     }
 
-    const departmentIds = user.departmentIds?.length ? user.departmentIds : user.departmentId ? [user.departmentId] : [];
-    if ((user.role === role_enum.HOD || ASSISTANT_ROLES.includes(user.role) || user.role === role_enum.PURCHASE_HEAD) && departmentIds.includes(departmentId)) {
-      return;
+    if (!scope.departmentIds.includes(departmentId)) {
+      throw new ForbiddenException('Access denied to this request');
     }
-
-    throw new ForbiddenException('Access denied to this request');
   }
 
   private async ensureTaskCommentVisible(taskId: string, commentId: string, user: JwtPayload) {
@@ -499,12 +504,14 @@ export class AttachmentsService {
       throw new NotFoundException('Self action not found');
     }
 
-    if (user.role === role_enum.MD || user.role === role_enum.ADMIN || ASSISTANT_ROLES.includes(user.role)) return;
     if (action.created_by_id === user.sub) return;
-    if (user.role === role_enum.HOD && user.departmentIds?.includes(action.department_id)) return;
-    if (user.role === role_enum.EMPLOYEE && user.departmentId === action.department_id) return;
 
-    throw new ForbiddenException('Access denied to this self action');
+    const scope = await this.departmentScopeService.resolveDepartmentScope(user);
+    if (scope.unrestricted) return;
+
+    if (!scope.departmentIds.includes(action.department_id)) {
+      throw new ForbiddenException('Access denied to this self action');
+    }
   }
 
   private async ensureSelfActionCommentVisible(actionId: string, commentId: string, user: JwtPayload) {

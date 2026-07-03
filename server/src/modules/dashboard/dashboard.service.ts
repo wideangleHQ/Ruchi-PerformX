@@ -9,23 +9,28 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
-
-const ASSISTANT_ROLES: role_enum[] = [role_enum.EA, role_enum.PA, role_enum.DEPARTMENT_CONTROLLER];
-const DEPARTMENT_SCOPED_ROLES: role_enum[] = [role_enum.HOD, role_enum.PURCHASE_HEAD, ...ASSISTANT_ROLES];
+import { DepartmentScopeService } from '../../common/services/department-scope.service';
+import { DepartmentQueryHelper } from '../../common/helpers/department-query.helper';
 
 @Injectable()
 export class DashboardService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly departmentScopeService: DepartmentScopeService,
+  ) {}
 
   private readonly terminalStatuses = [
     task_status_enum.COMPLETED,
     task_status_enum.HOD_VERIFIED,
     task_status_enum.REJECTED,
+    task_status_enum.CLOSED,
   ];
 
   private readonly completedStatuses = [
     task_status_enum.COMPLETED,
     task_status_enum.HOD_VERIFIED,
+    task_status_enum.REVIEWED,
+    task_status_enum.CLOSED,
   ];
 
   async getDashboard(user: JwtPayload) {
@@ -34,9 +39,38 @@ export class DashboardService {
     weekStart.setDate(now.getDate() - 6);
     weekStart.setHours(0, 0, 0, 0);
 
-    const taskWhere = this.taskScope(user);
-    const activeTaskWhere = { ...taskWhere, status: { notIn: this.terminalStatuses } };
-    const completedTaskWhere = { ...taskWhere, status: { in: this.completedStatuses } };
+    // Resolve department scope once for entire request
+    const scope = await this.departmentScopeService.resolveDepartmentScope(user);
+
+    // Build base filters using centralized helpers
+    const taskBaseFilter = {
+      deleted_at: null,
+      ...DepartmentQueryHelper.buildTaskDepartmentFilter(scope),
+    };
+    const activeTaskWhere = { ...taskBaseFilter, status: { notIn: this.terminalStatuses } };
+    const completedTaskWhere = { ...taskBaseFilter, status: { in: this.completedStatuses } };
+
+    const requestFilter = {
+      status: request_status_enum.PENDING,
+      ...DepartmentQueryHelper.buildRequestDepartmentFilter(scope),
+    };
+
+    const transferFilter = {
+      status: transfer_status_enum.PENDING,
+      ...DepartmentQueryHelper.buildTransferDepartmentFilter(scope),
+    };
+
+    const escalationFilter = {
+      is_resolved: false,
+      ...DepartmentQueryHelper.buildEscalationDepartmentFilter(scope),
+    };
+
+    const incentiveFilter = {
+      ...DepartmentQueryHelper.buildIncentiveDepartmentFilter(scope),
+      is_approved: true,
+      month: now.getMonth() + 1,
+      year: now.getFullYear(),
+    };
 
     const [
       activeTasks,
@@ -54,27 +88,16 @@ export class DashboardService {
       employeeSharedTasks,
     ] = await Promise.all([
       this.prisma.tasks.count({ where: activeTaskWhere }),
-      this.prisma.task_requests.count({ where: this.requestScope(user) }),
-      this.prisma.tasks.count({ where: taskWhere }),
+      this.prisma.task_requests.count({ where: requestFilter }),
+      this.prisma.tasks.count({ where: taskBaseFilter }),
       this.prisma.tasks.count({ where: completedTaskWhere }),
       this.prisma.incentives.aggregate({
         _sum: { amount: true },
-        where: {
-          ...this.incentiveScope(user),
-          is_approved: true,
-          month: now.getMonth() + 1,
-          year: now.getFullYear(),
-        },
+        where: incentiveFilter,
       }),
-      this.prisma.task_requests.count({
-        where: { ...this.requestScope(user), status: request_status_enum.PENDING },
-      }),
-      this.prisma.task_transfers.count({
-        where: { ...this.transferScope(user), status: transfer_status_enum.PENDING },
-      }),
-      this.prisma.task_escalations.count({
-        where: { ...this.escalationScope(user), is_resolved: false },
-      }),
+      this.prisma.task_requests.count({ where: requestFilter }),
+      this.prisma.task_transfers.count({ where: transferFilter }),
+      this.prisma.task_escalations.count({ where: escalationFilter }),
       this.prisma.tasks.count({
         where: { ...activeTaskWhere, due_date: { lt: now } },
       }),
@@ -82,14 +105,18 @@ export class DashboardService {
         where: { ...completedTaskWhere, completed_at: { gte: weekStart } },
         select: { completed_at: true },
       }),
-      this.prisma.tasks.groupBy({
+      this.prisma.task_departments.groupBy({
         by: ['department_id'],
-        where: taskWhere,
+        where: {
+          tasks: taskBaseFilter,
+        },
         _count: { id: true },
       }),
-      this.prisma.tasks.groupBy({
+      this.prisma.task_departments.groupBy({
         by: ['department_id'],
-        where: completedTaskWhere,
+        where: {
+          tasks: completedTaskWhere,
+        },
         _count: { id: true },
       }),
       this.prisma.tasks.count({
@@ -135,93 +162,8 @@ export class DashboardService {
     };
   }
 
-  private hodDeptIds(user: JwtPayload): string[] {
-    return user.departmentIds?.length ? user.departmentIds : user.departmentId ? [user.departmentId] : [];
-  }
-
-  private taskScope(user: JwtPayload): Prisma.tasksWhereInput {
-    const base = { deleted_at: null };
-    if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return base;
-    if (DEPARTMENT_SCOPED_ROLES.includes(user.role)) {
-      const deptIds = this.hodDeptIds(user);
-      return deptIds.length ? { ...base, ...this.departmentVisibility(deptIds) } : { id: { in: [] } };
-    }
-    
-    const conditions: Prisma.tasksWhereInput[] = [
-      { OR: [{ assigned_to_id: user.sub }, { assigned_by_id: user.sub }] }
-    ];
-    
-    if (user.departmentId) {
-      conditions.push(this.departmentVisibility([user.departmentId]));
-    }
-    
-    return {
-      ...base,
-      AND: conditions,
-    };
-  }
-
-  private requestScope(user: JwtPayload): Prisma.task_requestsWhereInput {
-    const base = { status: request_status_enum.PENDING };
-    if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return base;
-    if (DEPARTMENT_SCOPED_ROLES.includes(user.role)) {
-      const deptIds = this.hodDeptIds(user);
-      return deptIds.length
-        ? { ...base, users_task_requests_requested_by_idTousers: { department_id: { in: deptIds } } }
-        : { id: { in: [] } };
-    }
-    return { ...base, requested_by_id: user.sub };
-  }
-
-  private transferScope(user: JwtPayload): Prisma.task_transfersWhereInput {
-    if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return {};
-    if (DEPARTMENT_SCOPED_ROLES.includes(user.role)) {
-      const deptIds = this.hodDeptIds(user);
-      return deptIds.length ? { OR: [{ from_dept_id: { in: deptIds } }, { to_dept_id: { in: deptIds } }] } : { id: { in: [] } };
-    }
-    return { initiated_by_id: user.sub };
-  }
-
-  private escalationScope(user: JwtPayload): Prisma.task_escalationsWhereInput {
-    if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return {};
-    if (DEPARTMENT_SCOPED_ROLES.includes(user.role)) {
-      const deptIds = this.hodDeptIds(user);
-      return deptIds.length
-        ? {
-            tasks: {
-              OR: [
-                { department_id: { in: deptIds } },
-                { task_departments: { some: { department_id: { in: deptIds } } } },
-              ],
-            },
-          }
-        : { id: { in: [] } };
-    }
-    return { escalated_to_id: user.sub };
-  }
-
-  private incentiveScope(user: JwtPayload): Prisma.incentivesWhereInput {
-    if (user.role === role_enum.MD || user.role === role_enum.ADMIN) return {};
-    if (DEPARTMENT_SCOPED_ROLES.includes(user.role)) {
-      const deptIds = this.hodDeptIds(user);
-      return deptIds.length
-        ? { users_incentives_employee_idTousers: { department_id: { in: deptIds } } }
-        : { id: { in: [] } };
-    }
-    return { employee_id: user.sub };
-  }
-
   private percent(value: number, total: number) {
     return total ? Math.round((value / total) * 1000) / 10 : 0;
-  }
-
-  private departmentVisibility(departmentIds: string[]): Prisma.tasksWhereInput {
-    return {
-      OR: [
-        { department_id: { in: departmentIds } },
-        { task_departments: { some: { department_id: { in: departmentIds } } } },
-      ],
-    };
   }
 
   private weeklyChart(tasks: Array<{ completed_at: Date | null }>, weekStart: Date) {

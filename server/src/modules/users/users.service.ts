@@ -11,6 +11,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
 import { role_enum } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { DepartmentScopeService } from '../../common/services/department-scope.service';
 
 const USER_SELECT = {
   id: true,
@@ -54,7 +55,10 @@ const ASSISTANT_ROLES: role_enum[] = [role_enum.EA, role_enum.PA, role_enum.DEPA
 export class UsersService {
   private readonly BCRYPT_ROUNDS = 12;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly departmentScopeService: DepartmentScopeService,
+  ) {}
 
   // ─── ROLE CONSTRAINT CHECKS ───────────────────────────────────────────────────
 
@@ -187,15 +191,12 @@ export class UsersService {
       pending_approval: false,
     };
 
-    if (caller.role === role_enum.HOD || caller.role === role_enum.PURCHASE_HEAD || ASSISTANT_ROLES.includes(caller.role)) {
-      // HOD: only employees in any of their assigned departments
-      const deptIds = caller.role === role_enum.PURCHASE_HEAD
-        ? await this.getPurchaseDepartmentIds()
-        : caller.departmentIds ?? (caller.departmentId ? [caller.departmentId] : []);
-      where.department_id = { in: deptIds };
+    const scope = await this.departmentScopeService.resolveDepartmentScope(caller);
+
+    if (!scope.unrestricted) {
+      where.department_id = { in: scope.departmentIds };
       where.role = role_enum.EMPLOYEE;
     } else {
-      // MD/ADMIN: filter by department and/or role if provided
       if (departmentId && role) {
         where.role = role;
         if (role === role_enum.EMPLOYEE) {

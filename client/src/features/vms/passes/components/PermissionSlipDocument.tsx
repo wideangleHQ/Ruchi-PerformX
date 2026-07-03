@@ -16,35 +16,35 @@ export function PermissionSlipDocument({ slip, paperSize = 'a5' }: PermissionSli
   // Container classes
   const containerClass = `
     bg-white border-0 font-sans shadow-none text-black
-    ${isA5 ? 'w-[148mm] max-w-[148mm] p-3 mx-0' : ''}
+    ${isA5 ? 'w-[148mm] max-w-[148mm] p-3 mx-0 print:pt-[20mm] print:pr-[20mm] print:pb-[25mm] print:pl-[20mm]' : ''}
     ${isA4 ? 'w-full max-w-3xl p-8 mx-auto' : ''}
     ${isThermal ? 'w-[80mm] max-w-[80mm] p-2 mx-0 text-[10px]' : ''}
-    print:w-full print:max-w-none print:p-0 print:m-0 print:fixed print:top-0 print:left-0 print:z-[9999] print:bg-white
+    print:w-full print:max-w-none ${isA5 ? '' : 'print:p-0'} print:m-0 print:fixed print:top-0 print:left-0 print:z-[9999] print:bg-white
   `.trim();
 
   // Text sizing
   const titleClass = `
-    ${isA5 ? 'text-base' : ''}
+    ${isA5 ? 'text-base print:text-[17px]' : ''}
     ${isA4 ? 'text-xl' : ''}
     ${isThermal ? 'text-xs' : ''}
-    font-bold uppercase tracking-wider print:text-lg
+    font-bold uppercase tracking-wider
   `;
 
   const subtitleClass = `
-    ${isA5 ? 'text-sm' : ''}
+    ${isA5 ? 'text-sm print:text-[15px]' : ''}
     ${isA4 ? 'text-base' : ''}
     ${isThermal ? 'text-[10px]' : ''}
-    font-semibold mt-0.5 uppercase print:text-sm
+    font-semibold mt-0.5 uppercase
   `;
 
   const labelClass = `
-    ${isA5 ? 'text-[10px]' : ''}
+    ${isA5 ? 'text-[10px] print:text-[10px]' : ''}
     ${isA4 ? 'text-xs' : ''}
     ${isThermal ? 'text-[8px]' : ''}
   `;
 
   const valueClass = `
-    ${isA5 ? 'text-[10px]' : ''}
+    ${isA5 ? 'text-[10px] print:text-[10px]' : ''}
     ${isA4 ? 'text-xs' : ''}
     ${isThermal ? 'text-[8px]' : ''}
     border-b border-gray-300 pb-0.5 mt-0.5
@@ -52,17 +52,17 @@ export function PermissionSlipDocument({ slip, paperSize = 'a5' }: PermissionSli
 
   const sectionTitleClass = `
     font-bold border-b border-gray-400 pb-0.5 mb-1 uppercase
-    ${isA5 ? 'text-[10px]' : ''}
+    ${isA5 ? 'text-[10px] print:text-[10px]' : ''}
     ${isA4 ? 'text-xs' : ''}
     ${isThermal ? 'text-[8px]' : ''}
     tracking-widest
   `;
 
-  const photoSize = isThermal ? 'w-12 h-14' : isA5 ? 'w-16 h-20' : 'w-24 h-28';
-  const gapClass = isThermal ? 'gap-1' : isA5 ? 'gap-2' : 'gap-4';
-  const spaceClass = isThermal ? 'space-y-0.5' : isA5 ? 'space-y-1' : 'space-y-1.5';
-  const marginBottom = isThermal ? 'mb-1' : isA5 ? 'mb-2' : 'mb-3';
-  const signatureGap = isThermal ? 'gap-0.5 text-[8px]' : isA5 ? 'gap-1 text-[10px]' : 'gap-2 text-xs';
+  const photoSize = isThermal ? 'w-12 h-14' : isA5 ? 'w-16 h-20 print:w-14 print:h-16' : 'w-24 h-28';
+  const gapClass = isThermal ? 'gap-1' : isA5 ? 'gap-2 print:gap-1' : 'gap-4';
+  const spaceClass = isThermal ? 'space-y-0.5' : isA5 ? 'space-y-1 print:space-y-0' : 'space-y-1.5';
+  const marginBottom = isThermal ? 'mb-1' : isA5 ? 'mb-2 print:mb-1' : 'mb-3';
+  const signatureGap = isThermal ? 'gap-0.5 text-[8px]' : isA5 ? 'gap-1 text-[10px] print:gap-1 print:text-[9px]' : 'gap-2 text-xs';
 
   return (
     <div className={containerClass}>
