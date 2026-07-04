@@ -10,6 +10,7 @@ export const createTaskSchema = z.object({
   assignAllEmployees: z.boolean().optional(),
   departmentId: z.string().optional(),
   departmentIds: z.array(z.string()).optional(),
+  delegateDepartmentId: z.string().optional(),
 }).refine((data) => Boolean(data.departmentId || data.departmentIds?.length), {
   message: 'Department is required',
   path: ['departmentIds'],

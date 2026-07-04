@@ -8,26 +8,44 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateTransferDto } from './dto/create-transfer.dto';
 import { TransferActionDto } from './dto/transfer-action.dto';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
-import { role_enum as Role, transfer_status_enum as TransferStatus } from '@prisma/client';
+import { notification_type_enum, role_enum as Role, transfer_status_enum as TransferStatus } from '@prisma/client';
+import { DepartmentScopeService } from '../../common/services/department-scope.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class TransfersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly departmentScopeService: DepartmentScopeService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   async create(dto: CreateTransferDto, user: JwtPayload) {
-    const task = await this.prisma.tasks.findUnique({
-      where: { id: dto.taskId },
-      select: { id: true, department_id: true },
-    });
+    const [task, targetDepartment, pending, scope] = await Promise.all([
+      this.prisma.tasks.findUnique({
+        where: { id: dto.taskId },
+        select: { id: true, department_id: true },
+      }),
+      this.prisma.departments.findFirst({
+        where: { id: dto.toDepartmentId, is_active: true },
+        select: { id: true },
+      }),
+      this.prisma.task_transfers.findFirst({
+        where: { task_id: dto.taskId, status: TransferStatus.PENDING },
+        select: { id: true },
+      }),
+      this.departmentScopeService.resolveDepartmentScope(user),
+    ]);
 
     if (!task) throw new NotFoundException('Task not found');
+    if (!targetDepartment) throw new NotFoundException('Target department not found');
+
+    if (!scope.unrestricted && !scope.departmentIds.includes(task.department_id)) {
+      throw new ForbiddenException('Not authorized to transfer this task');
+    }
 
     if (task.department_id === dto.toDepartmentId)
       throw new BadRequestException('Task already belongs to this department');
-
-    const pending = await this.prisma.task_transfers.findFirst({
-      where: { task_id: dto.taskId, status: TransferStatus.PENDING },
-    });
 
     if (pending)
       throw new BadRequestException('A pending transfer already exists for this task');
@@ -45,13 +63,14 @@ export class TransfersService {
   }
 
   async findAll(user: JwtPayload) {
+    const scope = await this.departmentScopeService.resolveDepartmentScope(user);
     const where =
-      user.role === Role.MD
+      scope.unrestricted
         ? {}
         : {
             OR: [
-              { from_dept_id: user.departmentId! },
-              { to_dept_id: user.departmentId! },
+              { from_dept_id: { in: scope.departmentIds } },
+              { to_dept_id: { in: scope.departmentIds } },
             ],
           };
 
@@ -72,8 +91,7 @@ export class TransfersService {
 
     if (
       user.role !== Role.MD &&
-      transfer.from_dept_id !== user.departmentId &&
-      transfer.to_dept_id !== user.departmentId
+      !(await this.canViewTransfer(transfer, user))
     ) {
       throw new ForbiddenException('Not authorized to view this transfer');
     }
@@ -84,7 +102,7 @@ export class TransfersService {
   async approve(id: string, dto: TransferActionDto, user: JwtPayload) {
     const transfer = await this.ensurePendingTransfer(id);
 
-    this.ensureApprovalAuthority(transfer, user);
+    await this.ensureApprovalAuthority(transfer, user);
 
     await this.prisma.$transaction([
       this.prisma.task_transfers.update({
@@ -98,7 +116,31 @@ export class TransfersService {
         where: { id: transfer.task_id },
         data: { department_id: transfer.to_dept_id },
       }),
+      this.prisma.task_departments.createMany({
+        data: [{ task_id: transfer.task_id, department_id: transfer.to_dept_id }],
+        skipDuplicates: true,
+      }),
+      this.prisma.audit_logs.create({
+        data: {
+          user_id: user.sub,
+          action: 'TRANSFER_ACCEPTED',
+          entity: 'task_transfers',
+          entity_id: id,
+          old_value: JSON.stringify({
+            status: transfer.status,
+            departmentId: transfer.from_dept_id,
+          }),
+          new_value: JSON.stringify({
+            status: TransferStatus.ACCEPTED,
+            receivedBy: user.sub,
+            departmentId: transfer.to_dept_id,
+            taskId: transfer.task_id,
+          }),
+        },
+      }),
     ]);
+
+    await this.notifyTransferInitiator(transfer.initiated_by_id, transfer.task_id, 'Transfer Accepted', 'Your task transfer has been accepted.', notification_type_enum.TRANSFER_ACCEPTED);
 
     return { message: 'Transfer approved. Task department updated.' };
   }
@@ -106,16 +148,35 @@ export class TransfersService {
   async reject(id: string, dto: TransferActionDto, user: JwtPayload) {
     const transfer = await this.ensurePendingTransfer(id);
 
-    this.ensureApprovalAuthority(transfer, user);
+    await this.ensureApprovalAuthority(transfer, user);
 
-    await this.prisma.task_transfers.update({
-      where: { id },
-      data: {
-        status: TransferStatus.REJECTED,
-        received_by_id: user.sub,
-        rejection_reason: dto.reason ?? null,
-      },
-    });
+    await this.prisma.$transaction([
+      this.prisma.task_transfers.update({
+        where: { id },
+        data: {
+          status: TransferStatus.REJECTED,
+          received_by_id: user.sub,
+          rejection_reason: dto.reason ?? null,
+        },
+      }),
+      this.prisma.audit_logs.create({
+        data: {
+          user_id: user.sub,
+          action: 'TRANSFER_REJECTED',
+          entity: 'task_transfers',
+          entity_id: id,
+          old_value: JSON.stringify({ status: transfer.status }),
+          new_value: JSON.stringify({
+            status: TransferStatus.REJECTED,
+            receivedBy: user.sub,
+            reason: dto.reason ?? null,
+            taskId: transfer.task_id,
+          }),
+        },
+      }),
+    ]);
+
+    await this.notifyTransferInitiator(transfer.initiated_by_id, transfer.task_id, 'Transfer Rejected', 'Your task transfer has been rejected.', notification_type_enum.TRANSFER_REJECTED);
 
     return { message: 'Transfer rejected.' };
   }
@@ -140,9 +201,37 @@ export class TransfersService {
     return transfer;
   }
 
-  private ensureApprovalAuthority(transfer: { to_dept_id: string }, user: JwtPayload) {
-    if (user.role !== Role.MD && transfer.to_dept_id !== user.departmentId) {
+  private async ensureApprovalAuthority(transfer: { to_dept_id: string }, user: JwtPayload) {
+    if (user.role === Role.MD) return;
+
+    const scope = await this.departmentScopeService.resolveDepartmentScope(user);
+    if (!scope.departmentIds.includes(transfer.to_dept_id)) {
       throw new ForbiddenException('Not authorized to action this transfer');
+    }
+  }
+
+  private async canViewTransfer(transfer: { from_dept_id: string; to_dept_id: string }, user: JwtPayload) {
+    const scope = await this.departmentScopeService.resolveDepartmentScope(user);
+    return scope.unrestricted || [transfer.from_dept_id, transfer.to_dept_id].some((deptId) => scope.departmentIds.includes(deptId));
+  }
+
+  private async notifyTransferInitiator(
+    recipientId: string,
+    taskId: string,
+    title: string,
+    message: string,
+    type: notification_type_enum,
+  ) {
+    try {
+      await this.notificationsService.createNotification({
+        recipientId,
+        type,
+        title,
+        message,
+        taskId,
+      } as any);
+    } catch (error) {
+      console.warn('Transfer notification dispatch failed', error);
     }
   }
 

@@ -45,8 +45,10 @@ export class EmployeeSharingController {
     }
     
     dto.taskType = task_type_enum.EMPLOYEE_SHARED;
-    dto.departmentId = user.departmentId;
-    dto.departmentIds = [user.departmentId];
+    if (!dto.departmentId && !dto.departmentIds?.length) {
+      dto.departmentId = user.departmentId;
+      dto.departmentIds = [user.departmentId];
+    }
 
     return this.tasksService.create(dto, user, attachments ?? []);
   }
@@ -61,13 +63,21 @@ export class EmployeeSharingController {
   @Get('assignees')
   @Roles(role_enum.MD, role_enum.HOD, role_enum.EMPLOYEE, ...ASSISTANT_ROLES, role_enum.PURCHASE_HEAD)
   getAssignees(
+    @Query('departmentId') departmentId: string | undefined,
     @CurrentUser() user: JwtPayload,
   ) {
-    if (!user.departmentId) {
+    const selectedDepartmentId = departmentId ?? user.departmentId;
+    if (!selectedDepartmentId) {
       return [];
     }
     
-    return this.tasksService.getEmployeeSharedAssignees(user.departmentId, user.sub);
+    return this.tasksService.getEmployeeSharedAssignees(selectedDepartmentId, user.sub);
+  }
+
+  @Get('departments')
+  @Roles(role_enum.EMPLOYEE)
+  getDepartments() {
+    return this.tasksService.getEmployeeSharingDepartments();
   }
 
   @Patch(':id/status')

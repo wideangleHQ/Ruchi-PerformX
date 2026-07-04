@@ -23,7 +23,10 @@ export function TaskForm({ onSuccess, taskType = 'OFFICIAL' }: TaskFormProps) {
   const { user } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [assignmentMode, setAssignmentMode] = useState<'EMPLOYEE' | 'DEPARTMENT'>('EMPLOYEE');
   const userRole = user?.role;
+  const isEmployeeShared = taskType === 'EMPLOYEE_SHARED';
+  const canDelegateOfficial = userRole === 'HOD' && taskType === 'OFFICIAL';
 
   const canCreateTask = Boolean(userRole) && (userRole !== 'EMPLOYEE' || taskType === 'EMPLOYEE_SHARED');
 
@@ -39,33 +42,53 @@ export function TaskForm({ onSuccess, taskType = 'OFFICIAL' }: TaskFormProps) {
       assignAllEmployees: false,
       departmentId: taskType === 'EMPLOYEE_SHARED' && user?.departmentId ? user.departmentId : '',
       departmentIds: taskType === 'EMPLOYEE_SHARED' && user?.departmentId ? [user.departmentId] : [],
+      delegateDepartmentId: '',
     },
   });
 
   const { data: departments = [] } = useQuery<TaskDepartment[]>({
-    queryKey: ['task-departments'],
-    queryFn: () => tasksApi.getDepartments(),
-    enabled: canCreateTask && taskType !== 'EMPLOYEE_SHARED',
+    queryKey: ['task-departments', taskType],
+    queryFn: () => (isEmployeeShared ? tasksApi.employeeSharing.getDepartments() : tasksApi.getDepartments()),
+    enabled: canCreateTask,
+  });
+  const { data: delegationDepartments = [] } = useQuery<Array<TaskDepartment & { hod?: { id: string; fullName: string } | null }>>({
+    queryKey: ['task-delegation-departments'],
+    queryFn: () => tasksApi.getDelegationDepartments(),
+    enabled: canCreateTask && canDelegateOfficial,
   });
   const selectedDepartmentIds = form.watch('departmentIds') ?? [];
+  const selectedDepartmentId = selectedDepartmentIds[0] ?? '';
+  const selectedDelegateDepartmentId = form.watch('delegateDepartmentId') ?? '';
   const selectedAssigneeIds = form.watch('assignedToIds') ?? [];
   const selectAllEmployees = form.watch('assignAllEmployees') ?? false;
+  const selectedDelegateDepartment = delegationDepartments.find((department) => department.id === selectedDelegateDepartmentId);
 
   const { data: assignees = [] } = useQuery<User[]>({
-    queryKey: ['task-assignees', selectedDepartmentIds, taskType],
+    queryKey: ['task-assignees', selectedDepartmentIds, taskType, assignmentMode],
     queryFn: () => {
-      if (taskType === 'EMPLOYEE_SHARED') {
-        return tasksApi.employeeSharing.getAssignees();
+      if (isEmployeeShared) {
+        return tasksApi.employeeSharing.getAssignees(selectedDepartmentId);
       }
       return tasksApi.getAssignees(selectedDepartmentIds);
     },
-    enabled: canCreateTask && (taskType === 'EMPLOYEE_SHARED' || selectedDepartmentIds.length > 0),
+    enabled: canCreateTask && assignmentMode === 'EMPLOYEE' && selectedDepartmentIds.length > 0,
   });
+
+  useEffect(() => {
+    if (isEmployeeShared || !canDelegateOfficial || assignmentMode !== 'DEPARTMENT') return;
+    if (!selectedDepartmentIds.length && departments.length) {
+      const sourceDepartmentId = user?.departmentIds?.[0] ?? user?.departmentId ?? departments[0]?.id ?? '';
+      if (sourceDepartmentId) {
+        form.setValue('departmentId', sourceDepartmentId, { shouldValidate: true });
+        form.setValue('departmentIds', [sourceDepartmentId], { shouldValidate: true });
+      }
+    }
+  }, [assignmentMode, canDelegateOfficial, departments, form, isEmployeeShared, selectedDepartmentIds.length, user?.departmentId, user?.departmentIds]);
 
   useEffect(() => {
     const allowedIds = new Set(assignees.map((assignee) => assignee.id));
     const filteredIds = selectedAssigneeIds.filter((id) => allowedIds.has(id));
-    const nextIds = selectAllEmployees ? assignees.map((assignee) => assignee.id) : filteredIds;
+    const nextIds = selectAllEmployees && !isEmployeeShared ? assignees.map((assignee) => assignee.id) : filteredIds;
 
     const isSame =
       nextIds.length === selectedAssigneeIds.length &&
@@ -74,7 +97,7 @@ export function TaskForm({ onSuccess, taskType = 'OFFICIAL' }: TaskFormProps) {
     if (!isSame) {
       form.setValue('assignedToIds', nextIds, { shouldValidate: true });
     }
-  }, [assignees, form, selectAllEmployees, selectedAssigneeIds]);
+  }, [assignees, form, isEmployeeShared, selectAllEmployees, selectedAssigneeIds]);
 
   const createTaskMutation = useMutation({
     mutationFn: (data: CreateTaskFormData & { attachments?: File[] }) => {
@@ -88,6 +111,7 @@ export function TaskForm({ onSuccess, taskType = 'OFFICIAL' }: TaskFormProps) {
         assignAllEmployees: data.assignAllEmployees || undefined,
         departmentId: data.departmentId || undefined,
         departmentIds: data.departmentIds?.length ? data.departmentIds : undefined,
+        delegateDepartmentId: assignmentMode === 'DEPARTMENT' ? data.delegateDepartmentId || undefined : undefined,
         attachments: data.attachments,
         taskType,
       };
@@ -181,7 +205,67 @@ export function TaskForm({ onSuccess, taskType = 'OFFICIAL' }: TaskFormProps) {
         </div>
       </div>
 
-      {taskType !== 'EMPLOYEE_SHARED' && (
+      {canDelegateOfficial && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Assignment Type</label>
+          <div className="mt-2 flex gap-4 rounded-lg border border-gray-200 p-3">
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="radio"
+                checked={assignmentMode === 'EMPLOYEE'}
+                onChange={() => {
+                  setAssignmentMode('EMPLOYEE');
+                  form.setValue('delegateDepartmentId', '', { shouldValidate: true });
+                }}
+                className="h-4 w-4 border-gray-300 text-green-600"
+              />
+              Assign Employee
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="radio"
+                checked={assignmentMode === 'DEPARTMENT'}
+                onChange={() => {
+                  setAssignmentMode('DEPARTMENT');
+                  form.setValue('assignedToId', '');
+                  form.setValue('assignedToIds', []);
+                  form.setValue('assignAllEmployees', false);
+                }}
+                className="h-4 w-4 border-gray-300 text-green-600"
+              />
+              Delegate Department
+            </label>
+          </div>
+        </div>
+      )}
+
+      {isEmployeeShared ? (
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Department</label>
+          <select
+            value={selectedDepartmentId}
+            onChange={(event) => {
+              const departmentId = event.target.value;
+              form.setValue('departmentId', departmentId, { shouldValidate: true });
+              form.setValue('departmentIds', departmentId ? [departmentId] : [], { shouldValidate: true });
+              form.setValue('assignedToId', '');
+              form.setValue('assignedToIds', []);
+              form.setValue('assignAllEmployees', false);
+            }}
+            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+          >
+            <option value="">Select Department</option>
+            {departments.map((department) => (
+              <option key={department.id} value={department.id}>
+                {department.name}
+              </option>
+            ))}
+          </select>
+          {form.formState.errors.departmentIds && (
+            <p className="mt-1 text-sm text-red-600">{form.formState.errors.departmentIds.message}</p>
+          )}
+        </div>
+      ) : assignmentMode === 'EMPLOYEE' ? (
         <div>
           <label className="block text-sm font-medium text-gray-700">Department Selection</label>
           <div className="mt-2 grid gap-2 rounded-lg border border-gray-200 p-3">
@@ -211,11 +295,55 @@ export function TaskForm({ onSuccess, taskType = 'OFFICIAL' }: TaskFormProps) {
           <p className="mt-1 text-sm text-red-600">{form.formState.errors.departmentIds.message}</p>
         )}
         </div>
+      ) : (
+        <div className="grid gap-4">
+          {departments.length > 1 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Source Department</label>
+              <select
+                value={selectedDepartmentId}
+                onChange={(event) => {
+                  const departmentId = event.target.value;
+                  form.setValue('departmentId', departmentId, { shouldValidate: true });
+                  form.setValue('departmentIds', departmentId ? [departmentId] : [], { shouldValidate: true });
+                }}
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              >
+                <option value="">Select Source Department</option>
+                {departments.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Delegate Department</label>
+            <select
+              value={selectedDelegateDepartmentId}
+              onChange={(event) => form.setValue('delegateDepartmentId', event.target.value, { shouldValidate: true })}
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+            >
+              <option value="">Select Department</option>
+              {delegationDepartments.map((department) => (
+                <option key={department.id} value={department.id}>
+                  {department.name}
+                </option>
+              ))}
+            </select>
+            {selectedDelegateDepartment?.hod ? (
+              <p className="mt-2 text-sm text-gray-600">HOD: {selectedDelegateDepartment.hod.fullName}</p>
+            ) : null}
+          </div>
+        </div>
       )}
 
+      {assignmentMode === 'EMPLOYEE' && (
       <div>
         <div className="flex items-center justify-between">
           <label className="block text-sm font-medium text-gray-700">Employees</label>
+          {!isEmployeeShared && (
           <label className="flex items-center gap-2 text-sm text-gray-700">
             <input
               type="checkbox"
@@ -230,6 +358,7 @@ export function TaskForm({ onSuccess, taskType = 'OFFICIAL' }: TaskFormProps) {
             />
             Select All Employees
           </label>
+          )}
         </div>
 
         <div className="mt-2 rounded-lg border border-gray-200 p-3">
@@ -243,11 +372,13 @@ export function TaskForm({ onSuccess, taskType = 'OFFICIAL' }: TaskFormProps) {
                 return (
                   <label key={assignee.id} className="flex items-center gap-2 text-sm text-gray-700">
                     <input
-                      type="checkbox"
+                      type={isEmployeeShared ? 'radio' : 'checkbox'}
                       checked={checked}
                       disabled={selectAllEmployees}
                       onChange={(event) => {
-                        const nextIds = event.target.checked
+                        const nextIds = isEmployeeShared
+                          ? [assignee.id]
+                          : event.target.checked
                           ? [...selectedAssigneeIds, assignee.id]
                           : selectedAssigneeIds.filter((id) => id !== assignee.id);
 
@@ -269,6 +400,7 @@ export function TaskForm({ onSuccess, taskType = 'OFFICIAL' }: TaskFormProps) {
           )}
         </div>
       </div>
+      )}
 
       <div className="flex gap-4">
         <Button

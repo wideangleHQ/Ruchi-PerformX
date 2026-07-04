@@ -463,37 +463,25 @@ export class SelfActionsService {
   }
 
   private async checkReadAccess(action: any, user: JwtPayload) {
-    const scope = await this.departmentScopeService.resolveDepartmentScope(user);
+    // Employees can see their own actions
+    if (action.created_by_id === user.sub) return;
     
-    // Unrestricted roles have full access
-    if (scope.unrestricted) return;
-    
-    // Check department access
+    // Check department access (handles unrestricted roles internally)
     const actionDeptIds = action.self_action_departments?.map((d: any) => d.department_id) || [];
-    const hasDeptAccess = actionDeptIds.some((deptId: string) => scope.departmentIds.includes(deptId));
+    const hasDeptAccess = await this.departmentScopeService.hasAnyDepartmentAccess(user, actionDeptIds);
     
     if (hasDeptAccess) return;
-    
-    // Employees can see their own actions even if no department match
-    if (action.created_by_id === user.sub) return;
     
     throw new ForbiddenException('Access denied');
   }
 
   private async canEditAction(action: any, user: JwtPayload): Promise<boolean> {
-    const scope = await this.departmentScopeService.resolveDepartmentScope(user);
-    
-    // Unrestricted roles can edit
-    if (scope.unrestricted) return true;
-    
     // Creator can edit own action
     if (action.created_by_id === user.sub) return true;
     
-    // Check department access for department-scoped roles
+    // Check department access (handles unrestricted roles internally)
     const actionDeptIds = action.self_action_departments?.map((d: any) => d.department_id) || [];
-    const hasDeptAccess = actionDeptIds.some((deptId: string) => scope.departmentIds.includes(deptId));
-    
-    return hasDeptAccess;
+    return this.departmentScopeService.hasAnyDepartmentAccess(user, actionDeptIds);
   }
 
   private validateStatusTransition(

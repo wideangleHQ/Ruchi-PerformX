@@ -18,6 +18,7 @@ export interface CreateTaskData {
   assignAllEmployees?: boolean;
   departmentId?: string;
   departmentIds?: string[];
+  delegateDepartmentId?: string;
   attachments?: File[];
   taskType?: string;
 }
@@ -52,6 +53,16 @@ export const tasksApi = {
     return response.data;
   },
 
+  getDelegationDepartments: async (): Promise<Array<TaskDepartment & { hod?: { id: string; fullName: string } | null }>> => {
+    const response = await axiosClient.get<Array<TaskDepartment & { hod?: { id: string; fullName: string } | null }>>('/tasks/meta/delegation-departments');
+    return response.data;
+  },
+
+  getDelegatedOut: async (): Promise<any[]> => {
+    const response = await axiosClient.get<any[]>('/tasks/delegated-out');
+    return response.data;
+  },
+
   createTask: async (data: CreateTaskData): Promise<Task> => {
     const formData = new FormData();
     formData.append('title', data.title);
@@ -68,6 +79,7 @@ export const tasksApi = {
     if (data.departmentIds?.length) {
       data.departmentIds.forEach((departmentId) => formData.append('departmentIds', departmentId));
     }
+    if (data.delegateDepartmentId) formData.append('delegateDepartmentId', data.delegateDepartmentId);
     data.attachments?.forEach((file) => formData.append('attachments', file));
     const response = await axiosClient.post<Task>('/tasks', formData);
     return response.data;
@@ -144,8 +156,14 @@ export const tasksApi = {
       const response = await axiosClient.get<PaginatedResponse<Task>>('/tasks/employee-sharing', { params: filters });
       return response.data;
     },
-    getAssignees: async (): Promise<User[]> => {
-      const response = await axiosClient.get<User[]>('/tasks/employee-sharing/assignees');
+    getDepartments: async (): Promise<TaskDepartment[]> => {
+      const response = await axiosClient.get<TaskDepartment[]>('/tasks/employee-sharing/departments');
+      return response.data;
+    },
+    getAssignees: async (departmentId?: string): Promise<User[]> => {
+      const response = await axiosClient.get<User[]>('/tasks/employee-sharing/assignees', {
+        params: departmentId ? { departmentId } : undefined,
+      });
       return response.data;
     },
     createTask: async (data: CreateTaskData): Promise<Task> => {
@@ -159,6 +177,10 @@ export const tasksApi = {
         data.assignedToIds.forEach((assignedToId) => formData.append('assignedToIds', assignedToId));
       }
       if (data.assignAllEmployees) formData.append('assignAllEmployees', 'true');
+      if (data.departmentId) formData.append('departmentId', data.departmentId);
+      if (data.departmentIds?.length) {
+        data.departmentIds.forEach((departmentId) => formData.append('departmentIds', departmentId));
+      }
       data.attachments?.forEach((file) => formData.append('attachments', file));
       
       const response = await axiosClient.post<Task>('/tasks/employee-sharing', formData);

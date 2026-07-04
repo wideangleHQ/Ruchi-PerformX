@@ -187,4 +187,26 @@ export class DepartmentScopeService {
       scope.departmentIds.includes(deptId),
     );
   }
+
+  /**
+   * Validate that the user has access to AT LEAST ONE of the submitted departments.
+   * Useful for visibility checks where a record spans multiple departments.
+   * 
+   * @param user - Current user
+   * @param departmentIds - Array of department IDs the record belongs to
+   * @returns true if user has access to at least one department, false otherwise
+   */
+  async hasAnyDepartmentAccess(
+    user: JwtPayload,
+    departmentIds: string[],
+  ): Promise<boolean> {
+    const scope = await this.resolveDepartmentScope(user);
+
+    if (scope.unrestricted) {
+      return true;
+    }
+
+    // Check if any of the record's departments are within user's scope
+    return departmentIds.some((deptId) => scope.departmentIds.includes(deptId));
+  }
 }

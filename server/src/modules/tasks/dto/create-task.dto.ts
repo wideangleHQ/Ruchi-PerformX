@@ -42,6 +42,10 @@ export class CreateTaskDto {
   departmentId?: string;
 
   @IsOptional()
+  @IsUUID()
+  delegateDepartmentId?: string;
+
+  @IsOptional()
   @Transform(({ value }) =>
     Array.isArray(value) ? value : typeof value === 'string' ? [value] : value,
   )

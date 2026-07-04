@@ -85,6 +85,18 @@ export class TasksController {
 
   // ─── Find One ──────────────────────────────────────────────────
 
+  @Get('meta/delegation-departments')
+  @Roles(role_enum.HOD)
+  getDelegationDepartments(@CurrentUser() user: JwtPayload) {
+    return this.tasksService.getDelegationDepartments(user);
+  }
+
+  @Get('delegated-out')
+  @Roles(role_enum.HOD)
+  getDelegatedOut(@CurrentUser() user: JwtPayload) {
+    return this.tasksService.getDelegatedOut(user);
+  }
+
   @Get(':id')
   @Roles(role_enum.MD, role_enum.HOD, role_enum.EMPLOYEE, ...ASSISTANT_ROLES, role_enum.PURCHASE_HEAD)
   findOne(@Param('id') id: string, @CurrentUser() user: JwtPayload) {

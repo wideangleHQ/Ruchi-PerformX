@@ -17,6 +17,18 @@ import { UploadedFile } from '../../common/types/uploaded-file.type';
 import { DepartmentScopeService } from '../../common/services/department-scope.service';
 import { DepartmentQueryHelper } from '../../common/helpers/department-query.helper';
 
+type PendingTaskNotification = {
+  recipientId: string;
+  type: notification_type_enum;
+  title: string;
+  message: string;
+};
+
+type CreatedTaskRecord = {
+  id: string;
+  notifications?: PendingTaskNotification[];
+};
+
 @Injectable()
 export class TasksService {
   constructor(
@@ -56,6 +68,7 @@ export class TasksService {
         throw new BadRequestException('Failed to create task');
       }
 
+      await this.dispatchTaskNotifications(tasks);
       return this.findOne(createdTask.id, user);
     } catch (error: any) {
       throw error;
@@ -64,6 +77,7 @@ export class TasksService {
 
   async createInTransaction(dto: CreateTaskDto, user: JwtPayload, tx: any) {
     const tasks = await this.createTaskRecords(tx, dto, user);
+    await this.createTaskNotificationsInTransaction(tx, tasks);
     return tasks[0];
   }
 
@@ -366,6 +380,175 @@ export class TasksService {
     });
   }
 
+  async getEmployeeSharingDepartments() {
+    return this.prisma.departments.findMany({
+      where: { is_active: true },
+      select: { id: true, name: true, description: true, is_active: true },
+      orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
+    });
+  }
+
+  async getDelegationDepartments(user: JwtPayload) {
+    const scope = await this.departmentScopeService.resolveDepartmentScope(user);
+    if (user.role !== role_enum.HOD || scope.unrestricted) {
+      throw new ForbiddenException('Only HOD users can delegate tasks to another department');
+    }
+
+    const departments = await this.prisma.departments.findMany({
+      where: {
+        is_active: true,
+        id: { notIn: scope.departmentIds },
+        hod_departments: {
+          some: {
+            users: {
+              role: role_enum.HOD,
+              is_active: true,
+              deleted_at: null,
+              pending_approval: false,
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        is_active: true,
+        hod_departments: {
+          where: {
+            users: {
+              role: role_enum.HOD,
+              is_active: true,
+              deleted_at: null,
+              pending_approval: false,
+            },
+          },
+          select: {
+            users: { select: { id: true, full_name: true } },
+          },
+          take: 1,
+        },
+      },
+      orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
+    });
+
+    return departments.map((department) => ({
+      id: department.id,
+      name: department.name,
+      description: department.description,
+      is_active: department.is_active,
+      hod: department.hod_departments[0]?.users
+        ? {
+            id: department.hod_departments[0].users.id,
+            fullName: department.hod_departments[0].users.full_name,
+          }
+        : null,
+    }));
+  }
+
+  async getDelegatedOut(user: JwtPayload) {
+    const scope = await this.departmentScopeService.resolveDepartmentScope(user);
+    if (user.role !== role_enum.HOD || scope.unrestricted) {
+      throw new ForbiddenException('Only HOD users can view delegated tasks');
+    }
+
+    const transfers = await this.prisma.task_transfers.findMany({
+      where: {
+        initiated_by_id: user.sub,
+        from_dept_id: { in: scope.departmentIds },
+        tasks: {
+          deleted_at: null,
+          department_id: { notIn: scope.departmentIds },
+        },
+      },
+      select: {
+        id: true,
+        status: true,
+        reason: true,
+        rejection_reason: true,
+        created_at: true,
+        updated_at: true,
+        tasks: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            due_date: true,
+            departments: { select: { id: true, name: true } },
+            task_status_logs: {
+              select: {
+                from_status: true,
+                to_status: true,
+                reason: true,
+                created_at: true,
+                users: { select: { id: true, full_name: true } },
+              },
+              orderBy: { created_at: 'asc' },
+            },
+          },
+        },
+        departments_task_transfers_to_dept_idTodepartments: {
+          select: {
+            id: true,
+            name: true,
+            hod_departments: {
+              where: {
+                users: {
+                  role: role_enum.HOD,
+                  is_active: true,
+                  deleted_at: null,
+                  pending_approval: false,
+                },
+              },
+              select: {
+                users: { select: { id: true, full_name: true } },
+              },
+              take: 1,
+            },
+          },
+        },
+      },
+      orderBy: { created_at: 'desc' },
+    });
+
+    return transfers.map((transfer) => {
+      const currentDepartment = transfer.tasks.departments;
+      const targetDepartment = transfer.departments_task_transfers_to_dept_idTodepartments;
+      const assignedHod = targetDepartment.hod_departments[0]?.users ?? null;
+
+      return {
+        task: {
+          id: transfer.tasks.id,
+          title: transfer.tasks.title,
+          status: transfer.tasks.status,
+          dueDate: transfer.tasks.due_date,
+        },
+        status: transfer.tasks.status,
+        currentDepartment,
+        transferStatus: transfer.status,
+        assignedHod: assignedHod
+          ? { id: assignedHod.id, fullName: assignedHod.full_name }
+          : null,
+        timeline: [
+          {
+            type: 'TRANSFER_REQUESTED',
+            status: transfer.status,
+            reason: transfer.reason,
+            createdAt: transfer.created_at,
+          },
+          ...transfer.tasks.task_status_logs.map((log) => ({
+            type: 'STATUS_CHANGE',
+            fromStatus: log.from_status,
+            toStatus: log.to_status,
+            reason: log.reason,
+            createdAt: log.created_at,
+            actor: log.users ? { id: log.users.id, fullName: log.users.full_name } : null,
+          })),
+        ],
+      };
+    });
+  }
+
   async getAssignees(departmentIdsParam: string | string[] | undefined, user: JwtPayload) {
     const departmentIds = this.resolveQueryDepartmentIds(departmentIdsParam);
     if (!departmentIds.length) return [];
@@ -408,7 +591,12 @@ export class TasksService {
   }
 
   async getEmployeeSharedAssignees(departmentId: string, excludeUserId: string) {
-    const users = await this.prisma.users.findMany({
+    const [department, users] = await Promise.all([
+      this.prisma.departments.findFirst({
+        where: { id: departmentId, is_active: true },
+        select: { id: true },
+      }),
+      this.prisma.users.findMany({
       where: {
         role: role_enum.EMPLOYEE,
         is_active: true,
@@ -427,7 +615,12 @@ export class TasksService {
         departments: { select: { id: true, name: true } },
       },
       orderBy: { full_name: 'asc' },
-    });
+      }),
+    ]);
+
+    if (!department) {
+      throw new ForbiddenException('Invalid department selection');
+    }
 
     return users.map((assignee) => ({
       id: assignee.id,
@@ -526,13 +719,19 @@ export class TasksService {
     return [...new Set(departmentIds)];
   }
 
-  private async assertCreateAccess(departmentIds: string[], user: JwtPayload, taskType: task_type_enum = task_type_enum.OFFICIAL) {
+  private async assertCreateAccess(
+    departmentIds: string[],
+    user: JwtPayload,
+    taskType: task_type_enum = task_type_enum.OFFICIAL,
+    delegateDepartmentId?: string,
+  ) {
     // Validate departments exist and are active
+    const submittedDepartmentIds = [...new Set([...departmentIds, delegateDepartmentId].filter(Boolean) as string[])];
     const activeDepartments = await this.prisma.departments.count({
-      where: { id: { in: departmentIds }, is_active: true },
+      where: { id: { in: submittedDepartmentIds }, is_active: true },
     });
 
-    if (activeDepartments !== departmentIds.length) {
+    if (activeDepartments !== submittedDepartmentIds.length) {
       throw new ForbiddenException('Invalid department selection');
     }
 
@@ -543,10 +742,22 @@ export class TasksService {
       }
       
       const scope = await this.departmentScopeService.resolveDepartmentScope(user);
-      if (departmentIds.length > 1 || !departmentIds.every(id => scope.departmentIds.includes(id))) {
-        throw new ForbiddenException('Cross-department assignment is not allowed for Employee Shared Tasks');
+      if (!user.departmentId || !scope.departmentIds.includes(user.departmentId)) {
+        throw new ForbiddenException('Creator department is not available for Employee Shared Tasks');
+      }
+      if (departmentIds.length !== 1) {
+        throw new ForbiddenException('Select one target department for Employee Shared Tasks');
       }
       return;
+    }
+
+    if (delegateDepartmentId) {
+      if (user.role !== role_enum.HOD) {
+        throw new ForbiddenException('Only HOD users can delegate Official Tasks to another department');
+      }
+      if (departmentIds.includes(delegateDepartmentId)) {
+        throw new BadRequestException('Delegation department must be different from source department');
+      }
     }
 
     // Employees cannot create official tasks
@@ -561,7 +772,7 @@ export class TasksService {
     }
   }
 
-  private async resolveAssigneeIds(dto: CreateTaskDto, departmentIds: string[]) {
+  private async resolveAssignees(dto: CreateTaskDto, departmentIds: string[], user: JwtPayload, taskType: task_type_enum) {
     const assigneeIds = [...new Set([
       ...(dto.assignedToIds ?? []),
       dto.assignedToId ?? '',
@@ -569,6 +780,10 @@ export class TasksService {
 
     if (!assigneeIds.length) {
       return [];
+    }
+
+    if (taskType === task_type_enum.EMPLOYEE_SHARED && assigneeIds.length !== 1) {
+      throw new BadRequestException('Select exactly one employee for an Employee Shared Task');
     }
 
     const employees = await this.prisma.users.findMany({
@@ -579,15 +794,20 @@ export class TasksService {
         deleted_at: null,
         pending_approval: false,
         department_id: { in: departmentIds },
+        ...(taskType === task_type_enum.EMPLOYEE_SHARED ? { id: { in: assigneeIds, not: user.sub } } : {}),
       },
-      select: { id: true },
+      select: { id: true, department_id: true },
     });
 
     if (employees.length !== assigneeIds.length) {
-      throw new ForbiddenException('Assignee must belong to a selected department');
+      throw new ForbiddenException(
+        taskType === task_type_enum.EMPLOYEE_SHARED
+          ? 'Assignee must be an active employee in the selected department and cannot be the creator'
+          : 'Assignee must belong to a selected department',
+      );
     }
 
-    return employees.map((employee) => employee.id);
+    return employees;
   }
 
   private async assertAssigneeAccess(assignedToId: string, departmentIds: string[]) {
@@ -608,7 +828,7 @@ export class TasksService {
     }
   }
 
-  private async resolveAllEmployeeIds(departmentIds: string[]) {
+  private async resolveAllEmployees(departmentIds: string[]) {
     const employees = await this.prisma.users.findMany({
       where: {
         role: role_enum.EMPLOYEE,
@@ -617,7 +837,7 @@ export class TasksService {
         pending_approval: false,
         department_id: { in: departmentIds },
       },
-      select: { id: true },
+      select: { id: true, department_id: true },
       orderBy: { full_name: 'asc' },
     });
 
@@ -625,7 +845,7 @@ export class TasksService {
       throw new BadRequestException('No active employees found for selected departments');
     }
 
-    return employees.map((employee) => employee.id);
+    return employees;
   }
 
   private taskDepartmentIds(task: any) {
@@ -651,28 +871,44 @@ export class TasksService {
     };
   }
 
-  private async createTaskRecords(db: any, dto: CreateTaskDto, user: JwtPayload) {
+  private async createTaskRecords(db: any, dto: CreateTaskDto, user: JwtPayload): Promise<CreatedTaskRecord[]> {
     const departmentIds = this.resolveDepartmentIds(dto);
     const taskType = dto.taskType ?? task_type_enum.OFFICIAL;
-    await this.assertCreateAccess(departmentIds, user, taskType);
+    await this.assertCreateAccess(departmentIds, user, taskType, dto.delegateDepartmentId);
 
-    const assigneeIds = dto.assignAllEmployees
-      ? await this.resolveAllEmployeeIds(departmentIds)
-      : await this.resolveAssigneeIds(dto, departmentIds);
+    if (dto.delegateDepartmentId) {
+      return this.createDelegatedOfficialTask(db, dto, user, departmentIds[0]!, dto.delegateDepartmentId);
+    }
 
-    const createdTasks: Array<{ id: string }> = [];
+    if (taskType === task_type_enum.EMPLOYEE_SHARED && dto.assignAllEmployees) {
+      throw new BadRequestException('Employee Shared Tasks must be assigned to one employee');
+    }
 
-    if (assigneeIds.length) {
-      for (const assigneeId of assigneeIds) {
+    const assignees = dto.assignAllEmployees
+      ? await this.resolveAllEmployees(departmentIds)
+      : await this.resolveAssignees(dto, departmentIds, user, taskType);
+
+    const createdTasks: CreatedTaskRecord[] = [];
+
+    if (assignees.length) {
+      const employeeSharedHods = taskType === task_type_enum.EMPLOYEE_SHARED
+        ? await this.resolveHodIdsForDepartments([...new Set([user.departmentId!, ...departmentIds])])
+        : new Map<string, string[]>();
+
+      for (const assignee of assignees) {
+        const taskDepartmentIds = taskType === task_type_enum.EMPLOYEE_SHARED
+          ? [...new Set([user.departmentId!, assignee.department_id].filter(Boolean) as string[])]
+          : departmentIds;
+
         const created = await db.tasks.create({
           data: {
             title: dto.title,
             description: dto.description,
             priority: dto.priority,
             due_date: new Date(dto.dueDate),
-            assigned_to_id: assigneeId,
+            assigned_to_id: assignee.id,
             assigned_by_id: user.sub,
-            department_id: departmentIds[0]!,
+            department_id: taskType === task_type_enum.EMPLOYEE_SHARED ? assignee.department_id! : departmentIds[0]!,
             parent_task_id: dto.parentTaskId ?? null,
             status: task_status_enum.CREATED,
             task_type: taskType,
@@ -680,7 +916,7 @@ export class TasksService {
         });
 
         await db.task_departments.createMany({
-          data: departmentIds.map((department_id) => ({
+          data: taskDepartmentIds.map((department_id) => ({
             task_id: created.id,
             department_id,
           })),
@@ -707,23 +943,25 @@ export class TasksService {
               taskId: created.id,
               title: dto.title,
               description: dto.description,
-              assignedToId: assigneeId,
-              departmentIds,
+              assignedToId: assignee.id,
+              departmentIds: taskDepartmentIds,
               taskType,
             }),
           },
         });
 
-        await db.notifications.create({
-          data: {
-            user_id: assigneeId,
-            type: notification_type_enum.TASK_ASSIGNED,
-            title: 'New Task Assigned',
-            message: `You have been assigned task "${dto.title}".`,
-          },
+        createdTasks.push({
+          id: created.id,
+          notifications: this.taskCreatedNotifications({
+            taskTitle: dto.title,
+            taskType,
+            assigneeId: assignee.id,
+            creatorId: user.sub,
+            creatorDepartmentId: user.departmentId,
+            targetDepartmentId: assignee.department_id,
+            hodIdsByDepartment: employeeSharedHods,
+          }),
         });
-
-        createdTasks.push(created);
       }
     } else {
       const created = await db.tasks.create({
@@ -775,9 +1013,226 @@ export class TasksService {
         },
       });
 
-      createdTasks.push(created);
+      createdTasks.push({ id: created.id });
     }
 
     return createdTasks;
+  }
+
+  private async createDelegatedOfficialTask(
+    db: any,
+    dto: CreateTaskDto,
+    user: JwtPayload,
+    sourceDepartmentId: string,
+    targetDepartmentId: string,
+  ): Promise<CreatedTaskRecord[]> {
+    if (dto.assignedToId || dto.assignedToIds?.length || dto.assignAllEmployees) {
+      throw new BadRequestException('Delegated Official Tasks must be sent to the target department HOD');
+    }
+
+    const targetHodIds = await this.resolveHodIdsForDepartment(targetDepartmentId);
+    if (!targetHodIds.length) {
+      throw new BadRequestException('Target department does not have an active HOD');
+    }
+
+    const created = await db.tasks.create({
+      data: {
+        title: dto.title,
+        description: dto.description,
+        priority: dto.priority,
+        due_date: new Date(dto.dueDate),
+        assigned_to_id: null,
+        assigned_by_id: user.sub,
+        department_id: sourceDepartmentId,
+        parent_task_id: dto.parentTaskId ?? null,
+        status: task_status_enum.CREATED,
+        task_type: task_type_enum.OFFICIAL,
+      },
+    });
+
+    await db.task_departments.createMany({
+      data: [{ task_id: created.id, department_id: sourceDepartmentId }],
+      skipDuplicates: true,
+    });
+
+    await db.task_transfers.create({
+      data: {
+        task_id: created.id,
+        from_dept_id: sourceDepartmentId,
+        to_dept_id: targetDepartmentId,
+        initiated_by_id: user.sub,
+        reason: 'Initial cross-department delegation',
+      },
+    });
+
+    await db.task_status_logs.create({
+      data: {
+        task_id: created.id,
+        from_status: null,
+        to_status: task_status_enum.CREATED,
+        changed_by_id: user.sub,
+      },
+    });
+
+    await db.audit_logs.createMany({
+      data: [
+        {
+          user_id: user.sub,
+          action: 'TASK_CREATED',
+          entity: 'tasks',
+          entity_id: created.id,
+          old_value: null,
+          new_value: JSON.stringify({
+            taskId: created.id,
+            title: dto.title,
+            description: dto.description,
+            departmentIds: [sourceDepartmentId],
+            taskType: task_type_enum.OFFICIAL,
+          }),
+        },
+        {
+          user_id: user.sub,
+          action: 'TASK_DELEGATED',
+          entity: 'tasks',
+          entity_id: created.id,
+          old_value: JSON.stringify({ departmentId: sourceDepartmentId }),
+          new_value: JSON.stringify({
+            taskId: created.id,
+            fromDepartmentId: sourceDepartmentId,
+            toDepartmentId: targetDepartmentId,
+          }),
+        },
+      ],
+    });
+
+    return [{
+      id: created.id,
+      notifications: targetHodIds.map((hodId) => ({
+        recipientId: hodId,
+        type: notification_type_enum.TRANSFER_REQUESTED,
+        title: 'Department Task Delegation',
+        message: `Task "${dto.title}" has been delegated to your department for review.`,
+      })),
+    }];
+  }
+
+  private taskCreatedNotifications(input: {
+    taskTitle: string;
+    taskType: task_type_enum;
+    assigneeId: string;
+    creatorId: string;
+    creatorDepartmentId: string | null;
+    targetDepartmentId: string | null;
+    hodIdsByDepartment: Map<string, string[]>;
+  }): PendingTaskNotification[] {
+    const notifications: PendingTaskNotification[] = [
+      {
+        recipientId: input.assigneeId,
+        type: notification_type_enum.TASK_ASSIGNED,
+        title: 'New Task Assigned',
+        message: `You have been assigned task "${input.taskTitle}".`,
+      },
+    ];
+
+    if (input.taskType === task_type_enum.EMPLOYEE_SHARED) {
+      notifications.push({
+        recipientId: input.creatorId,
+        type: notification_type_enum.TASK_ASSIGNED,
+        title: 'Shared Task Created',
+        message: `Your shared task "${input.taskTitle}" has been created.`,
+      });
+
+      const hodIds = [
+        ...(input.creatorDepartmentId ? input.hodIdsByDepartment.get(input.creatorDepartmentId) ?? [] : []),
+        ...(input.targetDepartmentId ? input.hodIdsByDepartment.get(input.targetDepartmentId) ?? [] : []),
+      ];
+
+      for (const hodId of hodIds) {
+        notifications.push({
+          recipientId: hodId,
+          type: notification_type_enum.TASK_ASSIGNED,
+          title: 'Employee Shared Task',
+          message: `Employee shared task "${input.taskTitle}" is visible for your department.`,
+        });
+      }
+    }
+
+    return this.dedupeNotifications(notifications);
+  }
+
+  private async resolveHodIdsForDepartment(departmentId: string) {
+    const records = await this.prisma.hod_departments.findMany({
+      where: {
+        department_id: departmentId,
+        users: {
+          role: role_enum.HOD,
+          is_active: true,
+          deleted_at: null,
+          pending_approval: false,
+        },
+      },
+      select: { hod_id: true },
+    });
+
+    return records.map((record) => record.hod_id);
+  }
+
+  private async resolveHodIdsForDepartments(departmentIds: string[]) {
+    const records = await this.prisma.hod_departments.findMany({
+      where: {
+        department_id: { in: departmentIds },
+        users: {
+          role: role_enum.HOD,
+          is_active: true,
+          deleted_at: null,
+          pending_approval: false,
+        },
+      },
+      select: { department_id: true, hod_id: true },
+    });
+
+    const byDepartment = new Map<string, string[]>();
+    for (const record of records) {
+      byDepartment.set(record.department_id, [...(byDepartment.get(record.department_id) ?? []), record.hod_id]);
+    }
+    return byDepartment;
+  }
+
+  private async dispatchTaskNotifications(tasks: CreatedTaskRecord[]) {
+    const notifications = this.dedupeNotifications(tasks.flatMap((task) => task.notifications ?? []));
+    if (!notifications.length) return;
+
+    try {
+      await Promise.all(notifications.map((notification) =>
+        this.notificationsService.createNotification(notification),
+      ));
+    } catch (error) {
+      console.warn('Task notification dispatch failed', error);
+    }
+  }
+
+  private async createTaskNotificationsInTransaction(db: any, tasks: CreatedTaskRecord[]) {
+    const notifications = this.dedupeNotifications(tasks.flatMap((task) => task.notifications ?? []));
+    if (!notifications.length) return;
+
+    await db.notifications.createMany({
+      data: notifications.map((notification) => ({
+        user_id: notification.recipientId,
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  private dedupeNotifications(notifications: PendingTaskNotification[]) {
+    const seen = new Set<string>();
+    return notifications.filter((notification) => {
+      const key = `${notification.recipientId}:${notification.type}:${notification.title}:${notification.message}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
 }

@@ -438,11 +438,8 @@ export class AttachmentsService {
       throw new NotFoundException('Task not found');
     }
 
-    const scope = await this.departmentScopeService.resolveDepartmentScope(user);
-    if (scope.unrestricted) return;
-
     const departmentIds = this.taskDepartmentIds(task);
-    const hasAccess = departmentIds.some((deptId) => scope.departmentIds.includes(deptId));
+    const hasAccess = await this.departmentScopeService.hasAnyDepartmentAccess(user, departmentIds);
 
     if (!hasAccess) {
       throw new ForbiddenException('Access denied to this task');
@@ -496,7 +493,7 @@ export class AttachmentsService {
       select: {
         id: true,
         created_by_id: true,
-        department_id: true,
+        self_action_departments: { select: { department_id: true } },
       },
     });
 
@@ -506,10 +503,10 @@ export class AttachmentsService {
 
     if (action.created_by_id === user.sub) return;
 
-    const scope = await this.departmentScopeService.resolveDepartmentScope(user);
-    if (scope.unrestricted) return;
+    const departmentIds = action.self_action_departments?.map((d) => d.department_id) || [];
+    const hasAccess = await this.departmentScopeService.hasAnyDepartmentAccess(user, departmentIds);
 
-    if (!scope.departmentIds.includes(action.department_id)) {
+    if (!hasAccess) {
       throw new ForbiddenException('Access denied to this self action');
     }
   }

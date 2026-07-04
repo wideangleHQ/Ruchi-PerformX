@@ -45,7 +45,7 @@ export class DashboardService {
     // Build base filters using centralized helpers
     const taskBaseFilter = {
       deleted_at: null,
-      ...DepartmentQueryHelper.buildTaskDepartmentFilter(scope),
+      ...this.buildCurrentOwnerDepartmentFilter(scope),
     };
     const activeTaskWhere = { ...taskBaseFilter, status: { notIn: this.terminalStatuses } };
     const completedTaskWhere = { ...taskBaseFilter, status: { in: this.completedStatuses } };
@@ -103,18 +103,14 @@ export class DashboardService {
         where: { ...completedTaskWhere, completed_at: { gte: weekStart } },
         select: { completed_at: true },
       }),
-      this.prisma.task_departments.groupBy({
+      this.prisma.tasks.groupBy({
         by: ['department_id'],
-        where: {
-          tasks: taskBaseFilter,
-        },
+        where: taskBaseFilter,
         _count: { id: true },
       }),
-      this.prisma.task_departments.groupBy({
+      this.prisma.tasks.groupBy({
         by: ['department_id'],
-        where: {
-          tasks: completedTaskWhere,
-        },
+        where: completedTaskWhere,
         _count: { id: true },
       }),
       this.prisma.tasks.count({
@@ -162,6 +158,18 @@ export class DashboardService {
 
   private percent(value: number, total: number) {
     return total ? Math.round((value / total) * 1000) / 10 : 0;
+  }
+
+  private buildCurrentOwnerDepartmentFilter(scope: Awaited<ReturnType<DepartmentScopeService['resolveDepartmentScope']>>): Prisma.tasksWhereInput {
+    if (scope.unrestricted) {
+      return {};
+    }
+
+    if (scope.departmentIds.length === 0) {
+      return { id: { in: [] } };
+    }
+
+    return { department_id: { in: scope.departmentIds } };
   }
 
   private weeklyChart(tasks: Array<{ completed_at: Date | null }>, weekStart: Date) {
