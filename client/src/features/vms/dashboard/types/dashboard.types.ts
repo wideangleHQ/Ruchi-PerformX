@@ -8,11 +8,18 @@ export interface DashboardSummary {
 
 export interface RecentVisitor {
   id: string;
-  fullName: string;
-  mobileNumber?: string;
   purpose: string;
-  checkInTime?: string;
+  checkedInAt?: string | null;
+  checkedOutAt?: string | null;
   status: string;
+  updatedAt: string;
+  visitor: {
+    fullName: string;
+    companyName?: string | null;
+  };
+  hostEmployee?: {
+    fullName: string;
+  } | null;
 }
 
 export interface VisitorStatistics {

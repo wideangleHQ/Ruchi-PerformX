@@ -14,6 +14,26 @@ import * as ExcelJS from 'exceljs';
 export class DashboardServiceImpl implements DashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private readonly dashboardVisitorSelect = {
+    id: true,
+    purpose: true,
+    status: true,
+    checkInTime: true,
+    checkOutTime: true,
+    updatedAt: true,
+    visitor: {
+      select: {
+        fullName: true,
+        companyName: true,
+      },
+    },
+    hostEmployee: {
+      select: {
+        full_name: true,
+      },
+    },
+  } as const;
+
   async getSummary(user: AuthenticatedUser): Promise<DashboardSummaryDto> {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
@@ -61,35 +81,22 @@ export class DashboardServiceImpl implements DashboardService {
     const limit = params.limit && params.limit > 0 ? params.limit : 20;
 
     const where = {
-      checkInTime: { gte: todayStart, lte: todayEnd },
+      createdAt: { gte: todayStart, lte: todayEnd },
       deletedAt: null,
     };
 
-    const [visits, totalItems] = await Promise.all([
-      this.prisma.visit.findMany({
-        where,
-        select: {
-          id: true,
-          purpose: true,
-          checkInTime: true,
-          status: true,
-          visitor: { select: { fullName: true, mobileNumber: true } },
-        },
-        skip: (page - 1) * limit,
-        take: limit,
-        orderBy: { checkInTime: 'desc' },
-      }),
-      this.prisma.visit.count({ where }),
-    ]);
+    const visits = await this.prisma.visit.findMany({
+      where,
+      select: this.dashboardVisitorSelect,
+      skip: (page - 1) * limit,
+      take: limit + 1,
+      orderBy: { checkInTime: 'desc' },
+    });
 
-    const data = visits.map(v => plainToInstance(RecentVisitorDto, {
-      id: v.id,
-      fullName: v.visitor.fullName,
-      mobileNumber: v.visitor.mobileNumber,
-      purpose: v.purpose,
-      checkInTime: v.checkInTime,
-      status: v.status,
-    }));
+    const pageItems = visits.slice(0, limit);
+    const data = pageItems.map((visit) => this.mapDashboardVisit(visit));
+    const hasNextPage = visits.length > limit;
+    const totalItems = (page - 1) * limit + data.length + (hasNextPage ? 1 : 0);
 
     return {
       data,
@@ -97,8 +104,8 @@ export class DashboardServiceImpl implements DashboardService {
         page,
         limit,
         totalItems,
-        totalPages: Math.ceil(totalItems / limit),
-        hasNextPage: page * limit < totalItems,
+        totalPages: hasNextPage ? page + 1 : page,
+        hasNextPage,
         hasPreviousPage: page > 1,
       }
     };
@@ -120,8 +127,11 @@ export class DashboardServiceImpl implements DashboardService {
           id: true,
           purpose: true,
           checkInTime: true,
+          checkOutTime: true,
+          updatedAt: true,
           status: true,
-          visitor: { select: { fullName: true, mobileNumber: true } },
+          visitor: { select: { fullName: true, companyName: true } },
+          hostEmployee: { select: { full_name: true } },
         },
         skip: (page - 1) * limit,
         take: limit,
@@ -130,14 +140,7 @@ export class DashboardServiceImpl implements DashboardService {
       this.prisma.visit.count({ where }),
     ]);
 
-    const data = visits.map(v => plainToInstance(RecentVisitorDto, {
-      id: v.id,
-      fullName: v.visitor.fullName,
-      mobileNumber: v.visitor.mobileNumber,
-      purpose: v.purpose,
-      checkInTime: v.checkInTime,
-      status: v.status,
-    }));
+    const data = visits.map((visit) => this.mapDashboardVisit(visit));
 
     return {
       data,
@@ -153,27 +156,54 @@ export class DashboardServiceImpl implements DashboardService {
   }
 
   async getRecentVisitors(user: AuthenticatedUser): Promise<RecentVisitorDto[]> {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
     const visits = await this.prisma.visit.findMany({
-      where: { deletedAt: null },
-      select: {
-        id: true,
-        purpose: true,
-        checkInTime: true,
-        status: true,
-        visitor: { select: { fullName: true, mobileNumber: true } },
+      where: {
+        createdAt: { gte: todayStart, lte: todayEnd },
+        deletedAt: null,
       },
+      select: this.dashboardVisitorSelect,
       take: 20,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { checkInTime: 'desc' },
     });
 
-    return visits.map(v => plainToInstance(RecentVisitorDto, {
-      id: v.id,
-      fullName: v.visitor.fullName,
-      mobileNumber: v.visitor.mobileNumber,
-      purpose: v.purpose,
-      checkInTime: v.checkInTime,
-      status: v.status,
-    }));
+    return visits.map((visit) => this.mapDashboardVisit(visit));
+  }
+
+  private mapDashboardVisit(visit: {
+    id: string;
+    purpose: string;
+    status: string;
+    checkInTime: Date | null;
+    checkOutTime: Date | null;
+    updatedAt: Date;
+    visitor: {
+      fullName: string;
+      companyName: string | null;
+    };
+    hostEmployee: {
+      full_name: string;
+    } | null;
+  }): RecentVisitorDto {
+    return plainToInstance(RecentVisitorDto, {
+      id: visit.id,
+      purpose: visit.purpose,
+      checkedInAt: visit.checkInTime,
+      checkedOutAt: visit.checkOutTime,
+      status: visit.status,
+      updatedAt: visit.updatedAt,
+      visitor: {
+        fullName: visit.visitor.fullName,
+        companyName: visit.visitor.companyName,
+      },
+      hostEmployee: visit.hostEmployee
+        ? { fullName: visit.hostEmployee.full_name }
+        : null,
+    });
   }
 
   async getStatistics(user: AuthenticatedUser): Promise<StatisticsResponseDto> {

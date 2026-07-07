@@ -12,6 +12,21 @@ interface TodayVisitorsTableProps {
   visitors: RecentVisitor[];
 }
 
+const formatTime = (value?: string | null) => {
+  if (!value) return '-';
+  return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) return '-';
+  return new Date(value).toLocaleString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    day: '2-digit',
+    month: 'short',
+  });
+};
+
 export function TodayVisitorsTable({ visitors }: TodayVisitorsTableProps) {
   return (
     <div className="rounded-xl border bg-white shadow-sm overflow-hidden font-poppins">
@@ -25,7 +40,9 @@ export function TodayVisitorsTable({ visitors }: TodayVisitorsTableProps) {
               <TableHead>Visitor Name</TableHead>
               <TableHead>Company</TableHead>
               <TableHead>Whom To Meet</TableHead>
-              <TableHead>Check In Time</TableHead>
+              <TableHead>Purpose</TableHead>
+              <TableHead>Check-In Time</TableHead>
+              <TableHead>Check-Out Time</TableHead>
               <TableHead>Current Status</TableHead>
               <TableHead>Last Updated</TableHead>
             </TableRow>
@@ -33,31 +50,29 @@ export function TodayVisitorsTable({ visitors }: TodayVisitorsTableProps) {
           <TableBody>
             {visitors.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                  No recent visitors
+                <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                  No visitors today
                 </TableCell>
               </TableRow>
             ) : (
               visitors.map((visitor) => (
                 <TableRow key={visitor.id}>
-                  <TableCell className="font-medium">{visitor.fullName}</TableCell>
-                  <TableCell>{visitor.mobileNumber || 'N/A'}</TableCell>
-                  <TableCell>{visitor.purpose}</TableCell>
-                  <TableCell>
-                    {visitor.checkInTime 
-                      ? new Date(visitor.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
-                      : '-'}
-                  </TableCell>
+                  <TableCell className="font-medium">{visitor.visitor.fullName}</TableCell>
+                  <TableCell>{visitor.visitor.companyName?.trim() || '-'}</TableCell>
+                  <TableCell>{visitor.hostEmployee?.fullName || 'Not Assigned'}</TableCell>
+                  <TableCell>{visitor.purpose || '-'}</TableCell>
+                  <TableCell>{formatTime(visitor.checkedInAt)}</TableCell>
+                  <TableCell>{visitor.checkedOutAt ? formatTime(visitor.checkedOutAt) : 'Inside'}</TableCell>
                   <TableCell>
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      visitor.status.toLowerCase() === 'inside' 
+                      visitor.status === 'CHECKED_IN'
                         ? 'bg-green-100 text-green-700' 
                         : 'bg-gray-100 text-gray-700'
                     }`}>
                       {visitor.status}
                     </span>
                   </TableCell>
-                  <TableCell>-</TableCell>
+                  <TableCell>{formatDateTime(visitor.updatedAt)}</TableCell>
                 </TableRow>
               ))
             )}
