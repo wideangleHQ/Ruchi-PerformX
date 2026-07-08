@@ -277,6 +277,23 @@ async forgotPassword(dto: ForgotPasswordDto) {
   };
 }
 
+async verifyToken(token: string) {
+  try {
+    const payload = this.jwtService.verify(token, {
+      secret: process.env.JWT_SECRET as string, 
+    });
+
+    return {
+      userId: payload.sub,
+      email: payload.username ?? payload.email, // check which field PerformX actually puts email in
+      role: payload.role,
+      departmentId: payload.departmentId ?? null,
+    };
+  } catch (err) {
+    throw new UnauthorizedException('Invalid or expired token');
+  }
+}
+
 async verifyResetOtp(dto: VerifyResetOtpDto) {
   const otpRecord = await this.prisma.otpVerification.findFirst({
     where: {

@@ -116,4 +116,10 @@ export class AuthController {
   me(@CurrentUser() user: JwtPayload) {
     return user;
   }
+
+  @Public() 
+  @Post('verify')
+  async verify(@Body('token') token: string) {
+  return this.authService.verifyToken(token);
+  }
 }
