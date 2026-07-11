@@ -44,6 +44,7 @@ export interface JwtUser {
   role: Role;
   departmentId: string | null;
   departmentIds: string[];
+  departmentName?: string | null;
   fullName: string;
 }
 
@@ -57,6 +58,7 @@ export interface User {
   status?: UserStatus;
   departmentId?: string | null;
   departmentIds?: string[];
+  departmentName?: string | null;
   department?: { id: string; name: string } | null;
 }
 

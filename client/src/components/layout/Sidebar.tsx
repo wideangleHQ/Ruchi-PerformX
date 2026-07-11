@@ -18,7 +18,11 @@ import {
   Menu,
   X,
   UserCircle2,
+  Briefcase,
+  Loader2,
 } from 'lucide-react';
+import { launchCareerX } from '@/api/career';
+import { useToast } from '@/hooks/useToast';
 
 interface NavItem {
   href: string;
@@ -44,13 +48,35 @@ export function Sidebar() {
   const { user, logout } = useAuth();
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+  const [isLaunchingCareer, setIsLaunchingCareer] = useState(false);
+  const toast = useToast();
 
+  // Filter nav items based on user role
   const visibleItems = navItems.filter(
     (item) => !item.roles || (user?.role && item.roles.includes(user.role))
   );
 
+  // Check if user belongs to HR department (case-insensitive)
+  // CareerX is only accessible to HR department users
+  const isHRDepartment = user?.departmentName?.toLowerCase() === 'hr';
+
   const handleLogout = async () => {
     await logout();
+  };
+
+  const handleCareerXLaunch = async () => {
+    if (isLaunchingCareer) return;
+
+    setIsLaunchingCareer(true);
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) throw new Error('Authentication token not found');
+
+      await launchCareerX(token);
+    } catch (error: any) {
+      toast.error(error.message || 'Could not complete authentication handshake.');
+      setIsLaunchingCareer(false);
+    }
   };
 
   return (
@@ -107,6 +133,30 @@ export function Sidebar() {
               </Link>
             );
           })}
+
+          {/* CareerX - Only visible to HR department users */}
+          {isHRDepartment && (
+            <button
+              onClick={handleCareerXLaunch}
+              disabled={isLaunchingCareer}
+              className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+                isLaunchingCareer
+                  ? 'bg-slate-50 text-slate-400 cursor-wait'
+                  : 'text-slate-600 hover:bg-slate-50 hover:text-green-700'
+              }`}
+            >
+              <span
+                className={isLaunchingCareer ? 'text-slate-400' : 'text-slate-400 group-hover:text-green-600'}
+              >
+                {isLaunchingCareer ? (
+                  <Loader2 size={20} className="animate-spin" />
+                ) : (
+                  <Briefcase size={20} />
+                )}
+              </span>
+              <span>{isLaunchingCareer ? 'Launching...' : 'CareerX'}</span>
+            </button>
+          )}
         </nav>
 
         <div className="shrink-0 border-t border-slate-200 p-4">
