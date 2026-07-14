@@ -526,10 +526,6 @@ export class AttachmentsService {
     return [...new Set([task.department_id, ...task.task_departments.map((item) => item.department_id)].filter(Boolean))];
   }
 
-  private hasOverlap(source: string[], target: string[]) {
-    return source.some((item) => target.includes(item));
-  }
-
   private selectAttachment() {
     return {
       id: true,

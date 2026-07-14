@@ -3,6 +3,7 @@
 import { Global, Module } from '@nestjs/common';
 import { DepartmentScopeService } from './services/department-scope.service';
 import { PrismaModule } from '../prisma/prisma.module';
+import { RedisService } from './services/redis.service';
 
 /**
  * CommonModule
@@ -14,7 +15,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 @Global()
 @Module({
   imports: [PrismaModule],
-  providers: [DepartmentScopeService],
-  exports: [DepartmentScopeService],
+  providers: [DepartmentScopeService, RedisService],
+  exports: [DepartmentScopeService, RedisService],
 })
 export class CommonModule {}

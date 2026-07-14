@@ -43,7 +43,7 @@
   "scripts": {
     "build": "prisma generate && nest build",
     "start": "node dist/main.js",
-    "start:dev": "npx kill-port 3001 && nest start --watch",
-    "dev": "npx kill-port 3001 && nest start --watch"
+    "start:dev": "npx kill-port 4000 && nest start --watch --port 4000",
+    "dev": "npx kill-port 4000 && nest start --watch --port 4000"
   }
 }

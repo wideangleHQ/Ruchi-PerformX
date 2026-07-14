@@ -12,6 +12,7 @@ export const launchCareerX = async (accessToken: string) => {
   }
 
   try {
+    console.log("Access Token:", accessToken);
     // Perform the secure exchange request
     // This sends the PerformX JWT to CareerX backend
     // credentials: 'include' allows CareerX to set its own HttpOnly cookies

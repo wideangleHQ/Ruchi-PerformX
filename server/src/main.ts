@@ -21,14 +21,14 @@ async function bootstrap() {
   // CORS
   app.enableCors({
   origin: [
-    'http://localhost:3000',
+    'http://localhost:4001',
     'https://app.ruchiperformx.in',
   ],
   credentials: true,
 });
 
-  const port = process.env.PORT ?? 3001;
-  await app.listen(port, '0.0.0.0');
+  const port = process.env.PORT ?? 4000;
+  await app.listen(port);
 
   console.log(`RUCHI PerformX API running on port ${port}`);
 }

@@ -12,6 +12,7 @@ import { UpdateDepartmentDto } from './dto/update-department-dto';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
 import { role_enum } from '@prisma/client';
 import { DepartmentScopeService } from '../../common/services/department-scope.service';
+import { RedisService } from '../../common/services/redis.service';
 
 @Injectable()
 export class DepartmentsService {
@@ -20,6 +21,7 @@ export class DepartmentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly departmentScopeService: DepartmentScopeService,
+    private readonly redisService: RedisService,
   ) {}
 
   async findAll(user?: JwtPayload) {
@@ -39,6 +41,26 @@ export class DepartmentsService {
         created_at: true,
       },
     });
+  }
+
+  async findInternal() {
+    const CACHE_KEY = 'internal:departments';
+    const cached = await this.redisService.get<{ id: string; name: string }[]>(CACHE_KEY);
+    if (cached) {
+      return cached;
+    }
+
+    const departments = await this.prisma.departments.findMany({
+      where: { is_active: true },
+      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+
+    await this.redisService.set(CACHE_KEY, departments, 600);
+    return departments;
   }
 
   async findOne(id: string) {
@@ -91,6 +113,7 @@ export class DepartmentsService {
       },
     });
 
+    await this.redisService.del('internal:departments');
     this.logger.log(`Department created: ${department.name}`);
     return department;
   }
@@ -129,6 +152,7 @@ export class DepartmentsService {
       },
     });
 
+    await this.redisService.del('internal:departments');
     this.logger.log(`Department updated: ${updated.name}`);
     return updated;
   }

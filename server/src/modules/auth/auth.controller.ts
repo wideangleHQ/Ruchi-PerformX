@@ -6,7 +6,9 @@ import {
   Body,
   HttpCode,
   HttpStatus,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -31,8 +33,16 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
+    const result = await this.authService.login(dto);
+    res.cookie('px_at', result.accessToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      domain: '.ruchiperformx.in',
+      path: '/',
+    });
+    return result;
   }
 
   @Public()
@@ -108,7 +118,11 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  logout() {
+  logout(@Res({ passthrough: true }) res: Response) {
+    res.clearCookie('px_at', {
+      domain: '.ruchiperformx.in',
+      path: '/',
+    });
     return { message: 'Logged out successfully' };
   }
 

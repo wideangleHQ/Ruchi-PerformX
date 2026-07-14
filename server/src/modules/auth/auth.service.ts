@@ -120,6 +120,12 @@ export class AuthService {
         department_id: true,
         is_active: true,
         pending_approval: true,
+        departments: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
     });
 
@@ -167,6 +173,7 @@ export class AuthService {
       role: user.role,
       departmentId: user.department_id,
       departmentIds,
+      departmentName: user.departments?.name || null,
       fullName: user.full_name,
     };
 
@@ -280,16 +287,45 @@ async forgotPassword(dto: ForgotPasswordDto) {
 async verifyToken(token: string) {
   try {
     const payload = this.jwtService.verify(token, {
-      secret: process.env.JWT_SECRET as string, 
+      secret: process.env.JWT_SECRET as string,
     });
 
+    // Fetch the complete user from DB
+    const user = await this.prisma.users.findUnique({
+      where: { id: payload.sub },
+      include: {
+        departments: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const privilegedRoles: role_enum[] = [
+      role_enum.MD,
+      role_enum.EA,
+      role_enum.PA,
+    ];
+
+    const careerAccess =
+      user.departments?.name === 'HR' ||
+      privilegedRoles.includes(user.role);
+
     return {
-      userId: payload.sub,
-      email: payload.username ?? payload.email, // check which field PerformX actually puts email in
-      role: payload.role,
-      departmentId: payload.departmentId ?? null,
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      departmentId: user.department_id,
+      departmentName: user.departments?.name ?? null,
+      careerAccess,
     };
-  } catch (err) {
+  } catch {
     throw new UnauthorizedException('Invalid or expired token');
   }
 }
