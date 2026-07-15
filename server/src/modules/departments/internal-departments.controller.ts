@@ -2,9 +2,11 @@ import { Controller, Get, UseGuards, Logger } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { DepartmentsService } from './departments.service';
 import { InternalApiGuard } from '../../common/gaurds/internal-api.guard';
+import { Public } from '../../common/decorators/public.decorator';
 
 @ApiExcludeController()
-@Controller('api/v1/internal/departments')
+@Public()
+@Controller('internal/departments')
 @UseGuards(InternalApiGuard)
 export class InternalDepartmentsController {
   private readonly logger = new Logger(InternalDepartmentsController.name);
