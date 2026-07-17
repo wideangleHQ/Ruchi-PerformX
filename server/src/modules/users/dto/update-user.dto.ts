@@ -35,4 +35,8 @@ export class UpdateUserDto {
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  canAccessCareerHR?: boolean;
 }

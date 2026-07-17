@@ -19,6 +19,7 @@ export class ProfileService {
         mobile_number: true,
         role: true,
         department_id: true,
+        can_access_career_hr: true,
         created_at: true,
         departments: {
           select: {
@@ -80,6 +81,7 @@ export class ProfileService {
         mobile_number: true,
         role: true,
         department_id: true,
+        can_access_career_hr: true,
         created_at: true,
         departments: {
           select: {
@@ -101,6 +103,7 @@ export class ProfileService {
     mobile_number: string | null;
     role: role_enum;
     department_id: string | null;
+    can_access_career_hr: boolean;
     created_at: Date | null;
     departments: { id: string; name: string } | null;
   }): Promise<ProfileResponseDto> {
@@ -154,6 +157,7 @@ export class ProfileService {
       departmentIds,
       departmentNames,
       createdAt: user.created_at,
+      canAccessCareerHR: user.can_access_career_hr,
     };
   }
 }

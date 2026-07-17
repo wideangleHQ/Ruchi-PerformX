@@ -120,6 +120,7 @@ export class AuthService {
         department_id: true,
         is_active: true,
         pending_approval: true,
+        can_access_career_hr: true,
         departments: {
           select: {
             id: true,
@@ -175,6 +176,7 @@ export class AuthService {
       departmentIds,
       departmentName: user.departments?.name || null,
       fullName: user.full_name,
+      canAccessCareerHR: user.can_access_career_hr,
     };
 
     return {
@@ -324,6 +326,7 @@ async verifyToken(token: string) {
       departmentId: user.department_id,
       departmentName: user.departments?.name ?? null,
       careerAccess,
+      canAccessCareerHR: user.can_access_career_hr,
     };
   } catch {
     throw new UnauthorizedException('Invalid or expired token');

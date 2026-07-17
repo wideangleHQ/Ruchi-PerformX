@@ -46,6 +46,7 @@ export interface JwtUser {
   departmentIds: string[];
   departmentName?: string | null;
   fullName: string;
+  canAccessCareerHR: boolean;
 }
 
 /** Normalised User used throughout the app */
@@ -60,6 +61,7 @@ export interface User {
   departmentIds?: string[];
   departmentName?: string | null;
   department?: { id: string; name: string } | null;
+  canAccessCareerHR?: boolean;
 }
 
 export interface LoginRequest {

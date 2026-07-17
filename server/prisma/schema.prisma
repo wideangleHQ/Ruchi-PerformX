@@ -492,6 +492,7 @@ model users {
   must_change_password                                 Boolean?                @default(false)
   is_email_verified                                    Boolean?                @default(false)
   pending_approval                                     Boolean?                @default(false)
+  can_access_career_hr                                 Boolean                 @default(false)
   audit_logs                                           audit_logs[]
   incentives_incentives_approved_by_idTousers          incentives[]            @relation("incentives_approved_by_idTousers")
   incentives_incentives_employee_idTousers             incentives[]            @relation("incentives_employee_idTousers")

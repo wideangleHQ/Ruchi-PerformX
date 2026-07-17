@@ -11,4 +11,5 @@ export class ProfileResponseDto {
   departmentIds?: string[] | undefined;
   departmentNames?: string[] | undefined;
   createdAt?: Date | null;
+  canAccessCareerHR!: boolean;
 }

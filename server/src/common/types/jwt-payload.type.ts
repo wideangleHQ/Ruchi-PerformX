@@ -10,6 +10,7 @@ export interface JwtPayload {
   departmentIds: string[];     // HOD / EA / PA: all assigned dept IDs; others: [] or [departmentId]
   departmentName?: string | null; // Department name for display (primarily for EMPLOYEE role)
   fullName?: string;          // User's full name
+  canAccessCareerHR: boolean;
   iat?: number;
   exp?: number;
 }

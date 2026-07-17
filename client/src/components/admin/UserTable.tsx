@@ -53,6 +53,9 @@ export function UserTable({
               Department
             </th>
             <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
+              CareerX HR
+            </th>
+            <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
               Actions
             </th>
           </tr>
@@ -91,6 +94,17 @@ export function UserTable({
               </td>
               <td className="px-6 py-4 text-sm text-gray-600">
                 {user.department || '-'}
+              </td>
+              <td className="px-6 py-4">
+                <span
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                    user.canAccessCareerHR
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {user.canAccessCareerHR ? 'Enabled' : 'Disabled'}
+                </span>
               </td>
               <td className="px-6 py-4">
                 <div className="flex items-center gap-2">

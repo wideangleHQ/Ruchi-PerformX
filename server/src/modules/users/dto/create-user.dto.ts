@@ -8,6 +8,7 @@ import {
   IsEnum,
   IsEmail,
   IsArray,
+  IsBoolean,
   MinLength,
   MaxLength,
 } from 'class-validator';
@@ -50,4 +51,8 @@ export class CreateUserDto {
   @IsArray()
   @IsUUID('all', { each: true })
   departmentIds?: string[];
+
+  @IsBoolean()
+  @IsOptional()
+  canAccessCareerHR?: boolean;
 }

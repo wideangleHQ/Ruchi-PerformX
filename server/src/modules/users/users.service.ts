@@ -33,6 +33,7 @@ const USER_SELECT = {
       departments: { select: { name: true } },
     },
   },
+  can_access_career_hr: true,
   created_at: true,
 };
 
@@ -246,6 +247,7 @@ export class UsersService {
         role: dto.role,
         department_id: (dto.role !== role_enum.HOD && !ASSISTANT_ROLES.includes(dto.role) && dto.role !== role_enum.PURCHASE_HEAD) ? (dto.departmentId ?? null) : null,
         is_active: dto.role === role_enum.MD || dto.role === role_enum.HOD || ASSISTANT_ROLES.includes(dto.role) || dto.role === role_enum.PURCHASE_HEAD,
+        can_access_career_hr: dto.canAccessCareerHR ?? false,
       },
     });
 
@@ -312,6 +314,7 @@ export class UsersService {
             : { departments: { disconnect: true } }
           : {}),
         ...(dto.isActive !== undefined ? { is_active: dto.isActive } : {}),
+        ...(dto.canAccessCareerHR !== undefined ? { can_access_career_hr: dto.canAccessCareerHR } : {}),
       },
       select: USER_SELECT,
     });
@@ -579,6 +582,7 @@ export class UsersService {
       departmentId: user.department_id,
       departmentIds,
       department: departmentName,
+      canAccessCareerHR: user.can_access_career_hr ?? false,
       createdAt: user.created_at,
     };
   }
