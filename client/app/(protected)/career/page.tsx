@@ -18,8 +18,9 @@ export default function CareerPage() {
     if (isLoading) return;
 
     const isHRDepartment = user?.departmentName?.toLowerCase() === 'hr';
+    const canAccessCareer = isHRDepartment || user?.canAccessCareerHR === true;
 
-    if (!user || !isHRDepartment) {
+    if (!user || !canAccessCareer) {
       router.replace('/dashboard');
       return;
     }

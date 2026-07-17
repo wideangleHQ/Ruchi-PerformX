@@ -56,9 +56,9 @@ export function Sidebar() {
     (item) => !item.roles || (user?.role && item.roles.includes(user.role))
   );
 
-  // Check if user belongs to HR department (case-insensitive)
-  // CareerX is only accessible to HR department users
+  // CareerX is accessible to HR department users OR users with explicit canAccessCareerHR permission
   const isHRDepartment = user?.departmentName?.toLowerCase() === 'hr';
+  const canSeeCareerX = isHRDepartment || user?.canAccessCareerHR === true;
 
   const handleLogout = async () => {
     await logout();
@@ -134,8 +134,8 @@ export function Sidebar() {
             );
           })}
 
-          {/* CareerX - Only visible to HR department users */}
-          {isHRDepartment && (
+          {/* CareerX - Visible to HR department users and users with CareerX access */}
+          {canSeeCareerX && (
             <button
               onClick={handleCareerXLaunch}
               disabled={isLaunchingCareer}
