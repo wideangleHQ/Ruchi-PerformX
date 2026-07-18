@@ -52,6 +52,7 @@ export interface SelfActionComment {
 }
 
 export interface SelfActionFilters {
+  mine?: boolean;
   search?: string;
   status?: SelfActionStatus;
   priority?: SelfActionPriority;

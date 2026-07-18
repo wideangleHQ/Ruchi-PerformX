@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -24,6 +24,7 @@ export function TaskForm({ onSuccess, taskType = 'OFFICIAL' }: TaskFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [assignmentMode, setAssignmentMode] = useState<'EMPLOYEE' | 'DEPARTMENT'>('EMPLOYEE');
+  const [employeeSearch, setEmployeeSearch] = useState('');
   const userRole = user?.role;
   const isEmployeeShared = taskType === 'EMPLOYEE_SHARED';
   const canDelegateOfficial = userRole === 'HOD' && taskType === 'OFFICIAL';
@@ -74,6 +75,24 @@ export function TaskForm({ onSuccess, taskType = 'OFFICIAL' }: TaskFormProps) {
     enabled: canCreateTask && assignmentMode === 'EMPLOYEE' && selectedDepartmentIds.length > 0,
   });
 
+  const filteredAssignees = useMemo(() => {
+    if (!employeeSearch.trim()) return assignees;
+    const query = employeeSearch.toLowerCase();
+    return assignees.filter(
+      (a) =>
+        a.fullName?.toLowerCase().includes(query) ||
+        a.email?.toLowerCase().includes(query) ||
+        a.username?.toLowerCase().includes(query),
+    );
+  }, [assignees, employeeSearch]);
+
+  const selectedAssigneeNames = useMemo(() => {
+    if (!isEmployeeShared || !selectedAssigneeIds.length) return [];
+    return selectedAssigneeIds
+      .map((id) => assignees.find((a) => a.id === id))
+      .filter(Boolean) as User[];
+  }, [assignees, isEmployeeShared, selectedAssigneeIds]);
+
   useEffect(() => {
     if (isEmployeeShared || !canDelegateOfficial || assignmentMode !== 'DEPARTMENT') return;
     if (!selectedDepartmentIds.length && departments.length) {
@@ -88,7 +107,7 @@ export function TaskForm({ onSuccess, taskType = 'OFFICIAL' }: TaskFormProps) {
   useEffect(() => {
     const allowedIds = new Set(assignees.map((assignee) => assignee.id));
     const filteredIds = selectedAssigneeIds.filter((id) => allowedIds.has(id));
-    const nextIds = selectAllEmployees && !isEmployeeShared ? assignees.map((assignee) => assignee.id) : filteredIds;
+    const nextIds = selectAllEmployees ? assignees.map((assignee) => assignee.id) : filteredIds;
 
     const isSame =
       nextIds.length === selectedAssigneeIds.length &&
@@ -123,7 +142,11 @@ export function TaskForm({ onSuccess, taskType = 'OFFICIAL' }: TaskFormProps) {
     },
     onSuccess: (task) => {
       onSuccess?.();
-      router.push(`/tasks/${task.id}`);
+      if (taskType === 'EMPLOYEE_SHARED') {
+        router.push('/tasks?tab=EMPLOYEE_SHARED');
+      } else {
+        router.push(`/tasks/${task.id}`);
+      }
     },
     onError: (err: any) => {
       setError(err.response?.data?.message || 'Failed to create task');
@@ -251,6 +274,7 @@ export function TaskForm({ onSuccess, taskType = 'OFFICIAL' }: TaskFormProps) {
               form.setValue('assignedToId', '');
               form.setValue('assignedToIds', []);
               form.setValue('assignAllEmployees', false);
+              setEmployeeSearch('');
             }}
             className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
           >
@@ -342,43 +366,110 @@ export function TaskForm({ onSuccess, taskType = 'OFFICIAL' }: TaskFormProps) {
       {assignmentMode === 'EMPLOYEE' && (
       <div>
         <div className="flex items-center justify-between">
-          <label className="block text-sm font-medium text-gray-700">Employees</label>
-          {!isEmployeeShared && (
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              checked={selectAllEmployees}
-              disabled={!selectedDepartmentIds.length || !assignees.length}
-              onChange={(event) => {
-                const checked = event.target.checked;
-                form.setValue('assignAllEmployees', checked, { shouldValidate: true });
-                form.setValue('assignedToIds', checked ? assignees.map((assignee) => assignee.id) : []);
-              }}
-              className="h-4 w-4 rounded border-gray-300 text-green-600"
-            />
-            Select All Employees
+          <label className="block text-sm font-medium text-gray-700">
+            Employees
+            {isEmployeeShared && selectedAssigneeIds.length > 0 && (
+              <span className="ml-2 text-xs font-normal text-green-700">
+                {selectedAssigneeIds.length} Employee{selectedAssigneeIds.length !== 1 ? 's' : ''} Selected
+              </span>
+            )}
           </label>
-          )}
+          <div className="flex items-center gap-3">
+            {isEmployeeShared && selectedAssigneeIds.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  form.setValue('assignedToIds', [], { shouldValidate: true });
+                }}
+                className="text-xs text-red-600 hover:text-red-800"
+              >
+                Clear All
+              </button>
+            )}
+            {isEmployeeShared && assignees.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  form.setValue('assignedToIds', assignees.map((a) => a.id), { shouldValidate: true });
+                }}
+                className="text-xs text-green-600 hover:text-green-800"
+              >
+                Select All
+              </button>
+            )}
+            {!isEmployeeShared && (
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={selectAllEmployees}
+                disabled={!selectedDepartmentIds.length || !assignees.length}
+                onChange={(event) => {
+                  const checked = event.target.checked;
+                  form.setValue('assignAllEmployees', checked, { shouldValidate: true });
+                  form.setValue('assignedToIds', checked ? assignees.map((assignee) => assignee.id) : []);
+                }}
+                className="h-4 w-4 rounded border-gray-300 text-green-600"
+              />
+              Select All Employees
+            </label>
+            )}
+          </div>
         </div>
 
-        <div className="mt-2 rounded-lg border border-gray-200 p-3">
+        {isEmployeeShared && selectedAssigneeNames.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {selectedAssigneeNames.map((assignee) => (
+              <span
+                key={assignee.id}
+                className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800"
+              >
+                {assignee.fullName}
+                <button
+                  type="button"
+                  onClick={() => {
+                    form.setValue(
+                      'assignedToIds',
+                      selectedAssigneeIds.filter((id) => id !== assignee.id),
+                      { shouldValidate: true },
+                    );
+                  }}
+                  className="ml-0.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full text-green-600 hover:bg-green-200 hover:text-green-900"
+                >
+                  x
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {isEmployeeShared && selectedDepartmentIds.length > 0 && assignees.length > 5 && (
+          <div className="mt-2">
+            <Input
+              type="text"
+              placeholder="Search employees..."
+              value={employeeSearch}
+              onChange={(e) => setEmployeeSearch(e.target.value)}
+              className="text-sm"
+            />
+          </div>
+        )}
+
+        <div className="mt-2 max-h-64 overflow-y-auto rounded-lg border border-gray-200 p-3">
           {!selectedDepartmentIds.length ? (
             <p className="text-sm text-gray-500">Select at least one department to load employees.</p>
-          ) : assignees.length ? (
+          ) : (isEmployeeShared ? filteredAssignees : assignees).length ? (
             <div className="grid gap-2">
-              {assignees.map((assignee) => {
+              {(isEmployeeShared ? filteredAssignees : assignees).map((assignee) => {
                 const checked = selectedAssigneeIds.includes(assignee.id);
 
                 return (
                   <label key={assignee.id} className="flex items-center gap-2 text-sm text-gray-700">
                     <input
-                      type={isEmployeeShared ? 'radio' : 'checkbox'}
+                      type="checkbox"
                       checked={checked}
                       disabled={selectAllEmployees}
                       onChange={(event) => {
-                        const nextIds = isEmployeeShared
-                          ? [assignee.id]
-                          : event.target.checked
+                        const nextIds = event.target.checked
                           ? [...selectedAssigneeIds, assignee.id]
                           : selectedAssigneeIds.filter((id) => id !== assignee.id);
 
@@ -395,6 +486,8 @@ export function TaskForm({ onSuccess, taskType = 'OFFICIAL' }: TaskFormProps) {
                 );
               })}
             </div>
+          ) : employeeSearch ? (
+            <p className="text-sm text-gray-500">No employees matching &quot;{employeeSearch}&quot;.</p>
           ) : (
             <p className="text-sm text-gray-500">No active employees found for the selected department(s).</p>
           )}
@@ -408,7 +501,11 @@ export function TaskForm({ onSuccess, taskType = 'OFFICIAL' }: TaskFormProps) {
           disabled={createTaskMutation.isPending}
           className="bg-green-600 hover:bg-green-700"
         >
-          {createTaskMutation.isPending ? 'Creating...' : 'Create Task'}
+          {createTaskMutation.isPending
+            ? 'Creating...'
+            : isEmployeeShared && selectedAssigneeIds.length > 1
+              ? `Create ${selectedAssigneeIds.length} Tasks`
+              : 'Create Task'}
         </Button>
         <Button type="button" onClick={() => router.back()} variant="outline">
           Cancel

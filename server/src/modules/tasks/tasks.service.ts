@@ -63,13 +63,24 @@ export class TasksService {
         throw error;
       }
 
-      const createdTask = tasks[0];
-      if (!createdTask) {
+      if (!tasks.length) {
         throw new BadRequestException('Failed to create task');
       }
 
       await this.dispatchTaskNotifications(tasks);
-      return this.findOne(createdTask.id, user);
+
+      if (tasks.length > 1) {
+        const firstTask = await this.findOne(tasks[0]!.id, user);
+        return {
+          ...firstTask,
+          _multiAssignment: {
+            tasksCreated: tasks.length,
+            taskIds: tasks.map((t) => t.id),
+          },
+        };
+      }
+
+      return this.findOne(tasks[0]!.id, user);
     } catch (error: any) {
       throw error;
     }
@@ -778,12 +789,18 @@ export class TasksService {
       dto.assignedToId ?? '',
     ].filter(Boolean))];
 
-    if (!assigneeIds.length) {
-      return [];
+    if (taskType === task_type_enum.EMPLOYEE_SHARED) {
+      if (!assigneeIds.length) {
+        throw new BadRequestException('Select at least one employee for an Employee Shared Task');
+      }
+      const MAX_SHARED_ASSIGNEES = 50;
+      if (assigneeIds.length > MAX_SHARED_ASSIGNEES) {
+        throw new BadRequestException(`Cannot assign to more than ${MAX_SHARED_ASSIGNEES} employees at once`);
+      }
     }
 
-    if (taskType === task_type_enum.EMPLOYEE_SHARED && assigneeIds.length !== 1) {
-      throw new BadRequestException('Select exactly one employee for an Employee Shared Task');
+    if (!assigneeIds.length) {
+      return [];
     }
 
     const employees = await this.prisma.users.findMany({
@@ -881,7 +898,7 @@ export class TasksService {
     }
 
     if (taskType === task_type_enum.EMPLOYEE_SHARED && dto.assignAllEmployees) {
-      throw new BadRequestException('Employee Shared Tasks must be assigned to one employee');
+      throw new BadRequestException('Employee Shared Tasks cannot use "assign all employees"');
     }
 
     const assignees = dto.assignAllEmployees
@@ -960,6 +977,7 @@ export class TasksService {
             creatorDepartmentId: user.departmentId,
             targetDepartmentId: assignee.department_id,
             hodIdsByDepartment: employeeSharedHods,
+            totalAssignees: assignees.length,
           }),
         });
       }
@@ -1124,6 +1142,7 @@ export class TasksService {
     creatorDepartmentId: string | null;
     targetDepartmentId: string | null;
     hodIdsByDepartment: Map<string, string[]>;
+    totalAssignees?: number;
   }): PendingTaskNotification[] {
     const notifications: PendingTaskNotification[] = [
       {
@@ -1139,7 +1158,9 @@ export class TasksService {
         recipientId: input.creatorId,
         type: notification_type_enum.TASK_ASSIGNED,
         title: 'Shared Task Created',
-        message: `Your shared task "${input.taskTitle}" has been created.`,
+        message: input.totalAssignees && input.totalAssignees > 1
+          ? `Your shared task "${input.taskTitle}" has been created and assigned to ${input.totalAssignees} employees.`
+          : `Your shared task "${input.taskTitle}" has been created.`,
       });
 
       const hodIds = [

@@ -181,20 +181,26 @@ export class SelfActionsService {
   }
 
   async findAll(user: JwtPayload, filter: SelfActionFilterDto) {
-    // Resolve department scope
-    const scope = await this.departmentScopeService.resolveDepartmentScope(user);
-    
     const clauses: any[] = [{ deleted_at: null }];
 
-    // Apply department filter using helper
-    const departmentFilter = DepartmentQueryHelper.buildSelfActionDepartmentFilter(scope);
-    if (Object.keys(departmentFilter).length > 0) {
-      clauses.push(departmentFilter);
-    }
-
-    // For employees, add ownership filter
-    if (user.role === role_enum.EMPLOYEE) {
+    if (filter.mine) {
+      // "My Self Actions": ownership only, identity always from JWT.
+      // No department scoping needed — users always see their own records.
       clauses.push({ created_by_id: user.sub });
+    } else {
+      // Resolve department scope
+      const scope = await this.departmentScopeService.resolveDepartmentScope(user);
+
+      // Apply department filter using helper
+      const departmentFilter = DepartmentQueryHelper.buildSelfActionDepartmentFilter(scope);
+      if (Object.keys(departmentFilter).length > 0) {
+        clauses.push(departmentFilter);
+      }
+
+      // For employees, add ownership filter
+      if (user.role === role_enum.EMPLOYEE) {
+        clauses.push({ created_by_id: user.sub });
+      }
     }
 
     if (filter.status) clauses.push({ status: filter.status });
@@ -215,7 +221,8 @@ export class SelfActionsService {
     }
 
     if (filter.departmentId) clauses.push({ self_action_departments: { some: { department_id: filter.departmentId } } });
-    if (filter.createdById) clauses.push({ created_by_id: filter.createdById });
+    // createdById is ignored in "mine" mode — identity comes exclusively from JWT
+    if (filter.createdById && !filter.mine) clauses.push({ created_by_id: filter.createdById });
 
     const where = clauses.length === 1 ? clauses[0] : { AND: clauses };
 
