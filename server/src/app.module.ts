@@ -15,6 +15,7 @@ import { AttachmentsModule } from './modules/attachments/attachments.module';
 import { TransfersModule } from './modules/transfers/transfers.module'
 import { SelfActionsModule } from './modules/self-actions/self-actions.module'
 import { ScoringModule } from './modules/scoring/scoring.module'
+import { HodScoreModule } from './modules/hod-score/hod-score.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ProfileModule } from './modules/profile/profile.module';
 import { RequestsModule } from './modules/requests/requests.module';
@@ -36,6 +37,7 @@ import { VmsModule } from './modules/vms/vms.module';
     SelfActionsModule,
     RequestsModule,
     ScoringModule,
+    HodScoreModule,
     DashboardModule,
     ProfileModule,
     VmsModule,

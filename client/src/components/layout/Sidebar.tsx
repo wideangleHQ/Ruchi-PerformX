@@ -39,6 +39,12 @@ const navItems: NavItem[] = [
   { href: '/transfers', label: 'Transfers', icon: <ArrowRightLeft size={20} /> },
   { href: '/notifications', label: 'Notifications', icon: <Bell size={20} /> },
   { href: '/scoring', label: 'Scoring', icon: <Trophy size={20} /> },
+  {
+    href: '/hod-score',
+    label: 'HOD Scores',
+    icon: <BarChart3 size={20} />,
+    roles: ['MD', 'EA', 'PA', 'DEPARTMENT_CONTROLLER', 'HOD'],
+  },
   { href: '/analytics', label: 'Analytics', icon: <BarChart3 size={20} /> },
   { href: '/profile', label: 'Profile', icon: <UserCircle2 size={20} /> },
   { href: '/admin', label: 'Admin', icon: <Users size={20} />, roles: ['ADMIN'] },

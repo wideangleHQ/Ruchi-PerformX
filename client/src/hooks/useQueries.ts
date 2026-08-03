@@ -8,6 +8,7 @@ import { requestsApi } from '@/api/requests';
 import { transfersApi } from '@/api/transfers';
 import { analyticsApi } from '@/api/analytics';
 import { incentivesApi } from '@/api/incentives';
+import { hodScoreApi, HodScorePeriod } from '@/api/hod-score';
 
 // Dashboard Queries
 export const useDashboard = () => {
@@ -101,6 +102,33 @@ export const useUserScore = (userId: string, month?: string) => {
   return useQuery({
     queryKey: ['scoring', userId, month],
     queryFn: () => scoringApi.getUserScore(userId, month),
+  });
+};
+
+export const useHodScore = (period?: HodScorePeriod, enabled = true) => {
+  return useQuery({
+    queryKey: ['hod-score', 'me', period],
+    queryFn: () => hodScoreApi.getMyScore(period),
+    enabled,
+  });
+};
+
+export const useCompanyHodScores = (period?: HodScorePeriod, enabled = true) => {
+  return useQuery({
+    queryKey: ['hod-score', 'company', period],
+    queryFn: () => hodScoreApi.getCompanyScores(period),
+    enabled,
+  });
+};
+
+export const useHodScoreTrends = (
+  params?: HodScorePeriod & { hodId?: string; departmentId?: string; months?: number },
+  enabled = true,
+) => {
+  return useQuery({
+    queryKey: ['hod-score', 'trends', params],
+    queryFn: () => hodScoreApi.getTrends(params),
+    enabled,
   });
 };
 
