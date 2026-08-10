@@ -51,10 +51,12 @@ export interface VisitorSearchRequest {
 export interface PaginatedVisitorResponse {
   data: Visitor[];
   meta: {
-    total: number;
+    totalItems: number;
     page: number;
     limit: number;
     totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
   };
 }
 
