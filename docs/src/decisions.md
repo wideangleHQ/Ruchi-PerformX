@@ -700,3 +700,65 @@ editing `tasks.module.ts`, and the Phase 2 rule is that a feature branch touches
 its own module directory.
 **Costs.** Two instances of a stateless class. If it ever grows a dependency or
 a cache, this becomes wrong and the module should import `TasksModule` instead.
+## 2026-08-16 Leave balances run on a financial year starting 1 April
+
+**Decision.** `leave_balances.year` is the financial year named by the calendar
+year it starts in, so 16 August 2026 and 10 February 2027 are both year 2026. An
+application deducts from the financial year its start date falls in.
+**Why.** Entitlement, carry forward and the payroll the monthly export feeds are
+all reconciled against the Indian financial year. A balance that reset on 1
+January would disagree with the payroll run it exists to serve.
+**Instead of.** A calendar year, which is one line simpler and wrong from April
+onward; or storing the year as `2026-27`, which turns the `year - 1` carry
+forward lookup into a parse.
+**Costs.** Leave running 29 March to 2 April deducts entirely from the year it
+starts in. Splitting it needs two balance rows and a rule for which one runs out
+first; the upgrade path is written at the deduction in `leave.service.ts`.
+
+## 2026-08-16 Weekly offs are a constant, not a table
+
+**Decision.** `WEEKLY_OFF_DAYS` in `server/src/modules/leave/leave-days.ts` is
+Sunday, for everybody. Holidays come from the `holidays` table as the union of
+the company-wide rows and the applicant's department's.
+**Why.** RUCHI works one pattern. A per-employee shift calendar belongs to the
+attendance module, which is an optional add-on that does not exist, so a table
+for it would be a schema nobody writes to and a join on every day count.
+**Instead of.** A `work_schedules` table keyed by user or department, which is
+the right answer the day somebody works Sundays and speculation until then. Or
+an environment variable, which is a value that never changes dressed as
+configuration.
+**Costs.** Alternate-Saturday and shift patterns cannot be expressed, and
+changing the pattern is a deploy rather than a settings screen. The upgrade path
+is to read the constant from a row and pass it to `countLeaveDays`, which
+already takes the holiday set as an argument for exactly this reason.
+
+## 2026-08-16 Leave balance rows are created on read, not by a cron
+
+**Decision.** `LeaveService.ensureBalance` upserts a financial year's row the
+first time that year is read or deducted, seeding `carried_over` from the
+previous year capped at `max_carry_forward`.
+**Why.** A scheduled job's only failure mode here is silence on 1 April,
+discovered when leave stops working. Nothing on this deployment monitors a cron.
+**Instead of.** A job that creates every row for every active user. More code, it
+needs a backfill for anybody who joins after it runs, and it fails closed at the
+worst possible moment.
+**Costs.** A read endpoint writes as a side effect, which surprises whoever
+debugs it first, and `GET /leave/balances` shows rows sparsely until a year is
+under way. `upsert` rather than `create` because two tabs opening the balance
+screen together would otherwise race on the unique index.
+
+## 2026-08-16 The MD approves leave, because nobody approves their own
+
+**Decision.** `approved_by_id != user_id` is enforced in `LeaveService`, and the
+MD is on `PATCH /leave/applications/:id/approve` and `/reject` alongside HOD and
+HR. A HOD's or an HR user's own application notifies the MD at submission.
+**Why.** With one approval stage and company-wide HR authority, an HR user
+approving their own leave is a single click with nothing in its way. Leaving the
+MD off those endpoints, as the table in [Leave management](p2_leave.md) does,
+would make an approver's own application unapprovable by anyone.
+**Instead of.** A second mandatory HR stage, which the scope document dropped on
+purpose; or trusting the UI to hide the button, which is not enforcement.
+**Costs.** The MD can approve anybody's leave, not only an approver's. That
+matches every other place the MD is unrestricted but is wider than the rule
+needs. It is not a duration-based MD stage; if long leave should reach the MD
+generally, that is a separate rule and a separate entry.
