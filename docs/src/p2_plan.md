@@ -28,6 +28,14 @@ notification engine. Third party licensing for the WhatsApp Business API is
 billed separately by that provider. Neither is committed; build them only if
 the client asks and the notification engine is already done.
 
+Requested separately and not part of this phase: a conversational assistant over
+the whole database, scoped in [The PerformX Assistant](p2_assistant.md). It is
+not in the four week plan and nothing below accounts for it. Two things there
+matter to the work in this phase. Its headline example is an attendance
+question, so it depends on the optional module above being built. And it needs
+row-level security policies on every table it can read, which cannot start until
+migrations exist.
+
 ## Week by week
 
 The client-facing timeline is four weeks. This is the engineering ordering that

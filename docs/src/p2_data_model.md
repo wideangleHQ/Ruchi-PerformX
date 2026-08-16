@@ -7,6 +7,11 @@ Read [Known gaps](p1_known_gaps.md#no-database-migrations) first. There is no
 migration history in this repository. Establishing one is the prerequisite for
 everything below.
 
+One thing to keep in view while these tables are designed: if
+[The PerformX Assistant](p2_assistant.md) is built, every table here needs a
+row-level security policy before the assistant can read it. Policies are far
+cheaper to write alongside a new table than to retrofit across thirty of them.
+
 ## Setting up migrations
 
 Before writing any new table:
