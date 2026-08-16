@@ -107,6 +107,25 @@ socket.emit('task:leave', taskId)
 The task detail page joins on mount and leaves on unmount. This is how live
 comments arrive without polling.
 
+### Project rooms
+
+The same shape, for projects:
+
+```ts
+socket.emit('project:join', projectId)
+socket.emit('project:leave', projectId)
+```
+
+The project detail page joins on mount and leaves on unmount. Both the message
+thread and checklist ticks arrive on this room, so two people working the same
+checklist see each other's ticks rather than each other's stale copy.
+
+Joining is not authorised, exactly as `task:join` is not. Anyone holding a valid
+token can join `project:<id>` and receive its thread, which is wider than the
+REST rule that gives an observer no read on messages. Closing it is a
+`project_members` lookup in the join handler, and it wants doing before Phase 2
+puts external vendor logins on this namespace.
+
 ### Events the server emits
 
 | Event | Room | Sent when |
@@ -116,6 +135,8 @@ comments arrive without polling.
 | `task:updated` | `task:<id>` | a task changes |
 | `task:comment:new` | `task:<id>` | a comment is added |
 | `task:overdue` | `task:<id>` | a task passes its due date |
+| `project:message:new` | `project:<id>` | a message is posted to the thread |
+| `project:checklist:updated` | `project:<id>` | a checklist item changes |
 
 `task:overdue` has no producer today for the same reason the escalation
 notifications do not fire.
@@ -123,9 +144,14 @@ notifications do not fire.
 ### Helper methods
 
 The gateway exposes `sendToUser`, `sendToDepartment`, `sendToRole`,
-`sendToTask`, and `broadcast`, plus named wrappers `notifyUser`,
-`refreshDashboard`, `taskUpdated`, `taskCommentAdded`, and `taskOverdue`. Use
-the named wrappers from services so the event name lives in one place.
+`sendToTask`, `sendToProject`, and `broadcast`, plus named wrappers `notifyUser`,
+`refreshDashboard`, `taskUpdated`, `taskCommentAdded`, `taskOverdue`,
+`projectMessageAdded`, and `projectChecklistUpdated`. Use the named wrappers from
+services so the event name lives in one place.
+
+`broadcast` reaches every connected socket in the namespace, which from Phase 2
+includes external vendor logins. It has no callers and should not gain one.
+Anything company-wide wants `sendToRole` or a per-department fan-out.
 
 ### CORS
 

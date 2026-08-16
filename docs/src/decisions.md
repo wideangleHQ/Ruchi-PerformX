@@ -311,3 +311,53 @@ nobody has reported, or a first-day-only send, which is silent from day two.
 **Costs.** An MD with ten projects stuck past their deadline gets ten
 notifications a day. The gate is one modulo on the overdue day count in
 `project-deadline.cron.ts` when somebody complains.
+## 2026-08-16 An observer cannot read the project message thread
+
+**Decision.** `GET /projects/:id/messages` is gated exactly like the POST:
+`PROJECT_LEAD`, `CO_LEAD`, and `MEMBER` only. An observer gets the same 403 as a
+non-member.
+**Why.** [Projects](p2_projects.md#endpoints) marks both message routes "members
+(not observers)", which sits next to the sentence saying an observer reads
+everything a member reads. The endpoint table wins: everything else about a
+project is company-wide reading, but a conversation is participation, and an
+observer who can read the thread is in the room.
+**Instead of.** Letting observers read and not post, which is the rule for the
+checklist and the outcome log. That would make the thread the one place where a
+stakeholder watches a discussion they cannot answer.
+**Costs.** A stakeholder chasing a project has to ask for MEMBER to follow the
+discussion, which is a membership change rather than a permission tweak.
+
+## 2026-08-16 Outcomes are grouped by type on read and logged to the activity trail
+
+**Decision.** `GET /projects/:id/outcomes` returns `{ TRY, FAILURE, OUTCOME }`
+rather than a flat list, `POST` requires an explicit `entry_type` with no
+default, and there is no update or delete route. Creating one writes a
+`project_activity_logs` row; posting a message does not.
+**Why.** The three kinds each get their own affordance on the page, and an API
+that hands back a flat list with a type column is the one that quietly becomes a
+dropdown on a generic entry form. Failures being first-class is the unusual part
+of this module and the part most likely to be flattened away. The entries are
+permanent project knowledge, so a failure cannot be edited out later.
+**Instead of.** A flat list the client groups, which works until the client
+stops bothering; or reusing the message thread with a type column, which is the
+same collapse by another route.
+**Costs.** A correction to an outcome means posting another entry, and the log
+grows monotonically. Grouping in the service means a client wanting a single
+merged timeline has to interleave three arrays.
+
+## 2026-08-16 One project room carries both messages and checklist ticks
+
+**Decision.** `project:<id>` follows the existing `task:<id>` pattern, with
+`project:join` and `project:leave` handlers and no authorisation on the join.
+Both `project:message:new` and `project:checklist:updated` go to it.
+**Why.** It is the pattern already in `notifications.gateway.ts` and the one the
+client's socket hook already knows how to drive. Two rooms, one per sensitivity
+level, is a second thing to join and leave for one event type.
+**Instead of.** Gating the join on a `project_members` lookup, which is the
+correct thing and is not done here. Anyone with a valid token can join
+`project:<id>` and receive its thread, which is wider than the REST rule this
+same branch enforces on `GET /messages`.
+**Costs.** That gap is real and named in
+[Notifications and realtime](p1_notifications.md#project-rooms). It gets worse
+when Phase 2 puts external vendor logins on the same namespace, so the lookup
+should land before the vendor portal does.
