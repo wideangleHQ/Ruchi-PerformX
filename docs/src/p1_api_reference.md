@@ -406,8 +406,25 @@ the holidays module, not this one.
 | GET | `/hod-score/department/:departmentId` | same |
 | GET | `/hod-score/:hodId` | same, plus `HodScoreAccessGuard` |
 
-`ScoringService` has no controller. Employee scores are read through the
-dashboard endpoint.
+Employee scores, added in Phase 2. Unbounded points, a different scale to the
+HOD score above:
+
+| Method | Path | Roles |
+| --- | --- | --- |
+| GET | `/scoring/me` | any authenticated user, own row only |
+| GET | `/scoring/me/trend` | same |
+| GET | `/scoring/leaderboard` | MD, EA, PA, DEPT_CONTROLLER, HOD |
+| GET | `/scoring/department/:departmentId` | same, within department scope |
+| GET | `/scoring/department/:departmentId/trend` | same |
+
+The `me` routes take identity from the JWT and carry no `@Roles`, so every role
+reaches its own score and no other. The department routes are re-checked against
+`DepartmentScopeService`, so a HOD sees only their own departments.
+
+Both trend endpoints accept `month`, `year`, and `months` (1 to 24, default 6)
+and return the series oldest first. A month inside the window with no stored row
+comes back as `hasScore: false` and `points: null`, which is not the same as a
+stored zero. A user with no history at all returns an empty series.
 
 ## Holidays
 

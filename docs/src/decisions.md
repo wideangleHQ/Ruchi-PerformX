@@ -762,3 +762,66 @@ purpose; or trusting the UI to hide the button, which is not enforcement.
 matches every other place the MD is unrestricted but is wider than the rule
 needs. It is not a duration-based MD stage; if long leave should reach the MD
 generally, that is a separate rule and a separate entry.
+## 2026-08-16 The employee trend screen shows stored counts, not a fixed model
+
+**Decision.** `/scoring/*` and the two screens over it report
+`assigned_tasks_completed`, `self_actions_completed`, `overdue_tasks_count` and
+the points total, and label the total as unbounded points. No percentage, no
+rating out of anything, no progress bar with a maximum. The employee scoring
+formula is not changed in this phase.
+**Why.** The stored composition is three counts; the points total also carries
+review credit and a nightly-recalculated overdue penalty that are never stored
+per month, so the arithmetic cannot be shown from the table. Fixing the model is
+its own sequence - agree the formula in writing, implement it, recalculate
+history, then build the screen - and it does not fit the analytics allocation.
+Drawing an unbounded number as a score out of 100 produces complaints that no
+amount of UI work answers.
+**Instead of.** Rendering `final_score` on a 0-100 bar next to the HOD score,
+which invites averaging two scales that are not comparable. Or recomputing the
+composition on read, which would disagree with the stored numbers every report
+already quotes.
+**Costs.** The screen shows what was counted but not how the total was reached,
+and a user whose points fell has no on-screen explanation. That gap closes when
+the model is fixed, not before.
+
+## 2026-08-16 A month with no stored score is drawn, an empty history is not
+
+**Decision.** `buildScoreTrend` emits a gap point (`hasScore: false`,
+`points: null`) for a month inside the window with no row, but returns an empty
+series when there are no rows at all.
+**Why.** Skipping a gap draws five bars as though they were six consecutive
+months, which is a chart that lies. Filling a never-scored user's window with
+six gaps reads as six bad months rather than as no data.
+**Instead of.** Always filling the window, or always skipping gaps. Each is
+right in one of the two cases and wrong in the other.
+**Costs.** Two shapes for the client to handle, and an empty array is the only
+signal for "never scored". Both are covered in `score-trend.spec.ts`.
+
+## 2026-08-16 The scoring controller resolves department scope, the service does not
+
+**Decision.** `ScoringController` injects `DepartmentScopeService` and passes the
+resolved scope into `ScoringService.assertDepartmentVisible`.
+**Why.** `DepartmentScopeService` is request-scoped. Injecting it into
+`ScoringService` would make that service request-scoped, which would in turn
+make `ScoringCron` request-scoped and stop `@Cron` from ever firing - a silent
+failure that only shows up as scores that stop updating.
+**Instead of.** Injecting it into the service like every other module does,
+which is the majority pattern but is unsafe for the one service a cron holds.
+**Costs.** A scoring rule sits one level up from the rest of its module, and any
+future caller of these methods has to supply a scope rather than being handed
+one.
+
+## 2026-08-16 The client analytics module is the scoring API, not a second one
+
+**Decision.** `client/src/api/analytics.ts` is deleted along with the unused
+`useScores`, `useUserScore` and `useAnalytics` hooks. The analytics and scoring
+screens read `api/scoring.ts` and `api/hod-score.ts` through
+`hooks/useAnalytics.ts`.
+**Why.** `analyticsApi` called `/analytics` and `/analytics/departments/:id`,
+and `scoringApi` called `/scoring` and `/scoring/:id`. None of those routes has
+ever existed on the server. Leaving them there while adding real ones invites
+the next person to wire a screen to a 404.
+**Instead of.** Keeping them and adding the real calls alongside, which is two
+plausible-looking clients for one domain.
+**Costs.** Anything that wants a company-wide analytics rollup now has to add
+the endpoint first rather than finding a client function waiting for it.
