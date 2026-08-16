@@ -231,6 +231,24 @@ row and the approval flow assumes an internal employee with a department.
 The four task transitions a vendor may perform are in
 [Tasks](p1_tasks.md#the-state-machine). Everything else about the boundary is in
 [Vendor management](p2_vendors.md#external-vendor-portal--kept-separate).
+### HR and VENDOR
+
+Phase 2 added `HR` and `VENDOR` to `role_enum`. Company assets is the first
+module to give either of them a rule.
+
+`HR` reads one employee's assets at a time, through
+`GET /assets/employee/:userId`, and never a company wide list. On `GET /assets`
+an HR caller falls through to the ordinary employee rule and sees only their
+own. `HR` was also added to `GET /users`, because the offboarding screen needs
+the directory to pick a leaver and a new owner; every other internal role
+already had that route.
+
+`VENDOR` is refused twice: it is absent from every `@Roles` list in
+`assets.controller.ts`, and `AssetsService.assetScope` throws for it as well. A
+vendor is external, and `RolesGuard` knows nothing about vendor assignments, so
+one role list edit would otherwise open the company's credentials to everyone
+with a portal login. `just vendor-roles` fails the build if `VENDOR` appears on
+a controller outside `modules/vendor-portal/`.
 
 ## VMS access codes
 

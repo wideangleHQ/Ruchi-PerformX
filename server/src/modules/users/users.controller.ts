@@ -44,8 +44,11 @@ export class UsersController {
 
   // ─── CRUD ─────────────────────────────────────────────────────────────────────
 
+  // HR is here for offboarding: the assets handover screen needs the directory
+  // to pick a leaver and a new owner per asset. Every other internal role
+  // already had it, so this widens nothing that was closed.
   @Get()
-  @Roles(role_enum.MD, role_enum.ADMIN, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD, role_enum.EMPLOYEE)
+  @Roles(role_enum.MD, role_enum.ADMIN, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD, role_enum.EMPLOYEE, role_enum.HR)
   async findAll(@Query('active') active?: string) {
     const users = await this.usersService.findAll(active === 'true');
     console.log("Users API Response:", users);
