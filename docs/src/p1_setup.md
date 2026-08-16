@@ -6,10 +6,14 @@ before you start, because nothing works without it.
 
 ## Prerequisites
 
-Node 20 or newer. Bun is used for lockfiles in both `server` and `client`
-(`bun.lock` is committed), but the scripts run fine under npm. Pick one and
-stay with it, because mixing package managers on the same lockfile causes
-dependency drift that is annoying to debug.
+Node 22 or newer. Not 20: `@supabase/realtime-js` wants a native `WebSocket`,
+which arrives in 22, and on 20 the API dies at boot with `Node.js 20 detected
+without native WebSocket support` rather than failing a check somewhere useful.
+
+Bun installs both `server` and `client`, and `bun.lock` is the only lockfile in
+each. The `package-lock.json` files are gone, because npm writes down only the
+platform binaries it happened to install and the two had drifted to opposite
+platforms. `just install` and CI both run `bun install`.
 
 You also need access to:
 
