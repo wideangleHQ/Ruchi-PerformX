@@ -56,9 +56,10 @@ management subsystem.
 
 Phase 2 is scoped but not started. It adds leave management, cross-department
 projects, R&D reporting, company asset and password handover, a social layer on
-the home dashboard, external vendor accounts, a CSR section, a rebuilt
+the home dashboard, vendor management with an external vendor portal, a rebuilt
 notification engine, and folding CareerX into PerformX as a tab. The plan lives
-in [Plan and sequencing](p2_plan.md).
+in [Plan and sequencing](p2_plan.md). The CSR foundation tab was in the original
+Phase 2 scope and has already been delivered separately.
 
 Phase 3 is a roadmap only. Microservices, multi-tenancy, and ERP integration.
 Nothing in this handbook covers it.

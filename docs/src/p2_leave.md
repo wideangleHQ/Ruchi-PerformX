@@ -124,10 +124,35 @@ HOD and HR approving the same application and deducting twice. `increment` on
 the balance means Postgres does the arithmetic, so a concurrent deduction on
 another application for the same user cannot lose an update.
 
-Rejection does not touch the balance. HR cancellation of an `APPROVED`
-application runs the mirror transaction: set `status: CANCELLED`,
-`cancelled_by_id`, `cancellation_reason` (required, not null), then
-`used: { decrement: days_count }` on the balance.
+Rejection does not touch the balance.
+
+HR cancellation of an `APPROVED` application is the mirror transaction, and it
+needs the same guard for the same reason. Write it out rather than leaving it
+as "the mirror of the above," because the obvious implementation is a plain
+`update` and that one double-credits silently. Nobody reports a balance that
+came out too generous.
+
+```ts
+await this.prisma.$transaction(async (tx) => {
+  const updated = await tx.leave_applications.updateMany({
+    where: { id, status: 'APPROVED' },
+    data: {
+      status: 'CANCELLED',
+      cancelled_by_id: user.sub,
+      cancelled_at: new Date(),
+      cancellation_reason: reason,   // required, reject the request without it
+    },
+  });
+  if (updated.count === 0) {
+    throw new ConflictException('Application is not in an approved state');
+  }
+
+  await tx.leave_balances.update({
+    where: { user_id_leave_type_id_year: { ... } },
+    data: { used: { decrement: days_count } },
+  });
+});
+```
 
 ## Approval routing
 
@@ -142,9 +167,16 @@ drop it.
 **HR stage.** Any user in the HR role can act on any pending application,
 company-wide, regardless of the applicant's department or reporting line.
 
-The MD is not in this chain. If the client wants MD approval for long leave,
-that is a separate stage and a rule about which durations trigger it. Not
-currently in scope.
+**Nobody approves their own leave.** This mattered less under the old two-stage
+design, where a self-approval still had to clear a second desk. With one stage
+and company-wide HR authority, an HR employee approving their own application
+is a single click and nothing stops it. So: `approved_by_id != user_id`,
+enforced in the service, not the UI. An approver's own application routes to
+the MD, who is otherwise not in this chain.
+
+That is the only case where the MD acts on leave. If the client also wants MD
+approval for long leave generally, that is a separate stage and a rule about
+which durations trigger it. Not currently in scope.
 
 ## Holiday calendar
 
@@ -252,7 +284,7 @@ LEAVE_SUBMITTED    to the HOD and HR
 LEAVE_APPROVED     to the applicant, and to whichever of HOD/HR did not act
 LEAVE_REJECTED     to the applicant
 LEAVE_HR_CANCELLED to the applicant, and to the approver who originally approved it
-LEAVE_CANCELLED    to the HOD and HR if it had reached them
+LEAVE_CANCELLED    to the HOD and HR (both were notified at submission)
 ```
 
 Rejections and HR cancellations must carry the approver's remark or

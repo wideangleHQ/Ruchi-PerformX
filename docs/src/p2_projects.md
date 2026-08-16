@@ -80,9 +80,15 @@ service and back it with the unique constraint on `project_id`.
 
 Derive it, do not let it be hand-set as a free field: from the deadline
 proximity, checklist completion percentage, and count of overdue checklist
-items/milestones. Recompute on read or on a scheduled sweep — either is
-fine, but document which one you picked, because the dashboard and the
-directory both display it and they must agree.
+items and milestones.
+
+**Recompute it on the daily deadline sweep, not on read.** `health` is a
+stored, indexed column and the project directory filters on it, so a value
+computed at read time would leave the filter and the index querying stale
+rows. The sweep is already walking every project with a deadline (see
+Deadlines below), so this costs nothing extra. Anything that changes a
+project's inputs mid-day, ticking the last checklist item for example, can
+recompute that one row inline.
 
 ## Checklist and progress
 
@@ -91,8 +97,15 @@ and assign items. Items carry title, description, assignee, due date,
 priority, and status.
 
 **Progress is calculated from checklist completion**, not entered by hand.
-Team members cannot modify overall project progress directly — they can only
+Team members cannot modify overall project progress directly. They can only
 tick their assigned items, and the aggregate is computed.
+
+**A member's PATCH is limited to `is_done`, at field level.** Not "members can
+edit their own item." A member who can also change `title`, `due_date`,
+`priority` or `assigned_to_id` can move their own goalposts, which is the same
+thing as editing progress by hand with extra steps. Whitelist the field in the
+DTO rather than trusting the UI to only send one key. Lead and Co-Lead get the
+full field set.
 
 ## Milestones
 
@@ -179,8 +192,35 @@ Attachments.
 **No MD review.** This is a scope change from the earlier design. There is
 no MD approval workflow, no `md_viewed_at` column, no MD inbox gate. Once the
 Project Lead or Co-Lead submits the closure report, the project moves to
-`COMPLETED` per the normal completion rules — the same status-transition
+`COMPLETED` per the normal completion rules, the same status-transition
 check as any other lifecycle move, not a separate approval state.
+
+Removing the approval gate does not remove the deadline escalation below.
+Those are different things: one is a person blocking a state change, the other
+is a notification nobody has to act on.
+
+## Deadlines
+
+`projects.deadline` is nullable. When set, a daily cron reminds the Lead and
+Co-Lead as the date approaches. Suggested schedule: 7 days out, 1 day out, and
+on the day. That is `PROJECT_DEADLINE_NEAR`.
+
+After the deadline passes with no closure report, escalate to the MD. The scope
+document says the MD "receives escalation notifications for any project nearing
+deadline without a closure report," and that survives the removal of MD closure
+review. That is `PROJECT_OVERDUE_NO_CLOSURE`, and it is the only project
+notification the MD gets by default.
+
+Both go through the notification engine, not a direct call. See
+[Notification engine](p2_notifications.md).
+
+Put this in the same cron file as the existing escalation sweep, or in a new one
+next to it. Whichever you choose, make sure `EscalationModule` is actually
+imported into `AppModule` first, because it is not today. See
+[Known gaps](p1_known_gaps.md#the-escalation-engine-never-runs).
+
+The same sweep is the natural place to recompute `projects.health`, since it is
+already walking every project with a deadline. See Project health above.
 
 ## Dashboard
 
@@ -228,7 +268,7 @@ See [Schema changes](p2_data_model.md#projects) for the Prisma models.
 | DELETE | `/projects/:id/members/:userId` | Lead, Co-Lead |
 | GET | `/projects/:id/checklist` | all readers |
 | POST | `/projects/:id/checklist` | Lead, Co-Lead |
-| PATCH | `/projects/:id/checklist/:itemId` | members (their own assignment), Lead, Co-Lead |
+| PATCH | `/projects/:id/checklist/:itemId` | Lead, Co-Lead any field; members `is_done` only, own assignment only |
 | DELETE | `/projects/:id/checklist/:itemId` | Lead, Co-Lead |
 | GET/POST | `/projects/:id/milestones` | readers / Lead, Co-Lead |
 | PATCH/DELETE | `/projects/:id/milestones/:milestoneId` | Lead, Co-Lead |

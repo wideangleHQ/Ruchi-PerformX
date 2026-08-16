@@ -64,11 +64,14 @@ export const NOTIFICATION_CHANNELS: Record<notification_type_enum, Channel[]> = 
   ESCALATION_HOD:         ['IN_APP', 'EMAIL'],
   ESCALATION_MD:          ['IN_APP', 'EMAIL'],
   LEAVE_SUBMITTED:        ['IN_APP', 'EMAIL'],
-  LEAVE_HR_APPROVED:      ['IN_APP', 'EMAIL'],
-  LEAVE_HR_REJECTED:      ['IN_APP', 'EMAIL'],
+  LEAVE_APPROVED:         ['IN_APP', 'EMAIL'],
+  LEAVE_REJECTED:         ['IN_APP', 'EMAIL'],
+  LEAVE_HR_CANCELLED:     ['IN_APP', 'EMAIL'],
   PROJECT_DEADLINE_NEAR:  ['IN_APP'],
+  PROJECT_OVERDUE_NO_CLOSURE: ['IN_APP', 'EMAIL'],
   PROJECT_CLOSED:         ['IN_APP', 'EMAIL'],
   VENDOR_TASK_ASSIGNED:   ['IN_APP', 'EMAIL'],
+  VENDOR_CONTRACT_EXPIRING: ['IN_APP', 'EMAIL'],
   VISITOR_ARRIVED:        ['IN_APP'],
   // ...
 };
@@ -183,21 +186,39 @@ are ten modules producing them.
 
 ## New notification types
 
-Roughly twenty new values on `notification_type_enum`. Add them in one migration
-rather than one per module; each addition is a schema change against a live
-table.
+Roughly twenty-five new values on `notification_type_enum`. Add them in one
+migration rather than one per module; each addition is a schema change against
+a live table. This list is the source of truth. If a module page adds a type,
+it has to land here too, or the migration will be written from a stale list.
 
 ```
-LEAVE_SUBMITTED           LEAVE_MANAGER_APPROVED   LEAVE_MANAGER_REJECTED
-LEAVE_HR_APPROVED         LEAVE_HR_REJECTED        LEAVE_CANCELLED
+LEAVE_SUBMITTED           LEAVE_APPROVED           LEAVE_REJECTED
+LEAVE_CANCELLED           LEAVE_HR_CANCELLED
 PROJECT_INVITED           PROJECT_CHECKLIST_UPDATED PROJECT_MESSAGE
-PROJECT_DEADLINE_NEAR     PROJECT_CLOSED           PROJECT_CLOSURE_SUBMITTED
+PROJECT_DEADLINE_NEAR     PROJECT_OVERDUE_NO_CLOSURE
+PROJECT_CLOSED            PROJECT_CLOSURE_SUBMITTED
 POLL_CREATED              BIRTHDAY_TODAY
 RND_REPORT_SUBMITTED      RND_TEAM_ADDED
 ASSET_HANDOVER_INITIATED  ASSET_HANDOVER_CONFIRMED
 VENDOR_TASK_ASSIGNED      VENDOR_TASK_UPDATED      VENDOR_MESSAGE
+VENDOR_CONTRACT_EXPIRING  VENDOR_DOCUMENT_EXPIRING VENDOR_DELIVERABLE_DUE
 VISITOR_ARRIVED           VISITOR_REQUEST_APPROVED
 ```
+
+Leave is single stage, so there is no separate manager and HR pair here.
+`LEAVE_APPROVED` and `LEAVE_REJECTED` cover both approvers and the body says
+who acted. `LEAVE_CANCELLED` is the employee withdrawing a pending
+application; `LEAVE_HR_CANCELLED` is HR cancelling an already-approved one and
+crediting the balance back. They read differently to the applicant, so they are
+different types. See [Leave management](p2_leave.md#notifications).
+
+`PROJECT_DEADLINE_NEAR` is the reminder to the Lead before the date.
+`PROJECT_OVERDUE_NO_CLOSURE` is the escalation to the MD after it passes with
+no closure report. See [Projects](p2_projects.md#deadlines).
+
+The three `VENDOR_*_EXPIRING` and `_DUE` types are driven by the vendor
+deadline sweep and go to the internal owner, never to the vendor. See
+[Vendor management](p2_vendors.md#8-deadline-and-renewal-tracking).
 
 `BIRTHDAY_TODAY` is questionable. A birthday card on the dashboard may be
 enough, and a notification for every birthday in a hundred-person company is

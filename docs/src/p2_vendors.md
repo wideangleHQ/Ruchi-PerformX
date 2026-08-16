@@ -42,9 +42,15 @@ optional attribute of it.
 `vendors`: name, auto-generated vendor code, vendor type, service category
 (FK to `vendor_categories`), description/services provided, contact person,
 contact email, contact phone, alternate contact, company address, website,
-start date, contract start/end date (denormalized copy of the current
-contract's dates for list views — the source of truth is `vendor_contracts`),
-status, internal owner, internal department, notes, tags.
+relationship start date, status, internal owner, internal department, notes,
+tags.
+
+**No contract dates on this table.** An earlier draft kept a denormalized copy
+of the current contract's start and end dates here for list views. Dropped:
+`vendor_contracts` is the source of truth, a vendor can have several, and a
+copy with no stated sync path is wrong within a month. The directory and the
+profile header join the current contract instead. If that join is ever slow
+enough to matter, cache the read, do not duplicate the column.
 
 ## 2. Vendor categories
 
@@ -307,8 +313,38 @@ its own controller is harder to leak from than a shared controller with a
 role branch inside.
 
 Task lifecycle transitions available to a vendor stay limited to `ACCEPTED`,
-`IN_PROGRESS`, `COMPLETED`, and `REJECT` with a reason. See
+`IN_PROGRESS`, `COMPLETED`, and `REJECT` with a reason. They may not review,
+close, or return work. Add `role_enum.VENDOR` to exactly those four rows of
+`TRANSITIONS` in `task-lifecycle.service.ts` and no others. See
 [Tasks](p1_tasks.md#the-state-machine).
+
+### What a vendor cannot reach, by construction
+
+The table above is the allowlist. This is the other half: endpoints that must
+never list `VENDOR` in their `@Roles`, no matter what a future ticket asks for.
+Not by convention, by construction.
+
+Everything under `/hod-score`, `/scoring`, `/leave`, `/holidays`, `/assets`,
+`/rnd`, `/polls`, `/incentives`, `/transfers`, `/vms`, and `/users` except a
+narrowly scoped lookup of the people they are working with.
+
+Plus every route in this module's own internal half:
+
+| Route | Why a vendor must never reach it |
+| --- | --- |
+| `/vendors`, `/vendors/:id` | the vendor master, including every other vendor |
+| `/vendors/:id/deadlines` | internal deadline tracking across contracts |
+| `/vendor-contracts/*` | commercial terms |
+| `/vendor-documents/*` | legal and operational documents, both categories |
+| `/vendor-notes/*` | internal notes, see section 12 |
+| `/vendor-reviews/*` | internal ratings, see section 14 |
+| `/vendor-categories/*` | internal taxonomy |
+| `/vendor-access/*` | who inside RUCHI can see any of the above |
+
+A vendor's own view of its work comes from the portal routes only:
+`GET /vendor/dashboard`, `/vendor/tasks`, `/vendor/projects`, and
+`GET /vendor-deliverables/mine`. If a vendor needs to see something new,
+add it to that namespace. Do not open an internal route with a role branch.
 
 ### Account creation
 
@@ -358,6 +394,81 @@ VENDOR MANAGEMENT
   Reviews
   Access Management (MD / EA controlled)
 ```
+
+## 21. Endpoints
+
+Two namespaces, and they never share a controller. `VM` below means a caller
+holding a `vendor_dashboard_access` row, or MD/EA who hold it implicitly.
+`VENDOR_VIEWER` is read-only, `VENDOR_MANAGER` adds write, `VENDOR_ADMIN` adds
+reviews and deletion.
+
+Internal. No `VENDOR` on any row here:
+
+| Method | Path | Who |
+| --- | --- | --- |
+| GET | `/vendors` | VM, any level |
+| POST | `/vendors` | VM manager or admin |
+| GET | `/vendors/:id` | VM, any level |
+| PATCH | `/vendors/:id` | VM manager or admin, or the vendor's internal owner |
+| PATCH | `/vendors/:id/status` | VM manager or admin. No hard delete, ever |
+| GET | `/vendors/:id/deadlines` | VM, any level |
+| GET | `/vendors/:id/performance` | VM, any level |
+| GET | `/vendors/pickable` | any internal role. id, name, category, `ACTIVE` only |
+| GET/POST | `/vendor-categories` | GET any VM, POST HR/EA/MD |
+| GET/POST | `/vendor-assignments` | VM manager or admin |
+| PATCH/DELETE | `/vendor-assignments/:id` | VM manager or admin, or the assigner |
+| GET/POST | `/vendor-contracts` | VM manager or admin |
+| PATCH | `/vendor-contracts/:id` | VM manager or admin |
+| GET/POST | `/vendor-documents` | VM manager or admin |
+| DELETE | `/vendor-documents/:id` | VM admin |
+| GET/POST | `/vendor-deliverables` | VM manager or admin |
+| PATCH | `/vendor-deliverables/:id` | VM manager or admin, or the deliverable owner |
+| GET/POST | `/vendor-notes` | VM, any level. `is_internal` never exposed outward |
+| GET/POST | `/vendor-reviews` | VM admin or manager only, per section 14 |
+| GET | `/vendor-access` | MD, EA |
+| POST | `/vendor-access` | MD, EA only. Grants a level to one employee |
+| DELETE | `/vendor-access/:userId` | MD, EA only |
+
+External portal. `VENDOR` only, every one scoped through `vendor_assignments`:
+
+| Method | Path | Who |
+| --- | --- | --- |
+| GET | `/vendor/dashboard` | VENDOR, own assignments only |
+| GET | `/vendor/tasks` | VENDOR, filtered by `vendorTaskFilter` |
+| GET | `/vendor/projects` | VENDOR, assigned projects only |
+| GET | `/vendor-deliverables/mine` | VENDOR, own deliverables only |
+| PATCH | `/vendor-deliverables/:id/submit` | VENDOR, own only, sets `SUBMITTED` |
+
+Declare `/vendors/pickable` before `/vendors/:id` in the controller. Nest
+matches routes in declaration order, so the reverse binds `id: "pickable"` and
+the picker returns a 404 that looks like a data problem for an afternoon.
+
+`POST /vendor-access` is the one to write first and test hardest. Everything in
+the internal table depends on it being right, and it is the only endpoint in the
+module where a bug hands an employee the entire vendor book rather than one
+record.
+
+## Screens
+
+**Vendor directory and profile.** Covered in sections 16 and 17. Internal only,
+behind `vendor_dashboard_access`. Hide the whole Vendor Management nav item for
+employees without a row rather than 403ing on click.
+
+**Vendor portal dashboard.** Assigned tasks grouped by status, assigned
+projects, own deliverables, and unread messages. Nothing else. No sidebar
+items for modules a vendor cannot reach.
+
+**Task detail for vendors.** The task, its description, attachments, the
+message thread, and the status actions available to a vendor. No department, no
+assignee history, no internal notes.
+
+**Internal vendor picker.** An employee assigning work needs to pick a vendor,
+and that is the one vendor read an employee without Vendor Management access
+legitimately needs. It gets its own endpoint, `GET /vendors/pickable`, returning
+id, name and category for `ACTIVE` vendors only. Do not solve this by opening
+`GET /vendors` to all internal roles. The directory record carries the internal
+owner, notes, performance and status history, none of which belongs in a
+dropdown.
 
 ## Notifications
 

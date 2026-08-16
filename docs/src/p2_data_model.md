@@ -71,9 +71,24 @@ reporting_to_id String?    @db.Uuid     // leave approval routing
 ```
 
 `vendor_id` replaces the earlier flat `vendor_company` text field now that
-vendor identity lives in its own `vendors` table — see
-[Vendors](#vendors-1). A `users` row with `role: VENDOR` is a portal login
-for a `vendors` row; not every vendor needs one.
+vendor identity lives in its own `vendors` table, see [Vendors](#vendors-1).
+A `users` row with `role: VENDOR` is a portal login for a `vendors` row; not
+every vendor needs one.
+
+**This is the only destructive migration in Phase 2**, because
+`users.vendor_company` already exists in production with rows in it. Three
+steps, three separate deploys, not one:
+
+1. Add `vendors` and `users.vendor_id`. Backfill: one `vendors` row per
+   distinct non-null `vendor_company`, then set `vendor_id` on each user from
+   it. Leave `vendor_company` in place and still written to.
+2. Switch every read to `vendor_id`. Verify no code path reads
+   `vendor_company`: `grep -rn "vendor_company" server/src`.
+3. Drop `vendor_company`.
+
+Doing steps 1 and 3 in the same migration means any missed reader breaks at
+deploy with no way back except a restore. The column is small and one extra
+release is cheaper than that.
 
 `reporting_to_id` deserves thought. The scope document routes leave to "the
 immediate Reporting Manager/HOD." Today there is no reporting line in the
@@ -111,8 +126,9 @@ Also add an index for the read-all endpoint:
 @@index([user_id, is_read, created_at])
 ```
 
-`notification_type_enum` gains roughly twenty values. Add them all in one
-migration rather than one per module.
+`notification_type_enum` gains roughly twenty-five values. Add them all in one
+migration rather than one per module. The list lives in
+[Notification engine](p2_notifications.md#new-notification-types), not here.
 
 ## New tables
 
@@ -181,7 +197,7 @@ model holidays {
   created_by_id  String   @db.Uuid
   created_at     DateTime @default(now()) @db.Timestamptz(6)
 
-  @@unique([holiday_date, name, department_id])
+  @@unique([holiday_date, name, department_id])   // see the NULL caveat below
   @@index([year, department_id])
 }
 
@@ -194,13 +210,37 @@ enum leave_status_enum {
 ```
 
 Single-stage approval: `status` moves straight from `PENDING` to `APPROVED`
-or `REJECTED`, acted on by either an HOD or HR — `approved_by_role` records
+or `REJECTED`, acted on by either an HOD or HR. `approved_by_role` records
 which. HR-only cancellation of an `APPROVED` row is a second transition to
 `CANCELLED` with `cancellation_reason` required by the service layer (not a
 DB constraint, since Postgres can't conditionally require a column by
-status without a trigger). `holidays.department_id` is what makes a
-holiday common vs department-wise; the unique constraint includes it so the
-same date/name can exist once as common and once per department.
+status without a trigger).
+
+`holidays.department_id` is what makes a holiday common or department-wise,
+and the unique constraint includes it so the same date and name can exist once
+as common and once per department.
+
+**That constraint does not stop duplicate common holidays.** Postgres treats
+NULLs as distinct in a unique index, so two rows with the same date, the same
+name, and `department_id: null` both insert cleanly. Common is the tier HR
+maintains by hand for the whole company, so it is the tier most likely to get
+double-entered, and a duplicate there silently double-excludes a day from every
+leave calculation. Two ways to close it:
+
+```sql
+-- PG 15 and later
+ALTER TABLE holidays
+  ADD CONSTRAINT holidays_date_name_dept_uniq
+  UNIQUE NULLS NOT DISTINCT (holiday_date, name, department_id);
+
+-- any version
+CREATE UNIQUE INDEX holidays_common_uniq
+  ON holidays (holiday_date, name)
+  WHERE department_id IS NULL;
+```
+
+Check the server version before choosing. Prisma cannot express either one in
+the schema, so it goes in the migration by hand with a comment saying why.
 
 `days_count` is `Decimal(5,1)` rather than `Int` so half days work. Deciding
 against half days later is easy; adding them later is a migration on a table
@@ -526,10 +566,10 @@ model vendors {
   contact_person      String?           @db.VarChar(255)
   contact_email       String?           @db.VarChar(255)
   contact_phone       String?           @db.VarChar(30)
-  alternate_contact    String?          @db.VarChar(255)
+  alternate_contact   String?           @db.VarChar(255)
   company_address     String?
   website             String?           @db.VarChar(255)
-  start_date          DateTime?         @db.Date
+  start_date          DateTime?         @db.Date   // relationship start, not a contract date
   status              vendor_status_enum @default(PROSPECT)
   owner_id            String            @db.Uuid   // internal RUCHI owner
   department_id       String?           @db.Uuid
@@ -562,9 +602,8 @@ model vendor_dashboard_access {
 model vendor_assignments {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   vendor_id      String   @db.Uuid
-  assignment_type String  @db.VarChar(20)   // 'task', 'project', 'service', 'contract'
-  entity_type    String   @db.VarChar(20)
-  entity_id      String   @db.Uuid
+  entity_type    String   @db.VarChar(20)   // 'task', 'project', 'service', 'contract'
+  entity_id      String?  @db.Uuid          // null for 'service', which has no row behind it
   assigned_by_id String   @db.Uuid
   start_date     DateTime? @db.Date
   deadline       DateTime? @db.Date
@@ -590,6 +629,7 @@ model vendor_contracts {
   description    String?
   created_at     DateTime  @default(now()) @db.Timestamptz(6)
 
+  @@unique([vendor_id, contract_number])
   @@index([vendor_id, status])
   @@index([end_date])
 }
@@ -603,7 +643,8 @@ model vendor_documents {
   document_name String    @db.VarChar(255)
   issue_date    DateTime? @db.Date
   expiry_date   DateTime? @db.Date
-  status        String?   @db.VarChar(20)   // derived: ACTIVE, EXPIRING_SOON, EXPIRED
+  // no status column. ACTIVE / EXPIRING_SOON / EXPIRED is computed from
+  // expiry_date at read time, see the note below
   file_url      String    @db.VarChar(500)
   storage_path  String    @db.VarChar(500)
   uploaded_by_id String   @db.Uuid
@@ -678,19 +719,36 @@ enum deliverable_status_enum {
 }
 ```
 
-`vendor_assignments` keeps its role as the vendor allowlist — nothing a
-logged-in vendor requests is visible unless a row here says so — while
-gaining the richer fields the module needs for internal tracking.
+`vendor_assignments` keeps its role as the vendor allowlist. Nothing a
+logged-in vendor requests is visible unless a row here says so, and it now also
+carries the fields the module needs for internal tracking.
+
+`entity_type` is the single type column. An earlier draft had both an
+`assignment_type` and an `entity_type` with overlapping vocabularies, which
+left no answer for what `entity_id` holds on a 'service' assignment that has no
+row behind it. One column, and `entity_id` nullable for exactly that case.
+Note that nullable `entity_id` hits the same Postgres NULL rule as the holidays
+constraint above: `@@unique([vendor_id, entity_type, entity_id])` will not stop
+two identical 'service' rows. That is tolerable here, since a duplicate service
+assignment is visible in the UI and grants no access a single row would not,
+but do not rely on the constraint to dedupe them.
+
 `vendor_dashboard_access` is the separate, MD/EA-granted permission that
-controls who inside RUCHI can open Vendor Management at all; it does not
+controls who inside RUCHI can open Vendor Management at all. It does not
 touch what a vendor portal login can see. Never hard-delete `vendors`;
-`status` carries the lifecycle. Details in
-[Vendor management](p2_vendors.md).
+`status` carries the lifecycle.
 
-### CSR — removed
+**`vendor_documents` has no stored status.** `ACTIVE`, `EXPIRING_SOON` and
+`EXPIRED` are a function of `expiry_date` and today's date, so storing them
+means every row is wrong the morning after it is written unless a job keeps
+them fresh. Compute at read time in the same helper the deadline view uses. If
+a query ever needs to filter on it, filter on `expiry_date` ranges instead,
+which is what the `@@index([expiry_date])` is for. Same rule applies to
+`projects.health`, with the opposite answer, and the reason for the difference
+is that health has no single column you can express it as. See
+[Projects](p2_projects.md#project-health).
 
-**Out of Phase 2 scope.** Already delivered elsewhere. Do not create
-`csr_initiatives` or `csr_media`. See [CSR foundation](p2_csr.md).
+Details in [Vendor management](p2_vendors.md).
 
 ### Events, low priority
 
