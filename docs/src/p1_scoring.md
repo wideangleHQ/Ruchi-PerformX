@@ -104,6 +104,30 @@ reading them.
 `getLeaderboard(month, year)` returns the top 10 by `final_score` with the
 user's name, role, and department name.
 
+## Endpoints
+
+Phase 2 put a controller in front of the stored rows. Nothing recomputes on
+read; every route reads `performance_scores` as the cron last wrote it.
+
+| Method | Path | Returns |
+| --- | --- | --- |
+| GET | `/scoring/me` | the caller's own row for a month |
+| GET | `/scoring/me/trend` | the caller's own history, oldest month first |
+| GET | `/scoring/leaderboard` | top 10 by points |
+| GET | `/scoring/department/:departmentId` | the stored department average |
+| GET | `/scoring/department/:departmentId/trend` | department history plus one series per member |
+
+`score-trend.ts` holds the series assembly as pure functions, tested in
+`score-trend.spec.ts`. A month with no stored row is emitted as a gap rather
+than dropped, because dropping it draws five bars as though they were six
+consecutive months. A user with no rows at all returns an empty series, so the
+screen shows "no history" instead of a row of gaps that reads as bad months.
+
+The department routes resolve membership through `users.department_id`, the same
+as `getDepartmentScore`. That column does not describe the four
+multi-department roles, so it is never used to decide access: who may call these
+is `DepartmentScopeService`, checked in the controller.
+
 # HOD scoring
 
 Files: `server/src/modules/hod-score/`. This is the more serious engine:

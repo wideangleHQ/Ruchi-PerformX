@@ -3,10 +3,8 @@ import { dashboardApi } from '@/api/dashboard';
 import { tasksApi } from '@/api/tasks';
 import { notificationsApi } from '@/api/notifications';
 import { usersApi } from '@/api/users';
-import { scoringApi } from '@/api/scoring';
 import { requestsApi } from '@/api/requests';
 import { transfersApi } from '@/api/transfers';
-import { analyticsApi } from '@/api/analytics';
 import { incentivesApi } from '@/api/incentives';
 import { hodScoreApi, HodScorePeriod } from '@/api/hod-score';
 
@@ -86,25 +84,9 @@ export const useUser = (id: string) => {
 };
 
 // Scoring Queries
-export const useScores = (params?: {
-  month?: string;
-  page?: number;
-  limit?: number;
-  departmentId?: string;
-}) => {
-  return useQuery({
-    queryKey: ['scoring', params],
-    queryFn: () => scoringApi.getAllScores(params),
-  });
-};
-
-export const useUserScore = (userId: string, month?: string) => {
-  return useQuery({
-    queryKey: ['scoring', userId, month],
-    queryFn: () => scoringApi.getUserScore(userId, month),
-  });
-};
-
+// Employee score hooks live in useAnalytics.ts, next to the screens that read
+// them. What was here called /scoring and /scoring/:id, neither of which the
+// API has ever served.
 export const useHodScore = (period?: HodScorePeriod, enabled = true) => {
   return useQuery({
     queryKey: ['hod-score', 'me', period],
@@ -169,17 +151,6 @@ export const useTransfer = (id: string) => {
   return useQuery({
     queryKey: ['transfers', id],
     queryFn: () => transfersApi.getTransferById(id),
-  });
-};
-
-// Analytics Queries
-export const useAnalytics = (params?: {
-  startDate?: string;
-  endDate?: string;
-}) => {
-  return useQuery({
-    queryKey: ['analytics', params],
-    queryFn: () => analyticsApi.getAnalytics(params),
   });
 };
 
