@@ -167,6 +167,10 @@ docs(p2): add projects module spec
 Scopes: `auth`, `tasks`, `self-actions`, `requests`, `transfers`, `scoring`,
 `hod-score`, `notifications`, `vms`, `client`, `schema`, `docs`.
 
+Anything you chose between two reasonable options gets an entry in
+`docs/src/decisions.md`, in the same commit. `just no-ai-trails` runs from the
+pre-commit hook and fails on AI attribution in files or commit messages.
+
 Conventions worth knowing before your first pull request are in
 `docs/src/p1_conventions.md`. The one that catches people: the global
 `ValidationPipe` runs with `forbidNonWhitelisted`, so adding a field to a form
