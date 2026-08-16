@@ -593,6 +593,45 @@ and removing someone from the roster leaves their reports in place.
 R&D projects are ordinary projects with `is_rnd = true`; they use the
 `/projects` routes rather than anything under `/rnd`.
 
+## Vendor portal
+
+The external half of the vendor module, and the only place in this API where the
+token holder is not an employee. `VENDOR` is the only role on every route, and
+`RolesGuard` is the outer fence only: each one is scoped through
+`vendor_assignments` in `VendorPortalService` before it returns anything. Detail
+routes call `VendorScopeService.assertVendorAccess`, list routes merge
+`VendorScopeService.vendorFilter` into their `where`.
+
+| Method | Path | Scope applied |
+| --- | --- | --- |
+| GET | `/vendor/dashboard` | own assignments only |
+| GET | `/vendor/tasks` | `vendorFilter('task')`, optional `?status=` |
+| GET | `/vendor/tasks/:id` | `assertVendorAccess`, 403 if not assigned |
+| PATCH | `/vendor/tasks/:id/status` | `assertVendorAccess`, then the four vendor transitions |
+| GET | `/vendor/projects` | `vendorFilter('project')` |
+| GET | `/vendor/projects/:id` | `assertVendorAccess`, 403 if not assigned |
+| GET | `/vendor/messages` | shared `vendor_notes` thread for this vendor |
+| POST | `/vendor/messages` | writes `is_internal: false`, always |
+| GET | `/vendor-deliverables/mine` | `vendor_id` equals this vendor |
+| PATCH | `/vendor-deliverables/:id/submit` | own only, sets `SUBMITTED` |
+
+That is the complete list. A vendor reaching anything else is a bug, including
+everything under `/vendors`, `/vendor-contracts`, `/vendor-documents`,
+`/vendor-notes`, `/vendor-reviews`, `/vendor-categories`, `/vendor-access`,
+`/hod-score`, `/scoring`, `/leave`, `/holidays`, `/assets`, `/rnd`, `/polls`,
+`/incentives`, `/transfers`, `/vms`, and `/users`. If a vendor needs something
+new, it goes in this namespace; it does not go into an internal route behind a
+role branch. `just vendor-roles` enforces that in CI.
+
+`PATCH /vendor/tasks/:id/status` accepts `{ status, reason? }` where `status` is
+one of `ACCEPTED`, `IN_PROGRESS`, `COMPLETED`, `REJECTED`. The DTO refuses any
+other value before the lifecycle table is consulted, and `REJECTED` without a
+reason is a 400.
+
+Portal logins are created by an admin: `POST /users` with `role: VENDOR`,
+`vendor_id` set, `department_id` null, `must_change_password: true`. There is no
+vendor registration flow and there must not be one.
+
 ## VMS
 
 See [Visitor management](p1_vms.md) for the full list. VMS endpoints require a
