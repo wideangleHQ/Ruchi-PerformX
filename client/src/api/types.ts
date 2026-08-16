@@ -1,5 +1,5 @@
 // ─── Enums ────────────────────────────────────────────────────────────────────
-export type Role = 'MD' | 'EA' | 'PA' | 'PURCHASE_HEAD' | 'DEPARTMENT_CONTROLLER' | 'HOD' | 'EMPLOYEE' | 'ADMIN';
+export type Role = 'MD' | 'EA' | 'PA' | 'PURCHASE_HEAD' | 'DEPARTMENT_CONTROLLER' | 'HOD' | 'EMPLOYEE' | 'ADMIN' | 'HR';
 export type UserStatus = 'PENDING' | 'ACTIVE' | 'REJECTED' | 'SUSPENDED';
 
 export type TaskStatus =

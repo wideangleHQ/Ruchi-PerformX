@@ -137,6 +137,10 @@ db-studio:
 db-models:
     @grep -nE "^model |^enum " server/prisma/schema.prisma
 
+# Load the default common holiday calendar for this year and next. Safe to rerun.
+seed-holidays:
+    cd server && npx tsx prisma/seed-holidays.ts
+
 # What has been applied, and what has not. Reads production, changes nothing.
 migrate-status:
     cd server && npx prisma migrate status

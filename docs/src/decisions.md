@@ -361,3 +361,34 @@ same branch enforces on `GET /messages`.
 [Notifications and realtime](p1_notifications.md#project-rooms). It gets worse
 when Phase 2 puts external vendor logins on the same namespace, so the lookup
 should land before the vendor portal does.
+## 2026-08-16 HR reads every department's holidays, but only in this module
+
+**Decision.** `HolidaysService` treats HR as company-wide, alongside the
+unrestricted roles `DepartmentScopeService` already knows about. HR is not added
+to that service's unrestricted list.
+**Why.** HR owns the common tier and edits any department's tier, so a holiday
+screen scoped to HR's own department is unusable. But `DepartmentScopeService`
+is the one gate for tasks, self actions, scores and incentives, and widening HR
+there would open all four at once for a role whose scope in those modules has
+never been decided.
+**Instead of.** Adding `HR` to `isUnrestrictedRole`, which is a two-line change
+with a blast radius of every module. Or a `hasCompanyWideAccess(user, domain)`
+argument on the shared service, which is a config knob for one caller.
+**Costs.** A second module needing the same widening will copy the three-line
+check rather than share it. Move it into `DepartmentScopeService` behind an
+explicit domain when there is a second caller, not before.
+
+## 2026-08-16 A holiday date held by both tiers resolves to the common row
+
+**Decision.** `mergeEffectiveCalendar` drops a department-wise holiday when a
+common holiday already claims that date. The common row is the one returned.
+**Why.** The calendar's job is to answer "is this a working day", and a day
+excluded twice is a leave application short one day. The union has to be a set
+of dates, not a concatenation of rows.
+**Instead of.** Returning both and deduplicating in each caller, which is the
+same rule written once per consumer with one chance each to forget it. Or
+preferring the department row as the more specific one, which would make the
+same company holiday render under a different name per department.
+**Costs.** The suppressed department row is invisible to the screen that could
+delete it. It is inert, it excludes a day that is already excluded, so this is
+a cosmetic gap rather than a correctness one.
