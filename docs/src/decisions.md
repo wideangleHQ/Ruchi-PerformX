@@ -825,3 +825,56 @@ the next person to wire a screen to a 404.
 plausible-looking clients for one domain.
 **Costs.** Anything that wants a company-wide analytics rollup now has to add
 the endpoint first rather than finding a client function waiting for it.
+
+## 2026-08-16 Events ship without checklists
+
+**Decision.** The events module builds the budget path only: events,
+coordinators, expenses with receipts, and the variance report. No checklists,
+and `project_checklist_items.event_id` stays unused.
+**Why.** Events are the documented first thing to cut, and the only checklist
+service in the codebase is `ProjectExecutionService`, whose every method gates
+on project membership and derives project progress from the same rows. Making
+it serve events means rewriting its permission model and its progress
+calculation from inside the module most likely to be deleted.
+**Instead of.** A second checklist table, which the spec forbids outright; or
+generalising the projects one, which is a projects-shaped change landing in an
+events branch and puts two features in one review.
+**Costs.** An event cannot hold a to-do list. The column and its index already
+exist, so adding one later is a service change and no migration: an event
+checklist is `ProjectExecutionService` with `event_id` where it currently
+passes `project_id`, and coordinator checks where it currently checks project
+role. That belongs in a projects branch.
+
+## 2026-08-16 Event money is a string end to end
+
+**Decision.** `budget_estimated` and `event_expenses.amount` cross every
+boundary as fixed two place strings. DTOs validate with `@IsDecimal`, Prisma
+takes the string straight into the Decimal column, sums happen in
+`Prisma.Decimal`, and the client formats without parsing.
+**Why.** The whole module is one arithmetic question, and a JSON number is a
+double. A thousand expenses of 0.03 sum to 30.00000000000038 in binary floating
+point, which reports a fully on-budget event as over budget. That is exactly
+the kind of wrong that nobody reports as a bug.
+**Instead of.** Numbers in the DTO with rounding at the edges, which needs
+every future caller to remember the rounding; or `prisma.aggregate` for the
+sum, which is correct but leaves the arithmetic untestable without a database.
+The pure function in `events/budget.ts` is tested in `budget.spec.ts` instead.
+**Costs.** A request body with `"amount": 1200.5` is a 400 rather than a
+coercion, so every client has to send `"1200.50"`. The client also needs its
+own grouping helper, since `Intl.NumberFormat` wants a number.
+
+## 2026-08-16 Event receipts are storage paths, not URLs
+
+**Decision.** `event_expenses.receipt_url` holds the Supabase storage path.
+`AttachmentsService` grew `uploadEventReceipt` and made `createSignedUrl`
+public; events signs the path on every read.
+**Why.** Supabase signed URLs last an hour. Storing one puts a dead link in the
+database, and the `event_expenses` row is the only record of the file because
+that table has no attachment foreign key. `task_attachments` already solves
+this by keeping `storage_path` alongside `file_url`.
+**Instead of.** A second Supabase client in the events service, which
+duplicates the file type and size rules that already exist; or a public bucket,
+which makes every receipt in the company world readable.
+**Costs.** The column name says URL and holds a path. Deleting an expense
+leaves the object in the bucket, so the `events/receipts` prefix needs a sweep
+if it ever gets large.

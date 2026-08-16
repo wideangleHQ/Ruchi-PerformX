@@ -186,6 +186,36 @@ export class AttachmentsService {
     return this.mapAttachments(attachments ?? []);
   }
 
+  /**
+   * Put one event receipt in the shared bucket under `events/receipts/{eventId}`
+   * and return its storage path.
+   *
+   * The only upload here that writes no `task_attachments` row:
+   * `event_expenses.receipt_url` is the whole record of the file and that table
+   * has no attachment foreign key. Callers store the path and re-sign it with
+   * `createSignedUrl` on every read, because a signed URL lasts an hour and a
+   * stored one is dead before anyone opens the budget report.
+   *
+   * Throws BadRequestException for an unsupported type, an oversized file, or a
+   * rejected upload. Assumes the caller has already checked that the user may
+   * log expenses against the event.
+   */
+  async uploadEventReceipt(eventId: string, file: UploadedFile) {
+    const prepared = await this.prepareFile(file);
+    const storagePath = `events/receipts/${eventId}/${Date.now()}-${randomUUID()}-${prepared.safeName}`;
+
+    const { error } = await this.supabase.storage.from(this.bucket).upload(storagePath, prepared.buffer, {
+      contentType: prepared.mimetype,
+      upsert: false,
+    });
+
+    if (error) {
+      throw new BadRequestException(error.message);
+    }
+
+    return storagePath;
+  }
+
   async remove(id: string, user: JwtPayload) {
     const attachment = await this.prisma.task_attachments.findUnique({
       where: { id },
@@ -368,7 +398,13 @@ export class AttachmentsService {
     throw new BadRequestException('Unsupported file type');
   }
 
-  private async createSignedUrl(storagePath: string) {
+  /**
+   * A one hour download URL for a path in the shared bucket. Public because
+   * event receipts are stored as paths and signed on read.
+   *
+   * Throws BadRequestException when the path is not in the bucket.
+   */
+  async createSignedUrl(storagePath: string) {
     const { data, error } = await this.supabase.storage.from(this.bucket).createSignedUrl(storagePath, 60 * 60);
     if (error || !data?.signedUrl) {
       throw new BadRequestException(error?.message || 'Unable to create signed url');
