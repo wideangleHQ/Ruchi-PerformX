@@ -36,7 +36,10 @@ export default function CareerPage() {
       return;
     }
 
-    launchCareerX(token).catch((error: any) => {
+    // Same-tab navigation: CareerX renders its own shell and uses returnTo for
+    // the link back. The user visibly leaves PerformX, which is the accepted
+    // cost of not running CareerX in an iframe.
+    launchCareerX(token, `${window.location.origin}/dashboard`).catch((error: any) => {
       toast.error(error.message || 'CareerX authentication could not be completed.');
       router.replace('/dashboard');
     });

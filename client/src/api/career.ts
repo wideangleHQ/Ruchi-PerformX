@@ -1,9 +1,18 @@
 /**
- * CareerX Launch Service
- * Responsible for the SSO handshake between PerformX and CareerX
+ * CareerX launch.
+ *
+ * Same-tab navigation, not an iframe: exchange the PerformX JWT for a CareerX
+ * session, then send the browser to CareerX with a return path so its shell can
+ * render a link back here. See docs/src/p2_integration.md.
+ *
+ * `credentials: 'include'` is what lets CareerX set its own HttpOnly session
+ * cookies on the exchange response. The PerformX token is passed in the header
+ * and is never logged or persisted anywhere on the way through.
+ *
+ * Throws an Error carrying the CareerX message when the exchange is refused,
+ * which is the case where the user has no HR access.
  */
-
-export const launchCareerX = async (accessToken: string) => {
+export const launchCareerX = async (accessToken: string, returnTo?: string) => {
   const CAREER_APP_URL = process.env.NEXT_PUBLIC_CAREER_APP_URL || 'http://localhost:3001';
   const CAREER_API_URL = process.env.NEXT_PUBLIC_CAREER_API_URL || 'http://localhost:3000/api/v1';
 
@@ -11,29 +20,20 @@ export const launchCareerX = async (accessToken: string) => {
     throw new Error('No access token found');
   }
 
-  try {
-    console.log("Access Token:", accessToken);
-    // Perform the secure exchange request
-    // This sends the PerformX JWT to CareerX backend
-    // credentials: 'include' allows CareerX to set its own HttpOnly cookies
-    const response = await fetch(`${CAREER_API_URL}/auth/exchange`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-    });
+  const response = await fetch(`${CAREER_API_URL}/auth/exchange`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+  });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || 'CareerX authentication could not be completed.');
-    }
-
-    // On success, redirect to CareerX dashboard
-    window.location.href = `${CAREER_APP_URL}/dashboard`;
-  } catch (error: any) {
-    console.error('CareerX launch error:', error);
-    throw error;
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'CareerX authentication could not be completed.');
   }
+
+  const backTo = returnTo || `${window.location.origin}/dashboard`;
+  window.location.href = `${CAREER_APP_URL}/dashboard?returnTo=${encodeURIComponent(backTo)}`;
 };

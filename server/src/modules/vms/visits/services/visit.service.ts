@@ -1,6 +1,7 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../../prisma/prisma.service';
+import { NotificationsService } from '../../../notifications/notifications.service';
 import { CreateVisitDto } from '../dto/create-visit.dto';
 import { CheckInDto } from '../dto/check-in.dto';
 import { CheckOutDto } from '../dto/check-out.dto';
@@ -31,12 +32,15 @@ const MAX_VISIT_CODE_ATTEMPTS = 5;
 
 @Injectable()
 export class VisitService implements VisitServiceContract {
+  private readonly logger = new Logger(VisitService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     @Inject('VisitRepository')
     private readonly visitRepository: VisitRepository,
     @Inject('VisitorRepository')
     private readonly visitorRepository: VisitorRepository,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async createVisit(dto: CreateVisitDto, actorId: string, tx?: Prisma.TransactionClient): Promise<VisitQueryRecord> {
@@ -52,8 +56,17 @@ export class VisitService implements VisitServiceContract {
     });
   }
 
+  /**
+   * Moves a SCHEDULED visit to CHECKED_IN and tells the host their visitor is
+   * here. Only SCHEDULED visits check in, so the host is notified exactly once
+   * per visit.
+   *
+   * Throws VisitNotFoundException, or VisitStateViolationException when the
+   * visit is in any other state. The notification never throws; see
+   * notifyHostOfArrival.
+   */
   async checkIn(dto: CheckInDto, actorId: string, tx?: Prisma.TransactionClient): Promise<VisitQueryRecord> {
-    return this.runInTransaction(tx, async (client) => {
+    const checkedIn = await this.runInTransaction(tx, async (client) => {
       const visit = await this.requireVisit(dto.visitId, client, false, false);
       if (visit.status !== VisitStatus.SCHEDULED) throw new VisitStateViolationException('Only scheduled visits can be checked in');
       return client.visit.update({
@@ -66,6 +79,9 @@ export class VisitService implements VisitServiceContract {
         select: this.visitSelect(true, true),
       });
     });
+
+    await this.notifyHostOfArrival(checkedIn.id);
+    return checkedIn;
   }
 
   async checkOut(dto: CheckOutDto, actorId: string, tx?: Prisma.TransactionClient): Promise<VisitQueryRecord> {
@@ -138,6 +154,49 @@ export class VisitService implements VisitServiceContract {
     if (params.limit !== undefined) searchParams.limit = params.limit;
 
     return this.visitRepository.search(searchParams);
+  }
+
+  /**
+   * Tells the host employee their visitor is at reception.
+   *
+   * Runs after the check-in transaction commits, and goes through the main
+   * NotificationsService rather than the VMS one, so it lands in the employee's
+   * ordinary PerformX bell. The host is a PerformX user; the check-in was
+   * performed under a VMS token by somebody else. VISITOR_ARRIVED is in-app
+   * only by the channel map, which is correct: a person waiting at a desk is
+   * not an email.
+   *
+   * Never throws. Reception has already checked the visitor in by the time this
+   * runs, and a failed bell must not be reported back as a failed check-in.
+   *
+   * ponytail: one extra primary key read rather than widening the shared visit
+   * select, which four other endpoints return.
+   */
+  private async notifyHostOfArrival(visitId: string): Promise<void> {
+    try {
+      const visit = await this.prisma.visit.findUnique({
+        where: { id: visitId },
+        select: {
+          id: true,
+          hostEmployeeId: true,
+          visitor: { select: { fullName: true, companyName: true } },
+        },
+      });
+      if (!visit) return;
+
+      await this.notifications.notify({
+        recipientId: visit.hostEmployeeId,
+        type: 'VISITOR_ARRIVED',
+        title: 'Your visitor has arrived',
+        message: `${visit.visitor.fullName} from ${visit.visitor.companyName} is at reception`,
+        entityType: 'visit',
+        entityId: visit.id,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Visitor arrival notification failed for visit ${visitId}: ${(error as Error).message}`,
+      );
+    }
   }
 
   private async createVisitWithinTransaction(

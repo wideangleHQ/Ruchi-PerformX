@@ -150,6 +150,7 @@ Visits:
 | --- | --- |
 | POST | `/vms/visits` |
 | GET | `/vms/visits` |
+| GET | `/vms/visits/mine` |
 | GET | `/vms/visits/:id` |
 | POST | `/vms/visits/:id/check-in` |
 | POST | `/vms/visits/:id/check-out` |
@@ -233,9 +234,20 @@ visitor request, with success, expired, and unauthorized outcome pages.
 
 ## Phase 2 relevance
 
-The Phase 2 scope calls for pushing a realtime notification to the host employee
-when their visitor checks in, and for making visit history searchable from every
-employee's dashboard. Both are additive: the data already exists in `visits`
-with `hostEmployeeId`, and the socket gateway already has a `user:<id>` room.
-The work is emitting on check-in and building the employee-facing view. See
+Both Phase 2 additions are built.
+
+A successful check-in notifies the host employee. `VisitService.checkIn` calls
+the main `NotificationsService.notify()` after the transaction commits, with
+type `VISITOR_ARRIVED`, which the channel map routes in-app only. It lands in
+the employee's ordinary PerformX bell rather than a VMS-only channel, even
+though the check-in itself was performed by reception under a VMS token. Only
+`SCHEDULED` visits check in, so the host is notified exactly once per visit. A
+notification failure is logged and swallowed: the visitor is already inside the
+building and reception should not be told otherwise.
+
+`GET /vms/visits/mine` returns the caller's own visit history, filtered on
+`hostEmployeeId`, open to every internal role. It takes the same query
+parameters as `GET /vms/visits` and overwrites `hostEmployeeId` with the caller,
+so asking for somebody else's returns your own. Department-wide visibility was
+deliberately not built; visitor records carry personal contact details. See
 [CareerX and VMS integration](p2_integration.md).

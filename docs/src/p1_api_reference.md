@@ -67,6 +67,24 @@ under `/users`, put it above `/users/:id`.
 | PATCH | `/departments/:id` | ADMIN |
 | GET | `/internal/departments` | `x-internal-api-key` header, not a JWT |
 
+## Internal
+
+Service-to-service only. Authenticated by the `x-internal-api-key` header
+through `InternalApiGuard`, marked `@Public()` so the JWT guard stands aside,
+and hidden from Swagger. CareerX is the only caller.
+
+| Method | Path | Roles |
+| --- | --- | --- |
+| GET | `/internal/departments` | `x-internal-api-key` header, not a JWT |
+| GET | `/internal/employees` | same |
+
+`/internal/employees` returns a bare array of
+`{ id, fullName, email, departmentId, role, isActive }`, one entry per user that
+has not been soft deleted. Deactivated users are included with
+`isActive: false`, on purpose: CareerX deactivates an `hr_employees` row by
+seeing that flag flip, so dropping them from the payload would leave a departed
+employee with career portal access.
+
 ## Tasks
 
 | Method | Path | Roles |

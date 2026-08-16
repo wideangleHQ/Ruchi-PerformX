@@ -53,16 +53,16 @@ permission check in `validateHRResult`.
 
 ## What has to be fixed first
 
-**CareerX calls an endpoint PerformX does not have.**
+**CareerX called an endpoint PerformX did not have. Built.**
 
 `CareerX/server/src/integrations/performx/performx.client.ts` has
-`getEmployees()`, calling `GET /api/v1/internal/employees`. PerformX serves only
-`/api/v1/internal/departments`. The employee sync cron runs every six hours,
-gets a 404, converts it to `ServiceUnavailableException`, and fails silently.
-`hr_employees` is therefore stale or populated by hand.
+`getEmployees()`, calling `GET /api/v1/internal/employees`. PerformX served only
+`/api/v1/internal/departments`. The employee sync cron ran every six hours, got
+a 404, converted it to `ServiceUnavailableException`, and failed silently.
+`hr_employees` is therefore stale or populated by hand until the next sync runs.
 
-The fix is on the PerformX side. Add an internal employees controller alongside
-the existing departments one:
+`modules/internal/` now serves it, alongside the existing departments
+controller and behind the same `InternalApiGuard`:
 
 ```ts
 @ApiExcludeController()
@@ -72,20 +72,24 @@ the existing departments one:
 export class InternalEmployeesController {
   @Get()
   async getEmployees() {
-    return this.usersService.findInternal();
+    return this.internalEmployeesService.findInternal();
   }
 }
 ```
 
-Return `{ id, fullName, email, departmentId, role, isActive }` per user. The
+It returns `{ id, fullName, email, departmentId, role, isActive }` per user. The
 CareerX client accepts both camelCase and snake_case keys and both a bare array
-and a `{ data: [...] }` envelope, so the exact shape is forgiving. Filter out
-soft-deleted users; do not filter out inactive ones, because CareerX needs to
-know somebody was deactivated in order to deactivate their `hr_employees` row.
+and a `{ data: [...] }` envelope, so the exact shape is forgiving. Soft-deleted
+users are filtered out; inactive ones are not, because CareerX needs to know
+somebody was deactivated in order to deactivate their `hr_employees` row.
 
-This is a half-day fix and it unblocks everything else in this section.
+The shaping is a pure function, `toInternalEmployees` in
+`internal-employees.service.ts`, and the pinning test is
+`internal-employees.spec.ts`. Getting those two filters the wrong way round is
+silent: a departed employee keeps career portal access.
 
-**Set `PERFORMX_JWT_SECRET` on CareerX.** When it is unset, CareerX skips local
+**Set `PERFORMX_JWT_SECRET` on CareerX.** Still outstanding, and it is
+configuration rather than code. When it is unset, CareerX skips local
 verification entirely and relies on the remote call. That was a deliberate
 allowance for early development. It should not survive into Phase 2, because it
 means a network partition degrades to no verification at all rather than to a
@@ -117,11 +121,22 @@ it for this budget.
 **Rebuilding the HR screens inside PerformX against the CareerX API.** Explicitly
 out of scope.
 
-Take the first option. `client/app/(protected)/career/page.tsx` already exists
-as a stub; wire it to redirect with the token exchange.
+The first option is built. `client/app/(protected)/career/page.tsx` checks
+access, reads the PerformX token, and calls `launchCareerX` in
+`client/src/api/career.ts`, which POSTs the token to `/auth/exchange` with
+`credentials: 'include'` so CareerX can set its own session cookies, then
+navigates the browser to `${CAREER_APP_URL}/dashboard?returnTo=<url>`.
 
-Show the Career nav item only when `can_access_career_hr` is true or the user's
-role has career permissions. A tab that 403s on click reads as broken software.
+`returnTo` is the contract for the link back. It is a URL-encoded absolute
+PerformX URL, `/dashboard` by default, and CareerX's shell is what renders it.
+The exchange itself is unchanged; the token stays in the `Authorization` header
+and is not logged or persisted on the way through.
+
+The Career nav item shows only when `can_access_career_hr` is true or the user
+is in the HR department. That check lives in `Sidebar.tsx` and is not repeated
+anywhere else. The page keeps its own copy of the access check because it is
+reachable by direct navigation, and it redirects to `/dashboard` rather than
+letting CareerX answer with a 403.
 
 ## Aligning with the HR module
 
@@ -160,11 +175,12 @@ VMS already works. Phase 2 extends it in two directions, and both are additive.
 
 ## Notify the host employee on check-in
 
-Today reception checks a visitor in and nothing reaches the person being
-visited. `Visit.hostEmployeeId` already points at a `users` row, and the socket
-gateway already has a `user:<id>` room. The work is emitting.
+Built. Reception used to check a visitor in and nothing reached the person being
+visited. `Visit.hostEmployeeId` already pointed at a `users` row and the socket
+gateway already had a `user:<id>` room, so the work was emitting.
 
-In `visit.service.ts`, after a successful check-in:
+`VisitService.checkIn` now calls `notifyHostOfArrival` after the check-in
+transaction commits:
 
 ```ts
 await this.notifications.notify({
@@ -177,33 +193,45 @@ await this.notifications.notify({
 });
 ```
 
-Two things to watch.
+Two things this had to get right.
 
-The host is a PerformX user but the check-in is performed under a VMS token.
-The VMS notification service is separate from the main one
-(`modules/vms/notifications/`). Route this through the main engine so the
-notification lands in the employee's ordinary bell, not a VMS-only channel.
+The host is a PerformX user but the check-in is performed under a VMS token, and
+the VMS notification service (`modules/vms/notifications/`) is separate from the
+main one. `VisitsModule` imports the main `NotificationsModule`, so the
+notification lands in the employee's ordinary bell rather than a VMS-only
+channel.
 
-`VISITOR_ARRIVED` should be in-app only. A visitor at reception is an immediate
-event and email is the wrong medium for it.
+`VISITOR_ARRIVED` is in-app only. A visitor at reception is an immediate event
+and email is the wrong medium for it. That is already what
+`notification-channels.constants.ts` says, and the call does not override it.
+
+The notification never fails the check-in. It reads the visitor's `fullName` and
+`companyName` with one extra primary key read rather than widening the shared
+visit select that four other endpoints return, and any error is logged and
+swallowed, because by then the visitor is already inside the building.
+
+Note `visitors."companyName"` is camelCase in the live schema. A `company_name`
+column was dropped recently; do not reach for it.
 
 ## Visit history on employee dashboards
 
-The scope document asks for visit history searchable by employee, department, or
-date, available to every employee rather than only reception.
+Built. The scope document asks for visit history searchable by employee,
+department, or date, available to every employee rather than only reception.
 
-`GET /vms/reports/employee/:employeeId` already exists but is restricted to MD,
-EA, PA, HOD, and ADMIN. Add an endpoint that returns the caller's own history
-with no role restriction:
+`GET /vms/reports/employee/:employeeId` already existed but is restricted to MD,
+EA, PA, HOD, and ADMIN. The addition returns the caller's own history and is
+open to every internal role:
 
 ```
 GET /vms/visits/mine
 ```
 
-Filtered on `hostEmployeeId = caller`. This is the safe version: an employee
-sees their own visitors and nobody else's. Widening it to department-level
-visibility is a separate decision, and visitor records include personal contact
-details, so it should be made explicitly rather than by default.
+It takes the same query parameters as `GET /vms/visits` and overwrites
+`hostEmployeeId` with the caller after the spread, so asking for somebody else's
+returns your own. This is the safe version: an employee sees their own visitors
+and nobody else's. Department-level visibility was deliberately not built.
+Visitor records include personal contact details, so widening it is a decision
+to be made explicitly rather than by default.
 
 ## What not to do
 
