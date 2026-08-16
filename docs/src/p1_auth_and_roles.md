@@ -119,6 +119,8 @@ permission tiers, which is why the `@Roles(...)` lists on controllers are long.
 | `ADMIN` | System administrator | User and department CRUD, no task involvement |
 | `HR` | Human resources | Leave, holidays, and the vendor category list |
 | `VENDOR` | An external vendor's portal login | Only rows in `vendor_assignments` |
+| `HR` | Human resources | Leave and holidays, no task involvement |
+| `VENDOR` | An external vendor's portal login | Only what `vendor_assignments` grants it |
 
 `ADMIN` is a technical role. It creates users and departments and does not
 appear anywhere in the task lifecycle.
@@ -196,6 +198,39 @@ promise.
 `@Roles`. It answers only about the caller and returns
 `{ accessLevel: null }` to anyone without a grant, which is what the sidebar
 reads to decide whether the Vendors entry renders.
+### VENDOR is the exception, and it is the reason this section matters
+
+`VENDOR` is the only role in `role_enum` held by someone who does not work
+here. Every other part of this API was written assuming the holder of a valid
+JWT is an employee, and `RolesGuard` knows nothing about assignments — so
+adding `role_enum.VENDOR` to a decorator opens that endpoint to **every** vendor
+for **every** record it can return.
+
+Three rules make that safe, and all three are load bearing:
+
+1. Every vendor-reachable route lives under `modules/vendor-portal/` on the
+   `/vendor` and `/vendor-deliverables` prefixes. No internal controller carries
+   `role_enum.VENDOR`, and none gets an `if (role === VENDOR)` branch.
+   `just vendor-roles` fails the build if VENDOR appears on a controller outside
+   that directory.
+2. Every detail endpoint calls `VendorScopeService.assertVendorAccess` before it
+   reads a record. Every list endpoint merges `VendorScopeService.vendorFilter`
+   into its `where`. `vendorFilter` returns `{ id: { in: [] } }` when the vendor
+   has no assignments, which matches nothing — an empty filter object would
+   match everything, and that failure mode is the whole task table.
+3. The vendor is resolved with `VendorScopeService.vendorIdForUser`, which
+   throws when a VENDOR account has no `vendor_id`. Such an account can be
+   scoped to nothing and must never fall through to an unfiltered query.
+
+A vendor portal login is created by an admin through `POST /users` with
+`role: VENDOR`, `vendor_id` set, `department_id` null, and
+`must_change_password: true`. Credentials are handed over out of band. Vendors
+do not self-register: `POST /auth/register` writes a `registration_requests`
+row and the approval flow assumes an internal employee with a department.
+
+The four task transitions a vendor may perform are in
+[Tasks](p1_tasks.md#the-state-machine). Everything else about the boundary is in
+[Vendor management](p2_vendors.md#external-vendor-portal--kept-separate).
 
 ## VMS access codes
 

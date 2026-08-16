@@ -19,14 +19,14 @@ Here is the table, transcribed from the code:
 | From | To | Who may do it | Reason required |
 | --- | --- | --- | --- |
 | CREATED | ASSIGNED | MD, HOD, EA, PA, DEPT_CONTROLLER, PURCHASE_HEAD | no |
-| CREATED, ASSIGNED | ACCEPTED | MD, EMPLOYEE, HOD, EA, PA, DEPT_CONTROLLER | no |
-| ACCEPTED, CREATED, ASSIGNED | IN_PROGRESS | MD, EMPLOYEE, HOD, EA, PA, DEPT_CONTROLLER | no |
-| IN_PROGRESS | COMPLETED | MD, EMPLOYEE, HOD, EA, PA, DEPT_CONTROLLER | no |
+| CREATED, ASSIGNED | ACCEPTED | MD, EMPLOYEE, HOD, EA, PA, DEPT_CONTROLLER, VENDOR | no |
+| ACCEPTED, CREATED, ASSIGNED | IN_PROGRESS | MD, EMPLOYEE, HOD, EA, PA, DEPT_CONTROLLER, VENDOR | no |
+| IN_PROGRESS | COMPLETED | MD, EMPLOYEE, HOD, EA, PA, DEPT_CONTROLLER, VENDOR | no |
 | COMPLETED | HOD_VERIFIED_PENDING | MD, EMPLOYEE, HOD, EA, PA, DEPT_CONTROLLER | no |
 | HOD_VERIFIED_PENDING | HOD_VERIFIED | MD, HOD, EA, PA, DEPT_CONTROLLER, PURCHASE_HEAD | no |
 | HOD_VERIFIED | REVIEWED | MD, HOD, EA, PA, DEPT_CONTROLLER, PURCHASE_HEAD | no |
 | REVIEWED | CLOSED | MD, HOD, EA, PA, DEPT_CONTROLLER, PURCHASE_HEAD | no |
-| CREATED, ASSIGNED, ACCEPTED, IN_PROGRESS | REJECTED | MD, EMPLOYEE, HOD, EA, PA, DEPT_CONTROLLER | yes |
+| CREATED, ASSIGNED, ACCEPTED, IN_PROGRESS | REJECTED | MD, EMPLOYEE, HOD, EA, PA, DEPT_CONTROLLER, VENDOR | yes |
 | COMPLETED, HOD_VERIFIED_PENDING, HOD_VERIFIED, REVIEWED | IN_PROGRESS | MD, HOD, EA, PA, DEPT_CONTROLLER, PURCHASE_HEAD | yes |
 | CLOSED | REJECTED | MD, HOD, EA, PA, DEPT_CONTROLLER, PURCHASE_HEAD | no |
 
@@ -41,6 +41,17 @@ Two escape hatches: reject with a reason from any early state, and send work
 back to `IN_PROGRESS` with a reason from any of the four late states. The second
 one is the "this is not good enough, do it again" path and it is the one
 supervisors actually use.
+
+`VENDOR` appears on exactly four rows: accept, start, complete, and reject with
+a reason. It is absent from `HOD_VERIFIED_PENDING`, `HOD_VERIFIED`, `REVIEWED`,
+`CLOSED`, and from the return-for-rework row, so an external vendor can move its
+own work forward and refuse it, and can never review, close, or send work back.
+The return row shares its target status with the vendor's "start work" row,
+which makes it the one an over-eager edit would open by accident;
+`vendor-scope.spec.ts` asserts it stays shut. Role is the outer fence only —
+whether the vendor is assigned to the task at all is decided by
+`VendorScopeService` before `validate()` runs. See
+[Vendor management](p2_vendors.md#the-trust-boundary).
 
 `PENDING` is in `task_status_enum` but appears nowhere in the transition table.
 Nothing can enter or leave it through the lifecycle service. It is treated as a

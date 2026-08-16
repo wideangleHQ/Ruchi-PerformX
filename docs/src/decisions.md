@@ -657,3 +657,46 @@ supposed to trust; the channel map deliberately has no such type.
 **Costs.** The birthday list is a raw query rather than a Prisma find, because
 matching month and day while ignoring the year is not expressible in the query
 builder.
+## 2026-08-16 The vendor portal is a namespace, not a role branch
+
+**Decision.** Every route an external vendor can reach lives in
+`modules/vendor-portal/` on the `/vendor` and `/vendor-deliverables` prefixes,
+with `role_enum.VENDOR` on the controller and a `VendorScopeService` call in
+every service method. No internal controller carries the role.
+**Why.** `RolesGuard` only checks that `user.role` is in the `@Roles(...)` list.
+Adding `VENDOR` to `GET /tasks` would open every task in the company to every
+vendor, and the scope check that stops it would be a line in a shared service
+that an unrelated refactor can drop without a test failing. A separate namespace
+makes the blast radius of a mistake one file, and `just vendor-roles` turns the
+convention into a build failure.
+**Instead of.** A role branch inside the existing task, project, and dashboard
+controllers, which is fewer files and is the arrangement where a leak looks like
+a missing `if`.
+**Costs.** `/vendor/tasks` duplicates a small amount of `GET /tasks`, and the
+two will drift. That is the intended trade: the vendor select list is
+deliberately narrower (no department, no assignee, no history) and should not
+inherit changes to the employee one by accident.
+
+## 2026-08-16 The vendor message thread has no way to ask for internal notes
+
+**Decision.** `VendorPortalService.sharedThread(vendorId)` hardcodes
+`is_internal: false` and takes no flag. The portal has no other path into
+`vendor_notes`.
+**Why.** Section 12 of the vendor chapter makes internal notes RUCHI-only. A
+method taking `isInternal` as an argument is one caller typo away from serving
+them to the vendor, and the mistake would read as a normal parameter at review.
+**Instead of.** A shared `notes(vendorId, isInternal)` used by both halves of
+the module, or a `where` assembled by the caller.
+**Costs.** The internal Vendor Management half writes its own read for the
+internal thread rather than reusing this one. That duplication is the point.
+
+## 2026-08-16 TaskLifecycleService is provided twice rather than exported
+
+**Decision.** `VendorPortalModule` lists `TaskLifecycleService` in its own
+`providers` instead of importing `TasksModule` for it.
+**Why.** The service holds no state and takes no constructor arguments, so a
+second instance is a second copy of a lookup table. Exporting it would mean
+editing `tasks.module.ts`, and the Phase 2 rule is that a feature branch touches
+its own module directory.
+**Costs.** Two instances of a stateless class. If it ever grows a dependency or
+a cache, this becomes wrong and the module should import `TasksModule` instead.

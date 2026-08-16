@@ -11,6 +11,11 @@ type Transition = {
   requiresReason?: boolean;
 };
 
+// A vendor is external, so it appears on exactly four rows below: accept,
+// start, complete, and reject with a reason. It may never review, close, or
+// return work, and the review/close/return rows must stay free of it. Roles
+// are the outer fence only; whether the vendor is assigned to the task is
+// decided by VendorScopeService before this runs.
 const TRANSITIONS: Transition[] = [
   {
     from: [task_status_enum.CREATED],
@@ -20,17 +25,17 @@ const TRANSITIONS: Transition[] = [
   {
     from: [task_status_enum.CREATED, task_status_enum.ASSIGNED],
     to: task_status_enum.ACCEPTED,
-    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE, role_enum.HOD, ...ASSISTANT_ROLES],
+    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE, role_enum.HOD, ...ASSISTANT_ROLES, role_enum.VENDOR],
   },
   {
     from: [task_status_enum.ACCEPTED, task_status_enum.CREATED, task_status_enum.ASSIGNED],
     to: task_status_enum.IN_PROGRESS,
-    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE, role_enum.HOD, ...ASSISTANT_ROLES],
+    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE, role_enum.HOD, ...ASSISTANT_ROLES, role_enum.VENDOR],
   },
   {
     from: [task_status_enum.IN_PROGRESS],
     to: task_status_enum.COMPLETED,
-    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE, role_enum.HOD, ...ASSISTANT_ROLES],
+    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE, role_enum.HOD, ...ASSISTANT_ROLES, role_enum.VENDOR],
   },
   {
     from: [task_status_enum.COMPLETED],
@@ -55,7 +60,7 @@ const TRANSITIONS: Transition[] = [
   {
     from: [task_status_enum.CREATED, task_status_enum.ASSIGNED, task_status_enum.ACCEPTED, task_status_enum.IN_PROGRESS],
     to: task_status_enum.REJECTED,
-    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE, role_enum.HOD, ...ASSISTANT_ROLES],
+    allowedRoles: [role_enum.MD, role_enum.EMPLOYEE, role_enum.HOD, ...ASSISTANT_ROLES, role_enum.VENDOR],
     requiresReason: true,
   },
   {
