@@ -406,6 +406,43 @@ identical row through.
 
 `just seed-holidays` loads the fixed-date national holidays as common holidays
 for the current and next year. It is safe to rerun.
+## Polls
+
+| Method | Path | Roles |
+| --- | --- | --- |
+| GET | `/polls/active` | every internal role |
+| GET | `/polls` | every internal role |
+| POST | `/polls` | every internal role |
+| GET | `/polls/:id` | every internal role |
+| POST | `/polls/:id/vote` | every internal role |
+| PATCH | `/polls/:id/close` | every internal role, creator or MD in the service |
+| DELETE | `/polls/:id` | every internal role, creator or MD in the service |
+
+"Every internal role" is all of them except VENDOR. Raising a poll is not a
+management privilege; any employee can do it. Closing and deleting are open to
+the role list and narrowed to the creator or the MD in `PollsService`, which
+returns 403 rather than 404 because the poll itself is company wide.
+
+`/polls/active` is declared above `/polls/:id` in the controller so it is not
+shadowed.
+
+Polls are not anonymous. Every response carries `createdBy` and the UI shows
+that name next to the question.
+
+Whether a poll is open is computed from `closes_at` at read time and returned as
+`isOpen`. No job flips a column at midnight, so a poll cannot get stuck open
+because a cron did not run. `is_closed` remains for manual early closure by the
+creator and overrides `closes_at` in both directions.
+
+One vote per person is the unique key on `(poll_id, user_id)`, not an
+application check. `POST /polls/:id/vote` upserts on that key, so voting again
+changes your vote rather than failing. Every poll response includes
+`myVoteOptionId`, the caller's own choice, so the card paints the right state on
+first render without a second request.
+
+A vote or a close broadcasts `poll:updated` on the socket with the new tallies.
+Polls are company wide, so this is a genuine broadcast rather than a room.
+Creating one notifies every other active internal user with `POLL_CREATED`.
 
 ## Dashboard and profile
 
@@ -416,7 +453,30 @@ for the current and next year. It is safe to rerun.
 | PATCH | `/profile` |
 
 `GET /dashboard` returns a different payload per role. It is the aggregation
-layer over tasks, self actions, requests, scores, and incentives.
+layer over tasks, self actions, requests, scores, and incentives, and it also
+carries the social layer:
+
+| Field | What it is |
+| --- | --- |
+| `birthdays` | Everyone whose birthday is today, with department name |
+| `upcomingHoliday` | The next holiday with `daysAway`, or null |
+| `activePolls` | Up to five open polls with the caller's vote state |
+
+This stays one call. The dashboard loads on every login and five requests to
+five endpoints is a worse first paint than one wide one. If a list grows, it is
+trimmed inside the payload rather than moved to its own route.
+
+`birthdays` is derived from `users.date_of_birth` on every read, matching month
+and day and ignoring the year. There is no `birthday_cards` table: nothing needs
+storing, and a table would need one job to populate it and another to expire it.
+A 29 February birthday is shown on 28 February in a non-leap year, so it gets a
+card every year rather than one every four. There is deliberately no
+`BIRTHDAY_TODAY` notification; the card is enough, and a notification per
+birthday in a hundred-person company is noise.
+
+`PATCH /profile` accepts `dateOfBirth` as a date string or as null. Null clears
+it and removes the person from the birthday card for good. The column is
+nullable and is never required anywhere.
 
 ## Project execution
 

@@ -602,3 +602,58 @@ another thread from one of them.
 tested without a database, or inline branches per endpoint.
 **Costs.** One more file in a module that would otherwise be three. It buys
 `rnd-visibility.spec.ts`, which is the only test in the module.
+## 2026-08-16 A 29 February birthday shows on 28 February
+
+**Decision.** In a non-leap year, a leap day birthday appears on the dashboard
+on 28 February. The rule lives in the SQL in `DashboardService`, with a comment
+saying so.
+**Why.** The three options were 28 February, 1 March, or nothing. Nothing means
+a card once every four years, which reads as a bug to the person who does not
+get one. 28 February keeps the card inside February, which is where people
+expect a February birthday.
+**Costs.** On 28 February in a non-leap year two people can appear on one day,
+one of whom was born on the 28th and one on the 29th. That is the intended
+outcome, but it is why the query has an OR branch rather than a single date
+comparison.
+
+## 2026-08-16 Poll open state is computed, not stored
+
+**Decision.** Whether a poll accepts votes is derived from `closes_at` on every
+read. `is_closed` stays as a column but only for manual early closure by the
+creator.
+**Why.** The alternative is a cron flipping a boolean at midnight. A job that
+fails silently leaves a closed poll accepting votes, and nothing surfaces the
+failure until somebody complains about the result.
+**Instead of.** A scheduled sweep, which needs monitoring nobody will build for
+a poll feature.
+**Costs.** Every list query filters on both `is_closed` and `closes_at` rather
+than on one column. The composite index `(is_closed, closes_at)` already exists
+for exactly this.
+
+## 2026-08-16 The dashboard social layer rides in the dashboard call
+
+**Decision.** Birthdays, the next holiday, and active polls are fields on the
+existing `GET /dashboard` payload rather than three more endpoints. Polls are
+capped at five inside the payload.
+**Why.** The dashboard loads on every login. Four requests where there was one
+makes the first paint of the most-seen screen in the product worse for no
+benefit.
+**Instead of.** `GET /dashboard/birthdays` and friends, which the specification
+offered and then advised against. Holidays are read from the table directly here
+rather than by calling `/holidays/upcoming`, because a service calling its own
+API over HTTP to avoid a join is not a saving.
+**Costs.** The dashboard payload grows and `DashboardModule` now imports
+`PollsModule`. When a list outgrows one screen it gets paginated in place, which
+is more fiddly than a dedicated endpoint would be.
+
+## 2026-08-16 No birthday_cards table and no BIRTHDAY_TODAY notification
+
+**Decision.** Birthday cards are a derived view of `users.date_of_birth`. There
+is no table and no notification type.
+**Why.** A table holds nothing the column does not already answer, and it would
+need one job to populate it and another to expire it. A notification for every
+birthday in a hundred-person company is noise in the one channel people are
+supposed to trust; the channel map deliberately has no such type.
+**Costs.** The birthday list is a raw query rather than a Prisma find, because
+matching month and day while ignoring the year is not expressible in the query
+builder.

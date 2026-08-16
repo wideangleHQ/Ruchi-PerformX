@@ -1,3 +1,5 @@
+import type { Poll } from './polls';
+
 // ─── Enums ────────────────────────────────────────────────────────────────────
 export type Role = 'MD' | 'EA' | 'PA' | 'PURCHASE_HEAD' | 'DEPARTMENT_CONTROLLER' | 'HOD' | 'EMPLOYEE' | 'ADMIN' | 'HR';
 export type UserStatus = 'PENDING' | 'ACTIVE' | 'REJECTED' | 'SUSPENDED';
@@ -306,6 +308,19 @@ export interface AdminDashboardData {
   recentAuditLogs: any[];
 }
 
+export interface Birthday {
+  id: string;
+  fullName: string;
+  departmentName?: string | null;
+}
+
+export interface UpcomingHoliday {
+  id: string;
+  name: string;
+  holidayDate: string;
+  daysAway: number;
+}
+
 export interface DashboardData {
   activeTasks: number;
   pendingRequests: number;
@@ -323,6 +338,10 @@ export interface DashboardData {
     status: string;
   }>;
   employeeSharedTasks: number;
+  // The social layer rides along in the same call rather than in three more.
+  birthdays: Birthday[];
+  upcomingHoliday: UpcomingHoliday | null;
+  activePolls: Poll[];
 }
 
 // ─── API Error ────────────────────────────────────────────────────────────────

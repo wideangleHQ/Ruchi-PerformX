@@ -10,6 +10,7 @@ export class ProfileResponseDto {
   departmentName?: string | null | undefined;
   departmentIds?: string[] | undefined;
   departmentNames?: string[] | undefined;
+  dateOfBirth?: Date | null;
   createdAt?: Date | null;
   canAccessCareerHR!: boolean;
 }

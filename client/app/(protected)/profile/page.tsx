@@ -4,7 +4,7 @@ import type { ChangeEvent, FormEvent, ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, Building2, Mail, PencilLine, Phone, Save, Shield, UserCircle2, UserRound, Loader2 } from 'lucide-react';
+import { AlertCircle, Building2, Cake, Mail, PencilLine, Phone, Save, Shield, UserCircle2, UserRound, Loader2 } from 'lucide-react';
 import { profileApi, type UpdateProfilePayload } from '@/api/profile';
 import { useToast } from '@/hooks/useToast';
 
@@ -13,6 +13,7 @@ type ProfileFormState = {
   username: string;
   email: string;
   mobileNumber: string;
+  dateOfBirth: string;
 };
 
 const emptyForm: ProfileFormState = {
@@ -20,6 +21,7 @@ const emptyForm: ProfileFormState = {
   username: '',
   email: '',
   mobileNumber: '',
+  dateOfBirth: '',
 };
 
 const getErrorMessage = (error: any) =>
@@ -42,6 +44,7 @@ export default function ProfilePage() {
         username: profileQuery.data.username || '',
         email: profileQuery.data.email || '',
         mobileNumber: profileQuery.data.mobileNumber || '',
+        dateOfBirth: profileQuery.data.dateOfBirth?.slice(0, 10) || '',
       });
     }
   }, [profileQuery.data]);
@@ -55,6 +58,7 @@ export default function ProfilePage() {
         username: updated.username || '',
         email: updated.email || '',
         mobileNumber: updated.mobileNumber || '',
+        dateOfBirth: updated.dateOfBirth?.slice(0, 10) || '',
       });
       toast.success('Profile updated successfully');
     },
@@ -95,6 +99,9 @@ export default function ProfilePage() {
       username,
       email,
       mobileNumber: mobileNumber || undefined,
+      // An empty field sends null, which clears it. Leaving it set is opt in:
+      // nobody is required to publish a birthday.
+      dateOfBirth: form.dateOfBirth || null,
     };
 
     await updateMutation.mutateAsync(payload);
@@ -113,6 +120,7 @@ export default function ProfilePage() {
         { label: 'Role', value: profile.role || '—', icon: UserRound },
         { label: 'Department', value: profile.departmentId || '—', icon: Building2 },
         { label: 'Department Name', value: profile.departmentName || '—', icon: Building2 },
+        { label: 'Date of Birth', value: profile.dateOfBirth?.slice(0, 10) || 'Not shared', icon: Cake },
       ]
     : [];
 
@@ -269,6 +277,19 @@ export default function ProfilePage() {
                   onChange={handleChange('mobileNumber')}
                   className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
                 />
+              </Field>
+
+              <Field label="Date of Birth">
+                <input
+                  type="date"
+                  value={form.dateOfBirth}
+                  onChange={handleChange('dateOfBirth')}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                />
+                <p className="mt-2 text-xs text-slate-500">
+                  Optional. Set it and a card appears on everyone&apos;s dashboard on the
+                  day. Clear the field and save to take it down for good.
+                </p>
               </Field>
 
               <div className="grid gap-4 sm:grid-cols-2">
