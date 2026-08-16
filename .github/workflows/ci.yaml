@@ -56,12 +56,16 @@ jobs:
             --environment="$VERCEL_ENV" \
             --token="${{ secrets.VERCEL_TOKEN }}"
 
+      # PROD_FLAG is empty for preview and "--prod" for production, so it has to
+      # stay unquoted: quoting passes an empty argument that vercel rejects.
       - name: Build
         run: |
+          # shellcheck disable=SC2086
           vercel build $PROD_FLAG \
             --token="${{ secrets.VERCEL_TOKEN }}"
 
       - name: Deploy
         run: |
+          # shellcheck disable=SC2086
           vercel deploy --prebuilt $PROD_FLAG \
             --token="${{ secrets.VERCEL_TOKEN }}"
