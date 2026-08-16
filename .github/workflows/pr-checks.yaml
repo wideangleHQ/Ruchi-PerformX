@@ -27,6 +27,24 @@ jobs:
         run: npx tsc --noEmit -p tsconfig.json
       - name: Test
         run: npx vitest run
+      - name: Nest container builds
+        # Catches a module registering a controller without AuthModule, which
+        # typechecks and passes tests and then fails at boot on JwtService.
+        # No database is touched; these are placeholders for the two modules
+        # that read env at import time.
+        run: npx ts-node --transpile-only scripts/boot-check.ts
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
+          JWT_SECRET: ci-placeholder-not-a-real-secret
+          VMS_JWT_SECRET: ci-placeholder-not-a-real-secret
+          INTERNAL_API_KEY: ci-placeholder
+          RESEND_API_KEY: re_ci_placeholder
+          RESEND_FROM_EMAIL: ci@example.invalid
+          SUPABASE_URL: https://ci.invalid
+          SUPABASE_SERVICE_ROLE_KEY: ci-placeholder
+          SUPABASE_BUCKET: ci
+          SUPABASE_VMS_BUCKET: ci
 
   client:
     name: Client
