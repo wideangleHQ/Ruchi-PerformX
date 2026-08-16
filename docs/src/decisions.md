@@ -909,3 +909,34 @@ between the two conventions, so neither choice is consistent with everything.
 **Costs.** The leave module reads differently from `requests` in the same client.
 Leave type names come from `GET /leave/types` and are matched by id in the UI,
 because Phase 2 tables have no relation to include.
+## 2026-08-16 Vendor request bodies use the Prisma column names
+
+**Decision.** The vendor create and update payloads, the note payload and the
+access grant payload are snake_case, one for one with the `vendors`,
+`vendor_notes` and `vendor_dashboard_access` columns. The zod schema in
+`client/src/components/vendors/VendorForm.tsx` is the client half of that
+contract.
+**Why.** The vendor frontend and the vendor backends are being built in
+parallel against a written contract rather than against each other, so the
+field names have to be derivable from something both sides already read. The
+schema is that thing. Self-actions, the most recent module, already posts
+snake_case.
+**Instead of.** camelCase, as tasks and requests use. Both spellings exist in
+this codebase, so neither is the house style, and camelCase would need a
+mapping layer in the service that snake_case does not.
+**Costs.** Two spellings of the same idea now have a third module picking a
+side. `forbidNonWhitelisted` makes any disagreement a 400 with an unhelpful
+body, so the DTO and the zod schema have to change together.
+
+## 2026-08-16 Vendor list reads accept both the array and the envelope
+
+**Decision.** `client/src/api/vendors.ts` normalises every vendor list response
+through one `toList` helper that takes either a bare array or a
+`PaginatedResponse`.
+**Why.** List endpoints in this repository are split between the two shapes and
+the vendor controllers are not merged, so committing the screens to one shape
+would be a guess that fails at integration rather than at review.
+**Instead of.** Picking one and correcting later, which puts the correction in
+every component instead of one function.
+**Costs.** The union type is in the signature of nine functions. Drop the array
+branch once the module lands on a shape.
