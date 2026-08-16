@@ -118,6 +118,49 @@ allow ADMIN.
 | GET | `/self-actions/:id/comments` |
 | POST | `/self-actions/:id/comments` |
 
+## Projects
+
+Every role except VENDOR. Project visibility is company wide, so the role list
+only keeps external accounts out; the membership rules below are service-layer
+checks that `RolesGuard` cannot express, because the JWT carries a company role
+and says nothing about who leads which project. Vendors reach projects through
+`vendor_assignments` in the vendor portal namespace, never here.
+
+| Method | Path | Who |
+| --- | --- | --- |
+| POST | `/projects` | any internal user |
+| GET | `/projects` | any internal user |
+| GET | `/projects/mine` | any internal user, scoped to their memberships |
+| GET | `/projects/:id` | any internal user |
+| PATCH | `/projects/:id` | project Lead, Co-Lead |
+| DELETE | `/projects/:id` | project Lead, MD, soft delete |
+| POST | `/projects/:id/members` | project Lead, Co-Lead |
+| DELETE | `/projects/:id/members/:userId` | project Lead, Co-Lead |
+| GET | `/projects/:id/activity` | any internal user |
+
+`/projects/mine` is declared above `/projects/:id` in the controller. Keep any
+further literal route above it too.
+
+`GET /projects` and `/projects/mine` take the directory filters, which compose:
+`search`, `status`, `health`, `priority`, `category`, `departmentId`, `leadId`,
+`dateFrom`, `dateTo`, `mine`, `overdue`, `dueThisWeek`, `page`, `limit`. The
+date range bounds `created_at`; `overdue` and `dueThisWeek` are the deadline
+windows. Both return `{ data, total, page, limit }` with the Lead, Co-Lead, and
+creator resolved into `lead_id_user` and friends.
+
+`PATCH /projects/:id` will not accept `project_code`, which is generated once
+and immutable, or `health`, which the deadline sweep derives. A `status` in the
+payload runs through the transition table in `projects.service.ts`, so a value
+that is legal for the enum is still refused when it is not a legal move from
+the project's current status. `COMPLETED` additionally requires a
+`project_closure_reports` row.
+
+`POST /projects/:id/members` hands out `MEMBER` or `OBSERVER` only, and the
+picker behind it lists every active internal user rather than the caller's
+department. Leadership is reassigned through PATCH, which rewrites the matching
+member rows so the columns and the member list cannot disagree. An observer
+reads everything a member reads and writes nothing.
+
 ## Comments
 
 | Method | Path |

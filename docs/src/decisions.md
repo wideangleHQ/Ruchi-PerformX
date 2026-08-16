@@ -198,3 +198,35 @@ members-only, and the socket room is wider than that. A vendor login holding a
 valid token can join `project:<id>` and receive `project:message:new`. Until the
 join handlers check membership, do not treat the socket as a permission
 boundary. See `docs/src/p1_notifications.md`.
+## 2026-08-16 Project leadership is a column, membership is a table
+
+**Decision.** `projects.lead_id` and `projects.co_lead_id` are the source of
+truth for who leads a project. `POST /projects/:id/members` hands out `MEMBER`
+and `OBSERVER` only, and PATCH rewrites the matching `project_members` rows
+whenever a leadership column changes.
+**Why.** Both places carry the answer, and a member endpoint that could write
+`PROJECT_LEAD` would let a project have two leads that disagree, one on the
+project row and one in the member list. The directory sorts and filters on the
+column, so the column has to be right.
+**Instead of.** Treating `project_members.role` as the only truth and dropping
+the columns, which costs a join on every directory row; or letting the invite
+endpoint set any of the four roles and trusting callers to keep both in step.
+**Costs.** Reassigning a lead is a multi-row write and has to stay inside the
+transaction in `ProjectsService.update`. The outgoing leader is demoted to
+`MEMBER` rather than removed, which is a choice somebody will eventually want
+configurable.
+
+## 2026-08-16 The project lifecycle table is exactly the diagram
+
+**Decision.** `PROJECT_TRANSITIONS` transcribes the lifecycle diagram in
+`p2_projects.md` literally, so `CANCELLED` is reachable from `ACTIVE` and from
+nowhere else, and the pure `canTransition(from, to, hasClosureReport)` is
+tested against every ordered pair of statuses.
+**Why.** The obvious extra edges, cancelling a `DRAFT` or an `ON_HOLD` project,
+are plausible rather than specified. Adding them here would make the code and
+the handbook disagree, and the handbook is what the client signed off.
+**Instead of.** Guessing the full graph, or accepting any enum value on PATCH,
+which is a text field with extra steps.
+**Costs.** A `DRAFT` nobody wants has to be deleted rather than cancelled.
+Adding an edge later is two lines in the table and two cases in
+`project-lifecycle.spec.ts`.
