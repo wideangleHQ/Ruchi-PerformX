@@ -250,3 +250,36 @@ database because it returns before `onModuleInit`.
 **Costs.** CI needs placeholder values for the environment variables two modules
 read at import time, so that list has to stay in step with
 `server_env_required`. The check takes a few seconds.
+## 2026-08-16 A member's checklist PATCH is a different DTO, not a filtered one
+
+**Decision.** `PATCH /projects/:id/checklist/:itemId` binds the Lead field set,
+then narrows a non-Lead body through `toMemberTick` to `MemberTickChecklistDto`,
+which holds `is_done` and nothing else. Extra keys are dropped rather than
+rejected.
+**Why.** Progress is computed from checklist completion and cannot be set by
+hand. A member who can also write `due_date`, `priority`, `title` or
+`assigned_to_id` on their own item can move the goalposts instead, which is the
+same edit through a longer path. Nest binds one body type per route, so the
+whitelist has to be applied after the role is known.
+**Instead of.** One DTO with every field optional and an `if` per assignment in
+the service, which puts the rule in six places and adds a seventh the next time
+a field is added. Rejecting extra keys was considered; a UI reusing the Lead's
+form is a client bug, not an attack, and a 400 there is unhelpful.
+**Costs.** The route's declared body type is wider than what a member can
+actually write, so the OpenAPI shape overstates member permissions. The
+narrowing is one exported function with a test, not a comment.
+
+## 2026-08-16 Project health is recomputed inline on the tick that finishes a list
+
+**Decision.** `deriveHealth` is a pure function in
+`project-execution.service.ts`. The execution service calls it for one project
+after a checklist tick, a milestone status change, or a deletion; the daily
+sweep in `project-deadline.cron.ts` calls it for every project with a deadline.
+**Why.** `health` is a stored, indexed column the project directory filters on,
+so deriving it at read time would leave the filter and the index querying stale
+rows. Waiting for the next sweep to notice a checklist finished at 3pm is a day
+of a project showing DELAYED after it was delivered.
+**Instead of.** A computed getter, which breaks the filter. Or sweep-only, which
+is correct but a day late on the one change users watch for.
+**Costs.** Two callers of the same function, so a rule change has to keep both
+in mind. The function is pure and exported specifically so they cannot drift.
