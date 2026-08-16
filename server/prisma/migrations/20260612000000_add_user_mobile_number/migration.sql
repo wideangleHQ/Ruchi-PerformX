@@ -1,2 +1,0 @@
-ALTER TABLE "users"
-ADD COLUMN IF NOT EXISTS "mobile_number" VARCHAR(20);

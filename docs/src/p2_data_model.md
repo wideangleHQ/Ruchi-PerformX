@@ -14,26 +14,48 @@ cheaper to write alongside a new table than to retrofit across thirty of them.
 
 ## Setting up migrations
 
-Before writing any new table:
+Done, on 2026-08-16. This section is what was actually run, kept because the
+procedure it originally described was wrong in a way worth recording.
 
-```bash
-cd server
-mkdir -p prisma/migrations/0_init
-npx prisma migrate diff \
-  --from-empty \
-  --to-schema-datamodel prisma/schema.prisma \
-  --script > prisma/migrations/0_init/migration.sql
-npx prisma migrate resolve --applied 0_init
+The original said to generate `0_init` with `--to-schema-datamodel`, which
+builds the baseline from `schema.prisma`. That asserts the database matches the
+schema. It did not: production was missing all twenty-four indexes from
+`20260703184500_add_performance_indexes`, and carried two columns the schema no
+longer declares. The baseline is therefore taken `--to-config-datasource`, from
+the database as it really was, and the difference is expressed as two ordinary
+migrations on top.
+
+```
+prisma/migrations/
+  migration_lock.toml
+  0_init/                            production as it stood, resolve only
+  20260816120000_add_performance_indexes/   the 24 indexes it never got
+  20260816120100_drop_legacy_columns/       two dead columns, separate on purpose
 ```
 
-That records the current schema as an already-applied baseline. From then on,
-`prisma migrate dev` locally and `prisma migrate deploy` in the pipeline. Verify
-the whole sequence against a restored copy of production before touching the
-real database.
+The ten hand-written directories that were there before are deleted. None had
+ever been recorded in `_prisma_migrations`, one had never been applied at all,
+and the last of them would fail on a re-run because its `ADD COLUMN` has no
+`IF NOT EXISTS`. Their history is in git.
 
-Existing hand-applied SQL lives in `prisma/sql/`. Fold
-`add_can_access_career_hr.sql` into the baseline; it is already applied in
-production.
+To apply this to production, once:
+
+```bash
+just migrate-status                       # expect three, none applied
+cd server && npx prisma migrate resolve --applied 0_init
+just migrate-status                       # expect 0_init applied, two pending
+cd server && npx prisma migrate deploy    # applies the indexes and the drops
+```
+
+`just migrate-verify` rehearses that whole sequence against a throwaway
+database and asserts the result matches `schema.prisma` with zero drift. It
+passes. Run it before the commands above and after any schema change.
+
+From then on, `just migrate <name>` locally and `prisma migrate deploy` to
+release. `just db-push` now refuses to run.
+
+`prisma/sql/add_can_access_career_hr.sql` is folded into `0_init` and the
+directory is gone.
 
 ## Changes to existing tables
 

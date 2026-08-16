@@ -6,6 +6,11 @@
 # Package manager. Override per invocation: `just pm=npm install`
 pm := "bun"
 
+shadow_container := "pfx-shadow"
+shadow_port := "55432"
+shadow_url := "postgresql://postgres:shadow@localhost:" + shadow_port + "/shadow"
+shadow_diff_url := "postgresql://postgres:shadow@localhost:" + shadow_port + "/shadow_diff"
+
 # Server listens here, client listens on SERVER_PORT + 1.
 # The API CORS allowlist is hardcoded to localhost:4001, so do not move the client.
 server_port := "4000"
@@ -13,7 +18,7 @@ client_port := "4001"
 
 # Required environment variables, checked by `just check-env`.
 # JWT_SECRET and VMS_JWT_SECRET kill the process at import time when missing.
-server_env_required := "DATABASE_URL JWT_SECRET VMS_JWT_SECRET INTERNAL_API_KEY RESEND_API_KEY RESEND_FROM_EMAIL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY SUPABASE_BUCKET SUPABASE_VMS_BUCKET"
+server_env_required := "DATABASE_URL DIRECT_URL JWT_SECRET VMS_JWT_SECRET INTERNAL_API_KEY RESEND_API_KEY RESEND_FROM_EMAIL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY SUPABASE_BUCKET SUPABASE_VMS_BUCKET"
 client_env_required := "NEXT_PUBLIC_API_URL NEXT_PUBLIC_SOCKET_URL"
 
 # Show all recipes
@@ -116,10 +121,13 @@ clean:
 db-generate:
     cd server && npx prisma generate
 
-# There is no migration history yet, see docs/src/p2_data_model.md
-# Push schema changes to the database
+# Superseded by migrations. Kept because the schema was maintained this way
+# until 2026-08-16 and old habits need somewhere to fail loudly.
 db-push:
-    cd server && npx prisma db push
+    #!/usr/bin/env bash
+    echo "db push is how this schema drifted from its own migrations."
+    echo "Use 'just migrate' instead. See docs/src/p1_data_model.md."
+    exit 1
 
 # Browse the data
 db-studio:
@@ -128,6 +136,95 @@ db-studio:
 # Print the schema models and enums
 db-models:
     @grep -nE "^model |^enum " server/prisma/schema.prisma
+
+# What has been applied, and what has not. Reads production, changes nothing.
+migrate-status:
+    cd server && npx prisma migrate status
+
+# Author a migration from a schema.prisma edit. Needs the shadow database up.
+migrate name="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! docker exec {{shadow_container}} pg_isready -U postgres >/dev/null 2>&1; then
+        echo "Shadow database is not running. Run 'just shadow-up' first."
+        exit 1
+    fi
+    cd server
+    # The CLI reads DIRECT_URL (see server/prisma.config.ts). Overriding
+    # DATABASE_URL does nothing to it. Set the one it reads, then refuse to
+    # continue unless it points somewhere local, because the failure mode of
+    # getting this wrong is running a migration against production.
+    export DIRECT_URL="{{shadow_url}}"
+    export DATABASE_URL="{{shadow_url}}"
+    export SHADOW_DATABASE_URL="{{shadow_diff_url}}"
+    case "$DIRECT_URL" in
+        *localhost:{{shadow_port}}*) ;;
+        *) echo "Refusing to run: DIRECT_URL is not the shadow database."; exit 1 ;;
+    esac
+    if [ -n "{{name}}" ]; then
+        npx prisma migrate dev --name "{{name}}"
+    else
+        npx prisma migrate dev
+    fi
+
+# A throwaway Postgres for migrate dev to diff against. Supabase gives no shadow.
+shadow-up:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if docker exec {{shadow_container}} pg_isready -U postgres >/dev/null 2>&1; then
+        echo "Shadow already up on {{shadow_port}}."
+        exit 0
+    fi
+    docker rm -f {{shadow_container}} >/dev/null 2>&1 || true
+    docker run -d --name {{shadow_container}} \
+        -e POSTGRES_PASSWORD=shadow -e POSTGRES_DB=shadow \
+        -p {{shadow_port}}:5432 postgres:17-alpine >/dev/null
+    for _ in $(seq 1 60); do
+        docker exec {{shadow_container}} pg_isready -U postgres >/dev/null 2>&1 && break
+        sleep 1
+    done
+    docker exec {{shadow_container}} psql -U postgres -qc "create database shadow_diff" >/dev/null 2>&1 || true
+    echo "Shadow up on {{shadow_port}}. Postgres 17, matching production."
+    echo "  shadow      the database migrations are applied to"
+    echo "  shadow_diff the throwaway prisma migrate dev diffs against"
+
+shadow-down:
+    @docker rm -f {{shadow_container}} >/dev/null 2>&1 && echo "Shadow removed." || echo "Shadow was not running."
+
+# Rehearse the production sequence against the shadow, then assert no drift.
+# This is the check that has to pass before anyone runs migrate deploy for real.
+migrate-verify:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! docker exec {{shadow_container}} pg_isready -U postgres >/dev/null 2>&1; then
+        echo "Shadow database is not running. Run 'just shadow-up' first."
+        exit 1
+    fi
+    cd server
+    # The CLI reads DIRECT_URL (see server/prisma.config.ts). Overriding
+    # DATABASE_URL does nothing to it. Set the one it reads, then refuse to
+    # continue unless it points somewhere local, because the failure mode of
+    # getting this wrong is running a migration against production.
+    export DIRECT_URL="{{shadow_url}}"
+    export DATABASE_URL="{{shadow_url}}"
+    unset SHADOW_DATABASE_URL
+    case "$DIRECT_URL" in
+        *localhost:{{shadow_port}}*) ;;
+        *) echo "Refusing to run: DIRECT_URL is not the shadow database."; exit 1 ;;
+    esac
+    docker exec {{shadow_container}} psql -U postgres -d shadow -qc \
+        "drop schema public cascade; create schema public;" >/dev/null
+    echo "Applying the full history to an empty database."
+    npx prisma migrate deploy >/dev/null
+    echo "Asserting the result matches schema.prisma."
+    drift=$(npx prisma migrate diff \
+        --from-config-datasource --to-schema prisma/schema.prisma --script 2>/dev/null \
+        | grep -cE '^\s*(CREATE|ALTER|DROP)' || true)
+    if [ "$drift" -ne 0 ]; then
+        echo "FAIL: $drift statements of drift between the migrations and schema.prisma."
+        exit 1
+    fi
+    echo "OK: migrations and schema.prisma agree, no drift."
 
 # ---------------------------------------------------------------- docs
 

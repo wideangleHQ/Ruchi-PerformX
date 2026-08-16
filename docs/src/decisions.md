@@ -95,3 +95,40 @@ the preview" is a statement about yesterday. Production releases leave no trace
 in this repository, so "what is live right now" is answered in the Vercel
 dashboard and nowhere else. GitHub also disables scheduled workflows after
 sixty days without a push, which stops the daily preview silently.
+
+## 2026-08-16 The migration baseline is taken from the database, not the schema
+
+**Decision.** `0_init` is a dump of production as it actually was, generated
+with `migrate diff --from-empty --to-config-datasource`. It is marked applied on
+production and never executed there. Two real migrations follow it: the
+twenty-four indexes the database never received, and the two dead columns.
+**Why.** The baseline procedure written in `p2_data_model.md` generated `0_init`
+from `schema.prisma` instead. That records "the database matches the schema" as
+a fact, and it was not one: production was missing every index from
+`20260703184500_add_performance_indexes` and carried two columns the schema no
+longer declares. Baselining from the schema would have buried both, and the
+first Phase 2 `migrate dev` would then have produced a migration that quietly
+dropped two columns alongside whatever feature was being built.
+**Instead of.** Marking the ten existing directories applied one by one, which
+records the un-applied index migration as done and loses those indexes for good.
+And `--from-empty --to-schema-datamodel` as originally written, above.
+**Costs.** `0_init` is 918 lines of generated SQL that nobody will read. It is
+also never run against production, so a mistake in it only surfaces when
+somebody builds a database from scratch, which `just migrate-verify` is for.
+The ten old directories are deleted; their history is in git.
+
+## 2026-08-16 The Prisma CLI connects on 5432, the API on 6543
+
+**Decision.** `server/prisma.config.ts` sets the CLI datasource to `DIRECT_URL`.
+`DATABASE_URL` stays the pooler and stays what the API uses.
+**Why.** Supabase's transaction pooler cannot hold the session-level advisory
+lock `prisma migrate` takes. Every migrate command against it hangs until it is
+killed, with no error explaining why, which is how this went unnoticed long
+enough for the schema to drift from its own migrations.
+**Instead of.** Leaving the config on `DATABASE_URL` and asking everyone to
+remember an environment override. That is the same shape as the mistake that
+caused a `migrate deploy` to reach production during this work: an override that
+looked right and was inert.
+**Costs.** `DIRECT_URL` becomes required for any CLI work and is now in
+`server_env_required`. The two URLs being different is a thing to know, and the
+comment in `prisma.config.ts` is the only place it is explained in code.
