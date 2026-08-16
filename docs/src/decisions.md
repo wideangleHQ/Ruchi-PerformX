@@ -486,3 +486,59 @@ a vendor-shaped upload method. That is the right end state; it is one import
 line away whenever the two modules land together.
 **Costs.** Two calls from the client to attach a document, and deleting a
 vendor document drops the row while leaving the Supabase object behind.
+## 2026-08-16 The CareerX employee sync sees deactivated users
+
+**Decision.** `GET /internal/employees` filters out soft-deleted users and keeps
+deactivated ones, with `isActive: false`. A null `is_active` reads as false.
+**Why.** CareerX deactivates an `hr_employees` row by seeing that flag flip. A
+user dropped from the payload leaves CareerX holding whatever it had, so
+somebody who has left the company keeps their career portal access.
+**Instead of.** Filtering on `is_active: true`, which is the obvious reading of
+"active employees" and is exactly the mistake this inverts.
+**Costs.** The payload carries every user who has ever existed and not been
+deleted, which grows without bound. Fine at this headcount; add a
+`?changedSince=` parameter when the cron starts noticing.
+
+## 2026-08-16 The career tab navigates rather than iframes
+
+**Decision.** The Career tab sends the browser to CareerX in the same tab, with
+a `returnTo` query parameter carrying an absolute PerformX URL for CareerX's
+shell to render as a link back.
+**Why.** The session exchange already works this way, and it needs nothing from
+CareerX beyond reading one query parameter.
+**Instead of.** An iframe, which needs a chromeless CareerX variant,
+`frame-ancestors` headers, and inherits every third-party-cookie restriction
+browsers have added; or rebuilding the HR screens against the CareerX API, which
+the scope document rules out.
+**Costs.** The user visibly leaves PerformX. Acceptable for a tab HR sits in for
+a stretch rather than glances at. `returnTo` is an unversioned contract between
+the two apps; changing the parameter name breaks the back link silently.
+
+## 2026-08-16 Visitor arrival notifies through the main engine, after commit
+
+**Decision.** `VisitService.checkIn` calls the main `NotificationsService` after
+its transaction commits, and logs and swallows any failure.
+**Why.** The host is a PerformX user who wants this in their ordinary bell, but
+the check-in runs under a VMS token through the separate VMS notification
+service. Notifying inside the transaction would announce a check-in that could
+still roll back, and throwing afterwards would report a committed check-in as
+failed to a receptionist with a visitor standing in front of them.
+**Instead of.** The VMS notification service, which delivers to a channel the
+employee's dashboard does not read; or emitting inside the transaction, which
+trades a false negative for a false positive.
+**Costs.** A notification lost to a transient failure is not retried. The bell
+is not the record of the visit, `visits` is, so this is a missing ping rather
+than missing data.
+
+## 2026-08-16 Own visit history only, not department-wide
+
+**Decision.** `GET /vms/visits/mine` filters on `hostEmployeeId = caller` and
+overwrites any `hostEmployeeId` the caller passes.
+**Why.** Visitor records carry personal contact details. Every internal role can
+see who came to see them, and that is the whole of it.
+**Instead of.** Department scoping through `DepartmentScopeService`, which is
+the pattern elsewhere and would have been the default reading of "searchable by
+employee, department, or date".
+**Costs.** A HOD cannot see their department's visitors without going through
+`GET /vms/reports/employee/:employeeId`, which is already role-gated. Widen it
+with a deliberate decision entry, not by adding a query parameter.

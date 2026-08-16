@@ -52,6 +52,37 @@ export class VisitController {
     });
   }
 
+  /**
+   * The caller's own visitors, and nobody else's.
+   *
+   * `hostEmployeeId` is overwritten with the caller after the query spread, so
+   * passing somebody else's id changes nothing. Department-wide visibility is
+   * deliberately not offered here: visitor records carry personal contact
+   * details, so widening it is a decision to be made on its own.
+   *
+   * Open to every internal role. VENDOR is external and is never a visit host.
+   */
+  @Get('mine')
+  @Roles(
+    role_enum.ADMIN,
+    role_enum.MD,
+    role_enum.HOD,
+    role_enum.EA,
+    role_enum.PA,
+    role_enum.DEPARTMENT_CONTROLLER,
+    role_enum.PURCHASE_HEAD,
+    role_enum.HR,
+    role_enum.EMPLOYEE,
+  )
+  mine(@Query() query: SearchVisitDto, @CurrentUser() user: JwtPayload) {
+    return this.visitService.searchVisits({
+      ...query,
+      hostEmployeeId: user.sub,
+      includeVisitor: true,
+      includeHostEmployee: true,
+    });
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.visitService.getVisit(id, { includeVisitor: true, includeHostEmployee: true });

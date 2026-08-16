@@ -9,9 +9,12 @@ import { EmployeeService } from './employee.service';
 import { VisitRepositoryImpl } from './repositories/visit.repository';
 import { VisitService } from './services/visit.service';
 import { AuthModule } from '../../../modules/auth/auth.module';
+import { NotificationsModule } from '../../notifications/notifications.module';
 
 @Module({
-  imports: [PrismaModule, VisitorsModule, AuthModule],
+  // NotificationsModule is the main engine, not modules/vms/notifications. The
+  // host employee gets their ordinary PerformX bell on check-in.
+  imports: [PrismaModule, VisitorsModule, AuthModule, NotificationsModule],
   controllers: [EmployeeController, VisitController],
   providers: [
     VisitService,
