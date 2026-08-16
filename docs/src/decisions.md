@@ -1061,3 +1061,22 @@ subscribing by hand, which is not a control.
 page mounts. `mayJoin` returns false rather than throwing, because a gateway
 exception reaches the client as an unhandled error event and a refused join
 should read as a refused join.
+
+## 2026-08-16 The Vercel preview installs with bun
+
+**Decision.** `client/vercel.json` sets `installCommand` to
+`bun install --frozen-lockfile`, so the preview build resolves from `bun.lock`
+rather than `package-lock.json`.
+**Why.** `client/package-lock.json` was generated on Windows and records only
+`lightningcss-win32-x64-msvc`. npm on a Linux runner installs no native
+lightningcss binary as a result, and Turbopack fails on `app/globals.css` with
+`Cannot find module '../lightningcss.linux-x64-gnu.node'`. `bun.lock` carries
+the linux entry, and the workflow already installs bun for the Vercel CLI.
+**Instead of.** Regenerating `package-lock.json` on Linux, which fixes CI and
+breaks whoever generated it on Windows, because npm records only the optional
+binaries it actually installed. Or deleting `package-lock.json`, which is the
+right end state but breaks the `npm ci` in `pr-checks.yaml` in the same commit.
+**Costs.** The client carries two lockfiles with two consumers now. CI
+typechecks through npm, the preview builds through bun, and they can drift. The
+fix is to pick one, which is a change to `pr-checks.yaml` as much as to the
+client.
