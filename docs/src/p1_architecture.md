@@ -25,6 +25,38 @@ BullMQ setup that PerformX will eventually need.
 Production hosts: the client is on Vercel at `app.ruchiperformx.in`, the API is
 at `api.ruchiperformx.in`, and the database and object storage are on Supabase.
 
+## How the client gets deployed
+
+Nothing deploys on push, and nothing in this repository deploys production.
+
+Vercel's own git integration is off, because `client/vercel.json` sets
+`deploymentEnabled: false`. That leaves `.github/workflows/ci.yaml` as the only
+automated path, and it builds previews only:
+
+```
+schedule   30 18 * * *   18:30 UTC, midnight IST, every day
+dispatch   Actions -> Vercel Preview Deployment -> Run workflow
+```
+
+So there is always a preview URL showing roughly yesterday's `main`, and anyone
+who needs a fresher one can press the button.
+
+**Production is deployed by hand from Vercel**, by someone who decides the code
+is ready. There is no `--prod` anywhere in the workflow and adding one is a
+decision, not a tidy-up. The reasoning is in the
+[decision log](decisions.md).
+
+Three things follow.
+
+The preview URL is up to a day behind `main` unless somebody dispatches it, so
+it is not a check on a commit you just pushed.
+
+GitHub disables scheduled workflows after sixty days without a push to the
+repository, and it does so quietly. A long quiet period stops the daily preview
+and nothing announces it.
+
+The API is not deployed by this workflow and never has been.
+
 ## Request path
 
 Every request that is not marked `@Public()` goes through two global guards,
