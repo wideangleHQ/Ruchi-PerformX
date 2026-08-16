@@ -1,0 +1,168 @@
+import axiosClient from './client';
+
+export type LeaveStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+
+/** Day counts are `Decimal(5,1)` on the server and arrive as strings over JSON. */
+export type Days = number | string;
+
+/** Coerces a serialised Decimal to a number. Half days are the reason it is not an int. */
+export const toDays = (value: Days | null | undefined) => Number(value ?? 0);
+
+export interface LeaveType {
+  id: string;
+  name: string;
+  annual_entitlement: number;
+  is_paid: boolean;
+  carry_forward: boolean;
+  max_carry_forward: number;
+  requires_proof: boolean;
+  is_active: boolean;
+}
+
+/** Shape of `attachUsers` output on the server: a FK column plus `_user`. */
+export interface LeaveUserSummary {
+  id: string;
+  full_name: string;
+  email: string;
+  role: string;
+  department_id: string | null;
+}
+
+export interface LeaveBalance {
+  id: string;
+  user_id: string;
+  leave_type_id: string;
+  year: number;
+  entitled: Days;
+  used: Days;
+  carried_over: Days;
+}
+
+/** Phase 2 tables carry plain FK columns, so type names are resolved from `/leave/types`. */
+export const leaveTypeName = (types: LeaveType[], id: string) =>
+  types.find((type) => type.id === id)?.name ?? 'Leave';
+
+/** Entitlement plus anything carried over, less what has been approved. */
+export const remainingDays = (balance: LeaveBalance) =>
+  toDays(balance.entitled) + toDays(balance.carried_over) - toDays(balance.used);
+
+export interface LeaveApplication {
+  id: string;
+  user_id: string;
+  leave_type_id: string;
+  start_date: string;
+  end_date: string;
+  days_count: Days;
+  reason: string;
+  status: LeaveStatus;
+  manager_id: string | null;
+  approved_by_id: string | null;
+  approved_by_role: string | null;
+  approved_at: string | null;
+  approval_remark: string | null;
+  cancelled_by_id: string | null;
+  cancelled_at: string | null;
+  cancellation_reason: string | null;
+  created_at: string;
+  updated_at: string;
+  user_id_user?: LeaveUserSummary | null;
+  approved_by_id_user?: LeaveUserSummary | null;
+  cancelled_by_id_user?: LeaveUserSummary | null;
+  /** Only on the pending-approvals response: the applicant's remaining days for this type. */
+  remaining_balance?: Days | null;
+  attachments?: Array<{ id: string; file_name: string; file_url: string }>;
+}
+
+export interface Holiday {
+  id: string;
+  name: string;
+  holiday_date: string;
+  is_optional: boolean;
+  department_id: string | null;
+  year: number;
+}
+
+export interface ApplyLeavePayload {
+  leave_type_id: string;
+  start_date: string;
+  end_date: string;
+  reason: string;
+  attachments?: File[];
+}
+
+/** Endpoints return either a bare array or a paginated envelope depending on the module. */
+async function getList<T>(url: string, params?: Record<string, unknown>): Promise<T[]> {
+  const response = await axiosClient.get<T[] | { data?: T[] }>(url, { params });
+  return Array.isArray(response.data) ? response.data : response.data.data ?? [];
+}
+
+export const leaveApi = {
+  getTypes: () => getList<LeaveType>('/leave/types'),
+
+  /** Own balance for the current year, one row per active leave type. */
+  getMyBalance: () => getList<LeaveBalance>('/leave/balance'),
+
+  getMyApplications: (params?: { status?: LeaveStatus; year?: number }) =>
+    getList<LeaveApplication>('/leave/applications/mine', params),
+
+  /** Everything still `PENDING` that the caller may act on. HOD, HR and MD only. */
+  getPending: () => getList<LeaveApplication>('/leave/applications/pending'),
+
+  getById: async (id: string): Promise<LeaveApplication> => {
+    const response = await axiosClient.get<LeaveApplication>(`/leave/applications/${id}`);
+    return response.data;
+  },
+
+  /** Approved leave overlapping the month, scoped to what the caller may see. */
+  getCalendar: (params: { month: number; year: number }) =>
+    getList<LeaveApplication>('/leave/calendar', params),
+
+  /**
+   * The caller's effective holiday calendar, common plus their department's.
+   * ponytail: read-only here for the day-count preview. The holidays screen owns the CRUD.
+   */
+  getHolidays: (year: number) => getList<Holiday>('/holidays', { year }),
+
+  /**
+   * Submits an application. Multipart because a type with `requires_proof` needs
+   * the attachment in the same request, which is how `/requests` uploads too.
+   * Throws 400 when the server-side validation set in p2_leave.md fails.
+   */
+  apply: async ({ attachments, ...fields }: ApplyLeavePayload): Promise<LeaveApplication> => {
+    const formData = new FormData();
+    Object.entries(fields).forEach(([key, value]) => formData.append(key, value));
+    attachments?.forEach((file) => formData.append('attachments', file, file.name));
+    const response = await axiosClient.post<LeaveApplication>('/leave/applications', formData);
+    return response.data;
+  },
+
+  /** Withdraws the caller's own application. `PENDING` only, nothing was deducted. */
+  cancelMine: async (id: string): Promise<LeaveApplication> => {
+    const response = await axiosClient.patch<LeaveApplication>(`/leave/applications/${id}/cancel`);
+    return response.data;
+  },
+
+  /** Approves and deducts. 409 when someone else already closed the application. */
+  approve: async (id: string, approval_remark?: string): Promise<LeaveApplication> => {
+    const response = await axiosClient.patch<LeaveApplication>(`/leave/applications/${id}/approve`, {
+      approval_remark: approval_remark || undefined,
+    });
+    return response.data;
+  },
+
+  /** Rejects. The remark is mandatory: the applicant is told why. */
+  reject: async (id: string, approval_remark: string): Promise<LeaveApplication> => {
+    const response = await axiosClient.patch<LeaveApplication>(`/leave/applications/${id}/reject`, {
+      approval_remark,
+    });
+    return response.data;
+  },
+
+  /** HR-only reversal of an `APPROVED` application. Credits the balance back. */
+  hrCancel: async (id: string, cancellation_reason: string): Promise<LeaveApplication> => {
+    const response = await axiosClient.patch<LeaveApplication>(`/leave/applications/${id}/hr-cancel`, {
+      cancellation_reason,
+    });
+    return response.data;
+  },
+};
