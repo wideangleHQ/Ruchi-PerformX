@@ -297,3 +297,19 @@ vendor-roles:
         exit 1
     fi
     echo "No VENDOR roles outside the portal namespace."
+
+# Nest instantiates the global guards inside whichever module owns each
+# controller, so that module needs JwtService in scope. A module registering a
+# controller without AuthModule typechecks, passes every test, and then fails
+# at boot on JwtService. Only building the container catches it.
+boot-check:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    cd server
+    out=$(timeout 150 npx ts-node --transpile-only scripts/boot-check.ts 2>&1)
+    if echo "$out" | grep -q BOOT_OK; then
+        echo "Nest container builds. Every module has its guards in scope."
+    else
+        echo "$out" | grep -v "^◇" | tail -8
+        exit 1
+    fi

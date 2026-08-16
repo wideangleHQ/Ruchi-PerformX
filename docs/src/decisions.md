@@ -230,3 +230,23 @@ which is a text field with extra steps.
 **Costs.** A `DRAFT` nobody wants has to be deleted rather than cancelled.
 Adding an edge later is two lines in the table and two cases in
 `project-lifecycle.spec.ts`.
+
+## 2026-08-16 Every controller-owning module imports AuthModule
+
+**Decision.** A module registering a controller imports `AuthModule`, and
+`just boot-check` builds the Nest container in CI to prove it.
+**Why.** `JwtAuthGuard` and `RolesGuard` are global `APP_GUARD` providers, but
+Nest instantiates them inside whichever module owns the controller, so that
+module needs `JwtService` in scope. The Phase 2 module stubs imported
+`PrismaModule` and `NotificationsModule` only. Every one typechecked, every
+test passed, and the API did not start: `Nest can't resolve dependencies of the
+JwtAuthGuard`. Nothing in the existing checks could see it, and it was found by
+an agent trying to run the server rather than by any gate.
+**Instead of.** A static grep for `AuthModule` next to `controllers:`, which was
+written first and immediately produced three false positives on modules that
+boot fine. A check that lies is worse than no check. Building the container is
+the real question, and `NestFactory.create` answers it without touching a
+database because it returns before `onModuleInit`.
+**Costs.** CI needs placeholder values for the environment variables two modules
+read at import time, so that list has to stay in step with
+`server_env_required`. The check takes a few seconds.

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { AuthModule } from '../auth/auth.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 import { ProjectsController } from './projects.controller';
@@ -17,7 +18,7 @@ import { ProjectDeadlineCron } from './project-deadline.cron';
 // reason the Phase 2 spine registered the modules: this file is the one every
 // projects branch would otherwise touch.
 @Module({
-  imports: [PrismaModule, NotificationsModule],
+  imports: [AuthModule, PrismaModule, NotificationsModule],
   controllers: [
     ProjectsController,
     ProjectExecutionController,

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { AuthModule } from '../auth/auth.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 import { VendorsController } from './vendors.controller';
@@ -15,7 +16,7 @@ import { VendorDeadlineCron } from './vendor-deadline.cron';
 // is exported because the portal module is the only other caller and it is the
 // single thing standing between an external login and the whole company's data.
 @Module({
-  imports: [PrismaModule, NotificationsModule],
+  imports: [AuthModule, PrismaModule, NotificationsModule],
   controllers: [VendorsController, VendorAccessController, VendorWorkController],
   providers: [
     VendorsService,
