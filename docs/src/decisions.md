@@ -41,6 +41,40 @@ process for a repository with a single active developer.
 **Costs.** Every entry needs `just docs-build` to pass, so a malformed entry
 breaks the docs build rather than sitting there quietly.
 
+## 2026-08-16 The assistant enforces permissions in Postgres, not in the prompt
+
+**Decision.** Model-generated SQL runs as a dedicated read-only role inside a
+transaction that stamps the caller, and row-level security policies filter the
+rows. The permission rules are never stated to the model as instructions it is
+expected to follow.
+**Why.** A HOD is on the requested user list, and every other part of the
+product scopes a HOD to their own department. An assistant that got this wrong
+would hand out data the API refuses, through a friendlier interface.
+**Instead of.** Putting the rules in the system prompt, which fails to prompt
+injection, fails silently, and cannot be tested exhaustively.
+**Costs.** RLS policies are new infrastructure on a live database with no test
+coverage, written per table and tested against a restored production copy. It is
+the largest engineering item in that project and it cannot start before
+migrations exist. See [The PerformX Assistant](p2_assistant.md).
+
+## 2026-08-16 The assistant runs on a hosted model, starting with Claude Haiku 4.5
+
+**Decision.** Hosted API, Haiku 4.5 first, moving up only if tier 2 SQL quality
+measurably needs it.
+**Why.** At roughly 1,100 questions a month the whole company costs about ₹350
+with prompt caching. Inference cost is not a real variable, so the choice is
+made on tool-selection accuracy and latency instead.
+**Instead of.** Self-hosting, which is about 130 times more expensive at this
+volume and breaks even somewhere north of 97,000 questions a month. And Chinese
+hosted APIs, which save around ₹700 a month while putting employee records in a
+jurisdiction RUCHI has no recourse in, with RUCHI as the data fiduciary under
+the DPDP Act.
+**Costs.** Employee data reaches a third party, so this needs client sign-off.
+If residency turns out to be a hard requirement, the cheaper answers are a
+regional endpoint, a zero-retention agreement, and tokenising identifiers before
+they are sent, in that order. Self-hosted Qwen or DeepSeek runs the same
+architecture unchanged.
+
 ## 2026-08-16 Deploys are scheduled, and production is deployed by hand
 
 **Decision.** `ci.yaml` no longer deploys on push. It builds a preview on a
