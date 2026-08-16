@@ -305,15 +305,28 @@ vendor-roles:
 # Nest instantiates the global guards inside whichever module owns each
 # controller, so that module needs JwtService in scope. A module registering a
 # controller without AuthModule typechecks, passes every test, and then fails
-# at boot on JwtService. Only building the container catches it.
+# at boot on JwtService. Only starting the app catches it.
+#
+# This compiles and runs the real entrypoint rather than importing through
+# ts-node. ts-node --transpile-only swallowed the very exception this exists to
+# catch and reported success on a build that could not start. The DI graph
+# resolves before any database connection, so a connection failure here is not
+# a boot failure and is ignored.
 boot-check:
     #!/usr/bin/env bash
     set -uo pipefail
     cd server
-    out=$(timeout 150 npx ts-node --transpile-only scripts/boot-check.ts 2>&1)
-    if echo "$out" | grep -q BOOT_OK; then
-        echo "Nest container builds. Every module has its guards in scope."
-    else
-        echo "$out" | grep -v "^◇" | tail -8
+    npx nest build >/dev/null 2>&1 || { echo "Build failed."; exit 1; }
+    out=$(timeout 40 node dist/main.js 2>&1 || true)
+    if echo "$out" | grep -qE "can.t resolve dependencies|UnknownDependenciesException|Cannot find module"; then
+        echo "The app does not start:"
+        echo "$out" | grep -E "ERROR|resolve dependencies" | head -3
         exit 1
     fi
+    if echo "$out" | grep -q "Nest application successfully started"; then
+        echo "App starts. Every module has its guards in scope."
+        exit 0
+    fi
+    echo "App did not report a successful start:"
+    echo "$out" | tail -5
+    exit 1
