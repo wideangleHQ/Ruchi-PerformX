@@ -1,0 +1,3 @@
+# Agent working directories. client/, server/, and docs/ have their own ignores.
+.claude/
+.agents/

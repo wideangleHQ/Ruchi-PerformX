@@ -154,6 +154,22 @@ typecheck:
 health:
     @curl -sS http://localhost:{{server_port}}/api/v1/dashboard -o /dev/null -w "API on {{server_port}}: HTTP %{http_code}\n" || echo "API not reachable on {{server_port}}"
 
+# Runs from the pre-commit hook. Run it yourself before a push, the hook is local only.
+# Fail if AI attribution is in a tracked file or in the recent history
+no-ai-trails:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    pat='Co-Authored-By: *Claude|Generated with \[Claude Code\]|claude\.ai/code|Claude Code|Claude Opus|🤖'
+    files=$(git grep -nIE "$pat" -- . ':!justfile' ':!CLAUDE.md' ':!docs/src/decisions.md')
+    msgs=$(git log -50 --format='%h %s%n%b' | grep -E "$pat")
+    if [ -n "$files" ] || [ -n "$msgs" ]; then
+        echo "AI attribution found. Strip it before this goes anywhere."
+        [ -n "$files" ] && echo "$files"
+        [ -n "$msgs" ] && printf 'in commit messages:\n%s\n' "$msgs"
+        exit 1
+    fi
+    echo "No AI trails."
+
 # Every route the API exposes, grouped by controller
 routes:
     #!/usr/bin/env bash
