@@ -11,7 +11,7 @@ import { loadAssetKey } from './asset-crypto';
 // ASSET_ENCRYPTION_KEY kills the process at import. Booting without it would
 // mean every stored password is unreadable, discovered by whoever pressed
 // reveal first.
-loadAssetKey();
+loadAssetKey(process.env.ASSET_ENCRYPTION_KEY);
 
 // Registered in app.module.ts by the Phase 2 spine so that feature work never
 // has to touch that file.

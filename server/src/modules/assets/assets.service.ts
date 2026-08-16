@@ -57,7 +57,7 @@ export class AssetsService {
    * Validated once per process. `assets.module.ts` calls `loadAssetKey` in its
    * module body too, so a bad key stops the boot rather than the first reveal.
    */
-  private readonly key = loadAssetKey();
+  private readonly key = loadAssetKey(process.env.ASSET_ENCRYPTION_KEY);
 
   constructor(
     private readonly prisma: PrismaService,
