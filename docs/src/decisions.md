@@ -878,3 +878,34 @@ which makes every receipt in the company world readable.
 **Costs.** The column name says URL and holds a path. Deleting an expense
 leaves the object in the bucket, so the `events/receipts` prefix needs a sweep
 if it ever gets large.
+## 2026-08-16 The leave day count is previewed on the client, not asked for
+
+**Decision.** The apply screen computes working days itself from `GET /holidays`
+and a Sunday-only weekly off constant, and shows every excluded day by name. The
+server still recomputes `days_count` on submit and its number is the one stored.
+**Why.** p2_leave.md asks for the arithmetic to be visible the moment the dates
+are picked. A round trip per keystroke to a preview endpoint is a second code
+path for the same rule, and the second one is the one that drifts.
+**Instead of.** A `POST /leave/applications/preview` endpoint, which is a route
+and a DTO to keep in step with the real validator for a number the employee is
+about to see recomputed anyway.
+**Costs.** Two implementations of the same exclusion rule. They disagree if the
+weekly off constant changes on one side only, and the disagreement surfaces as a
+day count that moves between the form and the submitted row. `WEEKLY_OFF_DAYS`
+in `client/src/lib/leaveValidation.ts` is the client half; keep it equal to the
+server's configuration value.
+
+## 2026-08-16 Leave request and response bodies are snake_case
+
+**Decision.** The leave client sends `leave_type_id`, `start_date`, `end_date`,
+`approval_remark` and `cancellation_reason`, and reads rows in the shape the
+Prisma models define, with people resolved through the `attachUsers` convention
+(`user_id_user`, `approved_by_id_user`).
+**Why.** p2_leave.md names `cancellation_reason` in the endpoint table and writes
+every other field in schema case, and `attachUsers` is already the documented way
+a Phase 2 row carries a name. `forbidNonWhitelisted` makes a wrong guess a 400.
+**Instead of.** camelCase, which `requests` and `transfers` use. Phase 1 is split
+between the two conventions, so neither choice is consistent with everything.
+**Costs.** The leave module reads differently from `requests` in the same client.
+Leave type names come from `GET /leave/types` and are matched by id in the UI,
+because Phase 2 tables have no relation to include.
