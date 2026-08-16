@@ -34,7 +34,7 @@ Abbreviations: `ASSISTANTS` means EA, PA, and DEPARTMENT_CONTROLLER.
 
 | Method | Path | Roles |
 | --- | --- | --- |
-| GET | `/users` | MD, ADMIN, HOD, EA, PA, PURCHASE_HEAD, EMPLOYEE |
+| GET | `/users` | MD, ADMIN, HOD, EA, PA, PURCHASE_HEAD, EMPLOYEE, HR |
 | GET | `/users/assignable` | MD, HOD, EA, PA, DEPT_CONTROLLER, PURCHASE_HEAD |
 | GET | `/users/department/:departmentId` | MD, HOD, ADMIN, EA, PA, PURCHASE_HEAD |
 | GET | `/users/:id` | MD, HOD, ADMIN, EA, PA, PURCHASE_HEAD |
@@ -386,6 +386,56 @@ second deduction. HR cancellation credits the balance back.
 
 Holiday endpoints are in [Leave management](p2_leave.md#endpoints) and belong to
 the holidays module, not this one.
+## Company assets
+
+Every route is closed to `VENDOR` at the guard and again in the service. Roles
+below are what `@Roles(...)` allows; `AssetsService.assetScope` narrows further,
+and it is the only place that decides who sees which assets.
+
+| Method | Path | Roles |
+| --- | --- | --- |
+| GET | `/assets/handovers/pending` | any internal role, returns the caller's own |
+| GET | `/assets/employee/:userId` | EA, PA, MD, HR |
+| POST | `/assets/handovers` | EA, PA, MD, HR |
+| PATCH | `/assets/handovers/:id/confirm` | any internal role, the receiving user only |
+| GET | `/assets` | any internal role |
+| POST | `/assets` | any internal role |
+| GET | `/assets/:id` | any internal role |
+| GET | `/assets/:id/reveal` | any internal role |
+| PATCH | `/assets/:id` | any internal role |
+| DELETE | `/assets/:id` | any internal role |
+
+The four literal routes are declared above `:id` in the controller. Moving them
+below would make `handovers` and `employee` read as asset ids.
+
+Visibility, in priority order:
+
+1. an employee sees assets where `owner_id` is their own id, nothing else
+2. EA, PA and MD see every asset, company wide
+3. HR sees every asset of one employee through `/assets/employee/:userId`, never
+   a company wide list, so HR on `GET /assets` sees only its own
+4. `VENDOR` sees nothing
+
+`PATCH` and `DELETE` are further narrowed to the owner plus EA, PA and MD. HR
+reads for offboarding but does not edit. `DELETE` is a soft delete.
+
+`GET /assets` and `GET /assets/employee/:userId` never decrypt. They return the
+label, type, username, URL and a `has_secret` flag; the plaintext comes only
+from `GET /assets/:id/reveal`, which writes an `audit_logs` row every time with
+`entity` of `company_asset` and never the secret in `new_value`.
+
+`POST /assets` accepts JSON, or `multipart/form-data` with a `file` field when
+`assetType` is `DOCUMENT`. The file goes through the attachments uploader into
+the same Supabase bucket, and the row keeps `file_url` and `storage_path`
+instead of a `secret_cipher`.
+
+`POST /assets/handovers` takes `{ items: [{ assetId, toUserId }] }` and opens one
+row per asset with `completed_at` null. `owner_id` moves only in the transaction
+that `PATCH /assets/handovers/:id/confirm` runs.
+
+`GET /assets/:id/reveal` answers 422 when the stored ciphertext will not open
+under the current `ASSET_ENCRYPTION_KEY`, which is what a key rotation without a
+re-encrypt looks like. See [Setup](p1_setup.md).
 
 ## Notifications
 

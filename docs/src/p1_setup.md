@@ -45,6 +45,7 @@ failing later.
 | `JWT_EXPIRES_IN` | no | Defaults to `24h` |
 | `VMS_JWT_SECRET` | yes | Throws at import time in `vms-jwt.constants.ts` if unset |
 | `VMS_JWT_EXPIRES_IN` | no | Defaults to `8h` |
+| `ASSET_ENCRYPTION_KEY` | yes | 32 bytes, base64. AES-256-GCM key for company asset secrets. Throws at import in `assets.module.ts` if unset or not 32 bytes |
 | `PORT` | no | Defaults to `4000` |
 | `INTERNAL_API_KEY` | yes | Shared secret CareerX sends as `x-internal-api-key` |
 | `RESEND_API_KEY` | yes | Outbound email |
@@ -61,11 +62,25 @@ The two Supabase key names are a leftover from a rename that was never
 finished. Setting both to the service role key is the safe move until the
 duplicate is cleaned up.
 
-Two of these secrets kill the process at startup rather than at first use:
-`JWT_SECRET` is checked in the module body of `auth.module.ts`, and
-`VMS_JWT_SECRET` is checked at the top level of
-`common/constants/vms-jwt.constants.ts`. If the API exits immediately with no
-useful stack trace, check those two first.
+Three of these secrets kill the process at startup rather than at first use:
+`JWT_SECRET` is checked in the module body of `auth.module.ts`,
+`VMS_JWT_SECRET` at the top level of
+`common/constants/vms-jwt.constants.ts`, and `ASSET_ENCRYPTION_KEY` in the
+module body of `modules/assets/assets.module.ts`. If the API exits immediately
+with no useful stack trace, check those three first.
+
+Generate the asset key once and keep it with the other production secrets:
+
+```bash
+openssl rand -base64 32
+```
+
+It has to decode to exactly 32 bytes, which is what
+`loadAssetKey` in `modules/assets/asset-crypto.ts` asserts. Rotating it does not
+re-encrypt anything: every secret stored under the old key stops opening, and
+`GET /assets/:id/reveal` answers with a 422 naming the rotation rather than a
+500. The repair is to enter those secrets again, which re-encrypts them under
+the current key.
 
 ## Client
 

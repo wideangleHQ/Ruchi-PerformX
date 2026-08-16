@@ -970,3 +970,73 @@ dropping the sections from creation entirely, which the scope asks for.
 failed milestone post leaves the project created without it. The user lands on
 the detail page and can add the missing row there, so the failure is visible
 rather than silent.
+## 2026-08-16 Asset secrets are AES-256-GCM with the auth tag on the ciphertext
+
+**Decision.** `company_assets.secret_cipher` holds base64 of the AES-256-GCM
+ciphertext with its 16 byte auth tag appended, `secret_iv` holds a fresh 12 byte
+IV per record, and the key is `ASSET_ENCRYPTION_KEY` from the environment.
+`asset-crypto.ts` is three exported functions with no Nest in them so the tests
+can call them directly.
+**Why.** The feature is showing somebody their own password back, so it has to
+be reversible, and the module holds the company's bank portal login, so it has
+to be authenticated. GCM gives both from `node:crypto` with no new dependency.
+**Instead of.** Bcrypt, which is one way and cannot show the password back at
+all; base64 or a reversible XOR, which are encoding and would be called
+encryption in a review nobody reads; AES-CBC, which encrypts without detecting
+tampering; and a KMS or a vault service, which is the right answer at a
+different company size and needs infrastructure this project does not have.
+**Costs.** The key lives in an environment variable, so anyone with production
+env access can decrypt the table. Rotating it does not re-encrypt anything: old
+records stop opening and have to be entered again. `GET /assets/:id/reveal`
+catches the auth tag failure and answers 422 naming the rotation, because
+otherwise it is a 500 that looks like a bug in the server.
+
+## 2026-08-16 Asset visibility is one method that returns a Prisma where clause
+
+**Decision.** `AssetsService.assetScope(user, employeeId?)` is the only place
+that decides who sees which assets. List reads use its return value as a `where`
+clause; single record reads call it with the record's own `owner_id` and use it
+for its throw.
+**Why.** Four rules across seven endpoints is twenty-eight chances to get one
+branch wrong, and the branch that is wrong is the one that shows an employee
+somebody else's bank password. One method means one place to read and one place
+to change.
+**Instead of.** A guard, which cannot see the record and so cannot express rule
+three; or a role check per endpoint, which is the arrangement that drifts.
+**Costs.** A single record read costs one extra evaluation of the scope rather
+than being enforced by the query itself, so the throw inside `assetScope` is
+load bearing. Deleting it would silently open every record.
+
+## 2026-08-16 Handover moves owner_id on confirmation, not on submit
+
+**Decision.** `POST /assets/handovers` writes rows with `completed_at` null and
+changes nothing else. `PATCH /assets/handovers/:id/confirm` sets `completed_at`
+and rewrites `company_assets.owner_id` in one transaction, with the guard in the
+`where` clause so a double submit updates nothing.
+**Why.** HR works through a leaver's list over hours or days. Moving ownership
+at submit would hide each asset from the leaver the moment HR picked a name,
+while HR still needs the list to be complete, and the leaver still needs the
+credential until they actually stop using it.
+**Instead of.** Moving ownership at submit with a reversal on rejection, which
+needs a rejection flow nobody asked for; or a status column on
+`company_assets`, which puts handover state on the wrong table.
+**Costs.** An asset with a handover open still belongs to the leaver, so it
+appears in their list until the new owner acts. The offboarding screen shows
+outstanding, awaiting confirmation and confirmed counts so that state is
+visible rather than confusing.
+
+## 2026-08-16 Documents reuse the attachments uploader instead of a second one
+
+**Decision.** `AttachmentsService.uploadToStorage` was extracted from the
+existing `uploadFiles` loop and made public. It validates, uploads to the same
+Supabase bucket and returns the file fields without creating a
+`task_attachments` row. The assets module calls it and keeps `file_url` and
+`storage_path` on `company_assets`.
+**Why.** A DOCUMENT asset is a file with a different owner table, not a
+different kind of upload. A second uploader means a second bucket path
+convention, a second size limit, and a second place to fix a MIME bug.
+**Instead of.** Writing a Supabase client into the assets service, or giving
+documents a `task_attachments` row with every foreign key null.
+**Costs.** `AttachmentsService` now has a public method with a caller outside
+its own module, so its signature is no longer free to change. `uploadFiles`
+routes through it, so a bug there breaks both.

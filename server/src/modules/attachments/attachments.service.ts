@@ -239,6 +239,59 @@ export class AttachmentsService {
     return { message: 'Attachment deleted successfully' };
   }
 
+  /**
+   * Validate one file, upload it to the Supabase bucket under `folder`, and
+   * return the row fields that describe it. No `task_attachments` row is
+   * created, which is the difference from `uploadFiles`: modules that keep the
+   * file reference on their own table (company assets) call this so there is
+   * one uploader, one bucket, and one set of size and MIME rules.
+   *
+   * Throws `BadRequestException` for an unsupported type, an oversized file, or
+   * a storage failure. The caller owns cleanup: on a later failure, remove
+   * `storage_path` from the bucket.
+   */
+  async uploadToStorage(file: UploadedFile, folder: string) {
+    const prepared = await this.prepareFile(file);
+    const storagePath = `${folder}/${Date.now()}-${randomUUID()}-${prepared.safeName}`;
+
+    const uploadResult = await this.supabase.storage.from(this.bucket).upload(storagePath, prepared.buffer, {
+      contentType: prepared.mimetype,
+      upsert: false,
+    });
+
+    if (uploadResult.error) {
+      throw new BadRequestException(uploadResult.error.message);
+    }
+
+    return {
+      file_name: prepared.fileName,
+      file_url: await this.createSignedUrl(storagePath),
+      storage_path: storagePath,
+      file_type: prepared.mimetype,
+      file_size_kb: Math.ceil(prepared.buffer.length / 1024),
+    };
+  }
+
+  /**
+   * Refresh the signed URL for a stored object. Signed URLs expire after an
+   * hour, so anything that hands a file to the browser has to re-sign on read.
+   *
+   * Returns null when the object is gone or the path is malformed, so a list
+   * endpoint does not fail on one bad row.
+   */
+  async signStoredFile(storagePath: string): Promise<string | null> {
+    try {
+      return await this.createSignedUrl(storagePath);
+    } catch {
+      return null;
+    }
+  }
+
+  /** Delete one stored object. Used to roll back a failed create. */
+  async removeStoredFile(storagePath: string) {
+    await this.supabase.storage.from(this.bucket).remove([storagePath]);
+  }
+
   private async uploadFiles(
     files: UploadedFile[],
     target: {
@@ -276,7 +329,6 @@ export class AttachmentsService {
       const results = [];
 
       for (const file of files) {
-        const prepared = await this.prepareFile(file);
         const contextId = target.selfActionCommentId || target.commentId || target.taskId || target.requestId || target.selfActionId;
 
         if (!contextId) {
@@ -287,24 +339,9 @@ export class AttachmentsService {
           );
         }
 
-        const storagePath = `${target.folder}/${contextId}/${Date.now()}-${randomUUID()}-${prepared.safeName}`;
+        const stored = await this.uploadToStorage(file, `${target.folder}/${contextId}`);
+        uploadedPaths.push(stored.storage_path);
 
-        // DEBUG: remove after diagnosing
-        console.log('UPLOAD DEBUG storagePath=', storagePath, 'contextId=', contextId, 'safeName=', prepared.safeName);
-
-        const uploadResult = await this.supabase.storage.from(this.bucket).upload(storagePath, prepared.buffer, {
-          contentType: prepared.mimetype,
-          upsert: false,
-        });
-
-        if (uploadResult.error) {
-          // DEBUG: remove after diagnosing
-          console.log('UPLOAD DEBUG supabase error=', uploadResult.error);
-          throw new BadRequestException(uploadResult.error.message);
-        }
-        uploadedPaths.push(storagePath);
-
-        const signedUrl = await this.createSignedUrl(storagePath);
         const created = await this.prisma.task_attachments.create({
           data: {
             task_id: target.taskId ?? null,
@@ -312,11 +349,11 @@ export class AttachmentsService {
             comment_id: target.commentId ?? null,
             self_action_id: target.selfActionId ?? null,
             self_action_comment_id: target.selfActionCommentId ?? null,
-            file_name: prepared.fileName,
-            file_url: signedUrl,
-            storage_path: storagePath,
-            file_type: prepared.mimetype,
-            file_size_kb: Math.ceil(prepared.buffer.length / 1024),
+            file_name: stored.file_name,
+            file_url: stored.file_url,
+            storage_path: stored.storage_path,
+            file_type: stored.file_type,
+            file_size_kb: stored.file_size_kb,
             uploaded_by_id: target.uploadedById,
           },
           select: this.selectAttachment(),
