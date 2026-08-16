@@ -56,8 +56,10 @@ jobs:
             echo "$out" | grep -E "ERROR|resolve dependencies" | head -3
             exit 1
           fi
+          # The whole output, not a tail. Nest prints the message above the
+          # stack, so `tail -5` reliably showed five frames and no reason.
           echo "$out" | grep -q "Nest application successfully started" || {
-            echo "$out" | tail -5; exit 1; }
+            echo "$out"; exit 1; }
           echo "App starts."
 
   client:
