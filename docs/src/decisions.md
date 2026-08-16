@@ -559,3 +559,46 @@ is in question is cheaper than modelling it.
 instant. It also starts the app, which tries to reach the database; the DI graph
 resolves first, so a connection failure is not a boot failure and the check
 ignores it.
+## 2026-08-16 An R&D member's research thread is the categories they have written in
+
+**Decision.** `visibleCategories` derives a member's readable categories from
+the distinct `rnd_reports.category` values they have already submitted. There is
+no assignment table and no per-member category list.
+**Why.** The scope document asks for continuity within a member's own research
+thread. The set of categories somebody has filed research in is exactly that
+set, and it needs no screen, no roster field, and no second thing for the MD to
+keep current.
+**Instead of.** An `rnd_member_categories` table, which needs a UI to populate,
+goes stale the moment somebody researches something new, and can disagree with
+the reports that already exist.
+**Costs.** A brand new member reads nothing until their first submission, and
+they type the category that starts their thread rather than picking it from a
+list. If the MD ever wants to assign a thread before the first report, that
+table is the upgrade and `visibleCategories` is where it plugs in.
+
+## 2026-08-16 Reading an R&D report as MD is what closes the edit window
+
+**Decision.** `GET /rnd/reports/:id` stamps `md_viewed_at` when the caller is
+MD, EA, or PA, and `PATCH` is refused once it is set.
+**Why.** The rule wanted is "the submitter can fix a typo until it has been
+read". Reading is the event; anything else is a second action somebody has to
+remember to take.
+**Instead of.** An explicit acknowledge button, which is a step that gets
+skipped and leaves reports editable forever, or a fixed time window, which is
+wrong in both directions.
+**Costs.** A GET has a side effect, which is surprising in a REST API and means
+the MD cannot preview a report without ending the edit window. The detail sheet
+on the client fetches by id for that reason rather than reusing the list row.
+
+## 2026-08-16 R&D report visibility lives in one pure function
+
+**Decision.** `server/src/modules/rnd/rnd-visibility.ts` exports
+`visibleCategories(role, isMember, memberCategories)` and every read path in
+`RndService` goes through it.
+**Why.** The list, the detail endpoint, and the category list all need the same
+answer. Three copies of a three-branch rule is how a member ends up reading
+another thread from one of them.
+**Instead of.** A `where` builder that takes Prisma types, which cannot be
+tested without a database, or inline branches per endpoint.
+**Costs.** One more file in a module that would otherwise be three. It buys
+`rnd-visibility.spec.ts`, which is the only test in the module.
