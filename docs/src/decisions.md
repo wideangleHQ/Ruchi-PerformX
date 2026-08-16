@@ -132,3 +132,36 @@ looked right and was inert.
 **Costs.** `DIRECT_URL` becomes required for any CLI work and is now in
 `server_env_required`. The two URLs being different is a thing to know, and the
 comment in `prisma.config.ts` is the only place it is explained in code.
+
+## 2026-08-16 Phase 2 tables carry no Prisma relations
+
+**Decision.** Every Phase 2 table uses plain FK columns. No `@relation` fields,
+no back-relations on `users`. Services resolve display names through
+`common/helpers/user-lookup.helper.ts`.
+**Why.** `users` already holds forty relation fields. A back-relation per Phase
+2 table would put thirty-odd modules' migrations in one model, slow client
+generation, and make `users` a file every feature branch edits and conflicts
+over. This is also how `p2_data_model.md` writes the models.
+**Instead of.** Full relations, which buy `include` at the cost of that
+conflict surface; or ad-hoc lookups per service, which is the same query
+written thirty times with thirty chances to make it an N+1.
+**Costs.** No nested writes and no `include` on Phase 2 tables. A list endpoint
+needing names calls `attachUsers` explicitly, and forgetting to is a missing
+name in the UI rather than a crash. Add `@relation` per table if a module ever
+needs a nested write; nothing in Phase 2 does.
+
+## 2026-08-16 The Phase 2 spine lands before the feature work
+
+**Decision.** One commit carries the whole Phase 2 schema, the notification
+engine, all module registrations in `app.module.ts`, and the sidebar entries.
+Feature branches then touch only their own module directory.
+**Why.** `schema.prisma`, `app.module.ts` and `Sidebar.tsx` are the three files
+every Phase 2 module would otherwise edit. Sixteen branches editing them is a
+sixteen-way conflict in the one file where a bad merge silently drops a Prisma
+model and nothing fails until runtime.
+**Instead of.** A branch per module carrying its own slice of the schema, which
+is the arrangement that produces those conflicts. Or one giant branch, which
+nobody can review.
+**Costs.** The schema contains tables no code reads yet, which reads as
+speculative until the modules land. Module stubs are registered and expose no
+routes, so `just routes` lists them empty until their controller arrives.
