@@ -20,6 +20,7 @@ export class ProfileService {
         role: true,
         department_id: true,
         can_access_career_hr: true,
+        date_of_birth: true,
         created_at: true,
         departments: {
           select: {
@@ -37,6 +38,14 @@ export class ProfileService {
     return this.mapProfile(user);
   }
 
+  /**
+   * Updates the caller's own record. Only the fields present on the DTO move;
+   * `dateOfBirth` additionally accepts null, which clears it and takes the
+   * person off the dashboard birthday card for good.
+   *
+   * Throws ConflictException when the email or username is taken by somebody
+   * else, and whatever Prisma throws if the row has since been deleted.
+   */
   async updateProfile(userId: string, dto: UpdateProfileDto): Promise<ProfileResponseDto> {
     if (dto.email) {
       const existing = await this.prisma.users.findFirst({
@@ -69,6 +78,11 @@ export class ProfileService {
     if (dto.email !== undefined) updateData.email = dto.email;
     if (dto.username !== undefined) updateData.username = dto.username;
     if (dto.mobileNumber !== undefined) updateData.mobile_number = dto.mobileNumber;
+    // null clears it. `undefined` leaves it alone, so a form that never
+    // shows the field cannot wipe someone's birthday by omission.
+    if (dto.dateOfBirth !== undefined) {
+      updateData.date_of_birth = dto.dateOfBirth ? new Date(dto.dateOfBirth) : null;
+    }
 
     const updated = await this.prisma.users.update({
       where: { id: userId },
@@ -82,6 +96,7 @@ export class ProfileService {
         role: true,
         department_id: true,
         can_access_career_hr: true,
+        date_of_birth: true,
         created_at: true,
         departments: {
           select: {
@@ -104,6 +119,7 @@ export class ProfileService {
     role: role_enum;
     department_id: string | null;
     can_access_career_hr: boolean;
+    date_of_birth: Date | null;
     created_at: Date | null;
     departments: { id: string; name: string } | null;
   }): Promise<ProfileResponseDto> {
@@ -156,6 +172,7 @@ export class ProfileService {
       departmentName,
       departmentIds,
       departmentNames,
+      dateOfBirth: user.date_of_birth,
       createdAt: user.created_at,
       canAccessCareerHR: user.can_access_career_hr,
     };

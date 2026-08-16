@@ -12,6 +12,9 @@ import {
 } from 'lucide-react';
 
 import { useDashboard } from '@/hooks/useQueries';
+import { BirthdayCards } from '@/components/dashboard/BirthdayCards';
+import { HolidayBanner } from '@/components/dashboard/HolidayBanner';
+import { PollsSection } from '@/components/dashboard/PollsSection';
 
 const statusStyles: Record<string, string> = {
   'On Track': 'bg-green-50 text-green-700 ring-1 ring-green-200',
@@ -101,6 +104,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      <HolidayBanner holiday={data.upcomingHoliday} />
+
       {/* ── KPI Cards ── */}
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {kpis.map(({ title, value, subtitle, icon: Icon }) => (
@@ -121,6 +126,8 @@ export default function DashboardPage() {
           </div>
         ))}
       </section>
+
+      <BirthdayCards birthdays={data.birthdays ?? []} />
 
       {/* ── Charts Row ── */}
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -185,6 +192,8 @@ export default function DashboardPage() {
           </div>
         </div>
       </section>
+
+      <PollsSection polls={data.activePolls ?? []} />
 
       {/* ── Department Summary ── */}
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">

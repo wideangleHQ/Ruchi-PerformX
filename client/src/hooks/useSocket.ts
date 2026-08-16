@@ -39,6 +39,14 @@ export const useSocket = () => {
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     });
 
+    // Polls are company wide, so this arrives as a broadcast rather than to a
+    // room. Invalidate rather than writing the payload in: the socket shape and
+    // the dashboard response are not guaranteed to match.
+    socket.on('poll:updated', () => {
+      queryClient.invalidateQueries({ queryKey: ['polls'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    });
+
     socket.on('comment:new', () => {
       // Invalidate all task-related queries
       queryClient.invalidateQueries({ queryKey: ['tasks'] });

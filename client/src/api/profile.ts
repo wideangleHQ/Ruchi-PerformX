@@ -11,6 +11,7 @@ export interface ProfileData {
   role: Role;
   departmentId?: string | null;
   departmentName?: string | null;
+  dateOfBirth?: string | null;
   createdAt?: string;
 }
 
@@ -19,6 +20,8 @@ export interface UpdateProfilePayload {
   username?: string;
   email?: string;
   mobileNumber?: string;
+  /** null clears it, which takes you off the dashboard birthday card. */
+  dateOfBirth?: string | null;
 }
 
 export const profileApi = {
