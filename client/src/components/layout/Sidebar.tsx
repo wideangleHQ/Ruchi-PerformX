@@ -20,23 +20,58 @@ import {
   UserCircle2,
   Briefcase,
   Loader2,
+  CalendarDays,
+  FolderKanban,
+  FlaskConical,
+  KeyRound,
+  Building2,
+  CalendarHeart,
 } from 'lucide-react';
 import { launchCareerX } from '@/api/career';
 import { useToast } from '@/hooks/useToast';
+import { useNavAccess } from '@/hooks/useNavAccess';
 
 interface NavItem {
   href: string;
   label: string;
   icon: React.ReactNode;
   roles?: string[];
+  /**
+   * Extra grant that shows the item even when `roles` does not match. Resolved
+   * by useNavAccess, which asks the API once per session. Membership and
+   * per-person grants cannot be read off the JWT role.
+   */
+  showWhen?: 'rndMember' | 'vendorAccess';
 }
 
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
   { href: '/tasks', label: 'Tasks', icon: <ClipboardList size={20} /> },
   { href: '/self-actions', label: 'Self Actions', icon: <ClipboardCheck size={20} /> },
+  { href: '/projects', label: 'Projects', icon: <FolderKanban size={20} /> },
+  { href: '/leave', label: 'Leave', icon: <CalendarDays size={20} /> },
   { href: '/requests', label: 'Requests', icon: <FileText size={20} /> },
   { href: '/transfers', label: 'Transfers', icon: <ArrowRightLeft size={20} /> },
+  { href: '/assets', label: 'Assets', icon: <KeyRound size={20} /> },
+  {
+    href: '/rnd',
+    label: 'R&D',
+    icon: <FlaskConical size={20} />,
+    // Also shown to R&D team members, resolved at runtime through
+    // GET /rnd/team/me. A tab that 403s on click reads as broken software.
+    roles: ['MD', 'EA', 'PA'],
+    showWhen: 'rndMember',
+  },
+  {
+    href: '/vendors',
+    label: 'Vendors',
+    icon: <Building2 size={20} />,
+    // MD and EA hold vendor dashboard access implicitly; everyone else needs a
+    // vendor_dashboard_access row, which GET /vendor-access/me answers.
+    roles: ['MD', 'EA'],
+    showWhen: 'vendorAccess',
+  },
+  { href: '/events', label: 'Events', icon: <CalendarHeart size={20} /> },
   { href: '/notifications', label: 'Notifications', icon: <Bell size={20} /> },
   { href: '/scoring', label: 'Scoring', icon: <Trophy size={20} /> },
   {
@@ -57,10 +92,13 @@ export function Sidebar() {
   const [isLaunchingCareer, setIsLaunchingCareer] = useState(false);
   const toast = useToast();
 
-  // Filter nav items based on user role
-  const visibleItems = navItems.filter(
-    (item) => !item.roles || (user?.role && item.roles.includes(user.role))
-  );
+  // Role covers most items. Two are grants rather than roles, so they need an
+  // answer from the API before they can be shown or hidden.
+  const access = useNavAccess();
+  const visibleItems = navItems.filter((item) => {
+    if (item.showWhen && access[item.showWhen]) return true;
+    return !item.roles || (user?.role && item.roles.includes(user.role));
+  });
 
   // CareerX is accessible to HR department users OR users with explicit canAccessCareerHR permission
   const isHRDepartment = user?.departmentName?.toLowerCase() === 'hr';

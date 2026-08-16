@@ -29,6 +29,48 @@ export class EmailService {
     );
   }
 
+  /**
+   * Generic notification email, used by NotificationsService for every type
+   * whose channel map includes EMAIL.
+   *
+   * `body` is the notification message verbatim, which is why rejections and
+   * cancellations carry their reason: the caller already put it there. An
+   * email that says "your leave was rejected" with no reason is worse than no
+   * email, because the recipient then has to go and ask.
+   *
+   * Throws whatever Resend throws. The caller swallows it: email is best
+   * effort and must never roll back the notification row.
+   */
+  async sendNotificationEmail(
+    email: string,
+    fullName: string,
+    subject: string,
+    body: string,
+  ): Promise<void> {
+    const html = `
+      <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px">
+        <p style="color:#0f172a;font-size:15px">Hello ${fullName},</p>
+        <div style="background:#f8fafc;border-left:3px solid #15803d;padding:16px;margin:16px 0">
+          <p style="margin:0 0 8px;color:#0f172a;font-size:16px;font-weight:600">${subject}</p>
+          <p style="margin:0;color:#334155;font-size:14px;line-height:1.6">${body}</p>
+        </div>
+        <p style="color:#64748b;font-size:13px">
+          Open <a href="${process.env.CLIENT_URL ?? 'https://app.ruchiperformx.in'}" style="color:#15803d">RUCHI PerformX</a> to act on this.
+        </p>
+      </div>`;
+
+    const { error } = await this.resend.emails.send({
+      from: this.fromEmail,
+      to: email,
+      subject: `RUCHI PerformX - ${subject}`,
+      html,
+    });
+
+    if (error) {
+      throw new InternalServerErrorException(error.message);
+    }
+  }
+
   async sendOtpEmail(
     email: string,
     otp: string,

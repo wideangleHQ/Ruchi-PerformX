@@ -277,3 +277,23 @@ routes:
         echo "### $f"
         grep -nE "@(Controller|Get|Post|Patch|Put|Delete|Roles|Public)\(" "$f" | sed 's/^ *//'
     done
+
+# A vendor is external. RolesGuard knows nothing about assignments, so adding
+# VENDOR to an internal @Roles list opens that endpoint to every vendor for
+# every record it returns. This turns that from a review promise into a build
+# failure. See docs/src/p2_vendors.md.
+vendor-roles:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    hits=$(grep -rn "role_enum.VENDOR" server/src/modules \
+        --include="*.controller.ts" 2>/dev/null \
+        | grep -v "server/src/modules/vendor-portal/" || true)
+    if [ -n "$hits" ]; then
+        echo "VENDOR appears on a controller outside modules/vendor-portal/."
+        echo "Every vendor-reachable route lives in that namespace, scoped through"
+        echo "vendor_assignments. Opening an internal route with a role branch is"
+        echo "how the whole company's data leaks."
+        echo "$hits"
+        exit 1
+    fi
+    echo "No VENDOR roles outside the portal namespace."

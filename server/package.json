@@ -39,12 +39,15 @@
     "dotenv": "^17.4.2",
     "ts-node": "^10.9.2",
     "tsx": "^4.22.3",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^3.2.7"
   },
   "scripts": {
     "build": "prisma generate && nest build",
     "start": "node dist/main.js",
     "start:dev": "npx kill-port 4000 && nest start --watch --port 4000",
-    "dev": "npx kill-port 4000 && nest start --watch --port 4000"
+    "dev": "npx kill-port 4000 && nest start --watch --port 4000",
+    "test": "vitest run",
+    "test:watch": "vitest"
   }
 }

@@ -20,6 +20,17 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ProfileModule } from './modules/profile/profile.module';
 import { RequestsModule } from './modules/requests/requests.module';
 import { VmsModule } from './modules/vms/vms.module';
+import { EscalationModule } from './modules/escalation/escalation.module';
+import { LeaveModule } from './modules/leave/leave.module';
+import { HolidaysModule } from './modules/holidays/holidays.module';
+import { ProjectsModule } from './modules/projects/projects.module';
+import { RndModule } from './modules/rnd/rnd.module';
+import { AssetsModule } from './modules/assets/assets.module';
+import { PollsModule } from './modules/polls/polls.module';
+import { VendorsModule } from './modules/vendors/vendors.module';
+import { VendorPortalModule } from './modules/vendor-portal/vendor-portal.module';
+import { EventsModule } from './modules/events/events.module';
+import { InternalModule } from './modules/internal/internal.module';
 
 @Module({
   imports: [
@@ -41,6 +52,21 @@ import { VmsModule } from './modules/vms/vms.module';
     DashboardModule,
     ProfileModule,
     VmsModule,
+    // Written in Phase 1 and never imported, so nothing has ever escalated.
+    // See docs/src/p1_known_gaps.md.
+    EscalationModule,
+    // Phase 2. Registered here by the spine so feature branches never edit
+    // this file and never conflict with each other over it.
+    LeaveModule,
+    HolidaysModule,
+    ProjectsModule,
+    RndModule,
+    AssetsModule,
+    PollsModule,
+    VendorsModule,
+    VendorPortalModule,
+    EventsModule,
+    InternalModule,
   ],
   providers: [
     {
