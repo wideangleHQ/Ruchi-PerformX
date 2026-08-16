@@ -165,3 +165,36 @@ nobody can review.
 **Costs.** The schema contains tables no code reads yet, which reads as
 speculative until the modules land. Module stubs are registered and expose no
 routes, so `just routes` lists them empty until their controller arrives.
+
+## 2026-08-16 RolesGuard denies external roles when a handler has no @Roles
+
+**Decision.** A handler carrying no `@Roles` is now unreachable by
+`role_enum.VENDOR`. Opening a route to a vendor requires listing `VENDOR`
+explicitly, which only happens in `modules/vendor-portal/`.
+**Why.** `RolesGuard` returned true whenever no role list was present, which
+read as "any authenticated user" and was a safe default for exactly as long as
+every token holder was an employee. Seventeen controllers carry no `@Roles` at
+all, including `profile`, `dashboard`, `comments`, `notifications` and
+`attachments`. None was written with an outside reader in mind, and Phase 2 adds
+an external login on the same token and the same guard.
+**Instead of.** Adding `@Roles` to every one of those seventeen controllers and
+to each of the roughly 121 Phase 2 endpoints, then relying on nobody forgetting.
+That is the same guarantee spread across a hundred places instead of one, and
+the failure mode of forgetting is silent.
+**Costs.** A future non-employee role has to be added to `EXTERNAL_ROLES` or it
+inherits the old open default. The `@Public()` path is unchanged, since those
+requests carry no user and never reached a role check.
+
+## 2026-08-16 Socket rooms are not authorised on join
+
+**Decision.** Recorded, not fixed. `task:join` and `project:join` accept any
+valid token and admit the caller to that room.
+**Why not fixed here.** The fix is a membership lookup inside the gateway's join
+handlers, which means giving the gateway a Prisma dependency while several
+project branches are open against that file. It is a contained change and it
+should be its own commit.
+**What it means meanwhile.** The REST rule on `GET /projects/:id/messages` is
+members-only, and the socket room is wider than that. A vendor login holding a
+valid token can join `project:<id>` and receive `project:message:new`. Until the
+join handlers check membership, do not treat the socket as a permission
+boundary. See `docs/src/p1_notifications.md`.
