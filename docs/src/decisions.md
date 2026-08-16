@@ -392,3 +392,49 @@ same company holiday render under a different name per department.
 **Costs.** The suppressed department row is invisible to the screen that could
 delete it. It is inert, it excludes a day that is already excluded, so this is
 a cosmetic gap rather than a correctness one.
+## 2026-08-16 The vendors controller carries no route prefix
+
+**Decision.** `VendorsController` is declared `@Controller()` and each route
+names its full path, so `/vendors` and `/vendor-categories` are served from one
+class.
+**Why.** `vendors.module.ts` registers three controllers and is closed to
+feature branches, and categories are a five-row lookup table that does not earn
+a fourth. A controller cannot hold two prefixes without registering every route
+under both, which would publish `/vendor-categories/pickable`.
+**Instead of.** `@Controller(['vendors', 'vendor-categories'])`, which does
+exactly that. Or hanging categories off the access controller, where they have
+nothing to do with who can open the module.
+**Costs.** The route paths are no longer visible from the class decorator
+alone, so `just routes` is the honest answer to what this controller exposes.
+The literal-before-parameterised rule still applies: `vendors/pickable` is
+declared above `vendors/:id` and has to stay there.
+
+## 2026-08-16 Vendor categories are seeded on boot, not by a migration
+
+**Decision.** `VendorsService.onModuleInit` runs a `createMany` with
+`skipDuplicates` over the ten seed categories. A failure is logged and
+swallowed.
+**Why.** The list is business data with a unique name, not schema, and there is
+no seed script in this repository to add it to. `skipDuplicates` makes every
+boot after the first a no-op, and a category retired later is deactivated
+rather than deleted, so the seed does not resurrect it.
+**Instead of.** An `INSERT` in the Phase 2 migration, which cannot be corrected
+without a second migration and reseeds nothing on a fresh environment that
+skipped it. Or seeding lazily on first read, which puts a write in a GET.
+**Costs.** One query at boot, and a category deleted rather than deactivated
+comes back on the next restart. Deleting a category is not an endpoint, so that
+only happens by hand in the database.
+
+## 2026-08-16 MD and EA are refused a vendor_dashboard_access row
+
+**Decision.** `POST /vendor-access` rejects a target whose role is MD or EA
+with a 400, and rejects a `VENDOR` target outright.
+**Why.** MD and EA hold `VENDOR_ADMIN` implicitly in `VendorScopeService`, so a
+row saying `VENDOR_VIEWER` for an EA would be read by the access list screen
+and by nothing else. Two sources for one answer, disagreeing.
+**Instead of.** Accepting the row as a harmless no-op, which leaves the grants
+screen reporting an access level the API does not honour.
+**Costs.** Revoking access from an MD or EA is not possible through the API,
+which is correct today and becomes a real gap only if the implicit grant is
+ever meant to be removable. That would mean dropping the role branch in
+`accessLevelFor` and granting them rows like everyone else.
