@@ -133,15 +133,46 @@ because the Phase 1 spec lists it as an in-scope module.
 
 ## No database migrations
 
-`prisma/migrations/` does not exist. `schema.prisma` has no `url` and there is
-one loose SQL file at `prisma/sql/add_can_access_career_hr.sql`. Changes have
-been applied with `prisma db push`, which does not record history and offers no
-rollback.
+Migrations now exist. What follows is what was actually found when they were
+established on 2026-08-16, because the previous state was worse than this
+chapter described and the details explain the shape of the migration directory.
 
-Phase 2 adds roughly fifteen tables. Doing that with `db push` against a live
-production database, with no migration history and no rollback path, is the
-single largest delivery risk in the phase. Establishing migrations should be the
-first task, not an afterthought.
+`prisma/migrations/` held ten hand-written directories and no
+`migration_lock.toml`, which is the tell that none of them came from
+`prisma migrate dev`. `_prisma_migrations` existed on production with zero rows.
+So Prisma believed nothing had been applied while the schema said otherwise.
+
+Nine of the ten were effectively applied, by hand or by `db push`. One was not:
+`20260703184500_add_performance_indexes` was present on disk and **zero of its
+twenty-four indexes existed in production**. The composite `deleted_at` indexes
+that `p1_conventions.md` describes as making the soft-delete filter free were
+not there at all. They are now, as
+`20260816120000_add_performance_indexes`.
+
+The database had also drifted from `schema.prisma` in two places, both dead
+weight rather than live data:
+
+- `self_actions.department_id`, superseded by the `self_action_departments` join
+  table. All 288 non-null values were already represented there and no
+  `self_action` lacked a join row.
+- `visitors.company_name`, a leftover of the camelCase rename. The live column
+  is `visitors."companyName"`; every row of `company_name` still held the
+  `Unknown Company` default.
+
+Both are dropped in `20260816120100_drop_legacy_columns`, kept apart from the
+index migration so the destructive half is reviewable on its own.
+
+Two traps remain worth knowing:
+
+`prisma db push` is now a recipe that refuses to run. It is how the schema
+drifted from its own migrations, and it has no rollback.
+
+The Prisma CLI cannot use `DATABASE_URL`. That is Supabase's transaction pooler
+on 6543, which cannot hold the session-level advisory lock migrate takes, so a
+migrate command against it hangs until something kills it rather than failing
+with a message that says why. `server/prisma.config.ts` points the CLI at
+`DIRECT_URL` instead. The running API is unaffected: `PrismaService` builds its
+own adapter from `process.env.DATABASE_URL` and never reads that config.
 
 ## The `PENDING` task status is unreachable
 
