@@ -542,3 +542,20 @@ employee, department, or date".
 **Costs.** A HOD cannot see their department's visitors without going through
 `GET /vms/reports/employee/:employeeId`, which is already role-gated. Widen it
 with a deliberate decision entry, not by adding a query parameter.
+
+## 2026-08-16 The boot check runs the real entrypoint
+
+**Decision.** `just boot-check` compiles the server and runs `dist/main.js`,
+rather than importing `AppModule` through `ts-node --transpile-only`.
+**Why.** The ts-node version reported success on a build that could not start.
+It printed neither its success line nor its failure line, exited 1, and the
+recipe read that as a pass. The failure it was written to catch, `RndModule`
+missing `AuthModule`, went through it and was found by running the compiled
+server by hand.
+**Instead of.** Keeping ts-node and parsing its exit code more carefully, which
+is guessing at why a process died silently. Running the thing whose behaviour
+is in question is cheaper than modelling it.
+**Costs.** The check now pays for a `nest build`, so it is seconds rather than
+instant. It also starts the app, which tries to reach the database; the DI graph
+resolves first, so a connection failure is not a boot failure and the check
+ignores it.
