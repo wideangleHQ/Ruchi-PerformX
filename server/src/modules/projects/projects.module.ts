@@ -2,12 +2,35 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
-// Registered in app.module.ts by the Phase 2 spine so that feature work never
-// has to touch that file. Add this module's controller and service here.
+import { ProjectsController } from './projects.controller';
+import { ProjectsService } from './projects.service';
+import { ProjectExecutionController } from './project-execution.controller';
+import { ProjectExecutionService } from './project-execution.service';
+import { ProjectCollabController } from './project-collab.controller';
+import { ProjectCollabService } from './project-collab.service';
+import { ProjectClosureController } from './project-closure.controller';
+import { ProjectClosureService } from './project-closure.service';
+import { ProjectDeadlineCron } from './project-deadline.cron';
+
+// Controllers and services are split by concern so that concurrent work on
+// this module edits different files. Registered here up front for the same
+// reason the Phase 2 spine registered the modules: this file is the one every
+// projects branch would otherwise touch.
 @Module({
   imports: [PrismaModule, NotificationsModule],
-  controllers: [],
-  providers: [],
-  exports: [],
+  controllers: [
+    ProjectsController,
+    ProjectExecutionController,
+    ProjectCollabController,
+    ProjectClosureController,
+  ],
+  providers: [
+    ProjectsService,
+    ProjectExecutionService,
+    ProjectCollabService,
+    ProjectClosureService,
+    ProjectDeadlineCron,
+  ],
+  exports: [ProjectsService],
 })
 export class ProjectsModule {}
