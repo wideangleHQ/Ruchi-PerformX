@@ -291,6 +291,46 @@ the trail stays skimmable only if chat stays out of it.
 `ScoringService` has no controller. Employee scores are read through the
 dashboard endpoint.
 
+## Holidays
+
+| Method | Path | Roles |
+| --- | --- | --- |
+| GET | `/holidays` | authenticated |
+| GET | `/holidays/upcoming` | authenticated |
+| POST | `/holidays` | HR, HOD, ADMIN |
+| PATCH | `/holidays/:id` | HR, HOD, ADMIN |
+| DELETE | `/holidays/:id` | HR, HOD, ADMIN |
+
+Two tiers. `holidays.department_id` is null for a common holiday, which applies
+company-wide, and set for a department-wise one. A user's effective calendar is
+the union of both, which is what `GET /holidays` returns, each row tagged
+`tier: "COMMON" | "DEPARTMENT"`. A date held by both tiers appears once, as the
+common row, so a leave day count never deducts it twice.
+
+`GET /holidays?year=` defaults to the current calendar year.
+`GET /holidays/upcoming?limit=` defaults to five and adds `daysUntil`, where
+today is zero. It feeds the dashboard countdown banner.
+
+The write roles are not equal, and the difference is in the service rather than
+in `@Roles`. HR and ADMIN write both tiers. A HOD writes only the departments
+`DepartmentScopeService` resolves for them, and a HOD posting a common holiday
+gets a 403. HR is treated as company-wide here and only here; it is not in
+`DepartmentScopeService`'s unrestricted list, because for tasks and scores it is
+not unrestricted.
+
+`PATCH` takes `name`, `date`, and `isOptional` only. There is no `departmentId`,
+so moving a holiday between tiers is a delete plus a create, and sending one
+returns a 400 from `forbidNonWhitelisted`.
+
+Dates are `YYYY-MM-DD` in both directions. A duplicate returns 409 rather than
+500: the model's `[holiday_date, name, department_id]` unique index catches the
+department tier, and the hand-written partial index `holidays_common_uniq`
+catches the common tier, where the NULL department would otherwise let a second
+identical row through.
+
+`just seed-holidays` loads the fixed-date national holidays as common holidays
+for the current and next year. It is safe to rerun.
+
 ## Dashboard and profile
 
 | Method | Path |
