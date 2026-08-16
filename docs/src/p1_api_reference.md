@@ -206,6 +206,35 @@ reads everything a member reads and writes nothing.
 | PATCH | `/transfers/:id/approve` | HOD, MD |
 | PATCH | `/transfers/:id/reject` | HOD, MD |
 
+## Projects
+
+Every project route is open to all internal roles. VENDOR is not on the list;
+vendors reach projects through the portal namespace only. Lead and Co-Lead are
+project membership rather than JWT roles, so `RolesGuard` cannot express them
+and the service checks membership on top. The full route table is in
+[Projects](p2_projects.md#endpoints).
+
+Closure:
+
+| Method | Path | Roles |
+| --- | --- | --- |
+| POST | `/projects/:id/closure` | internal, Lead or Co-Lead of the project |
+| GET | `/projects/:id/closure` | internal, 404 until one is filed |
+| PATCH | `/projects/:id/close` | internal, Lead or Co-Lead, 400 without a closure report |
+
+There is no MD review. `POST /projects/:id/closure` files the report and
+notifies the project; `PATCH /projects/:id/close` moves the project to
+`COMPLETED` through the normal transition check. A second POST returns 409 —
+the unique constraint on `project_closure_reports.project_id` is what enforces
+one report per project.
+
+`projects.health` is not settable through any route. `ProjectDeadlineCron.sweep()`
+recomputes it daily at 08:00 from deadline proximity, checklist completion, and
+the counts of overdue checklist items and milestones. The same sweep sends
+`PROJECT_DEADLINE_NEAR` to the Lead and Co-Lead 7 days out, 1 day out, and on
+the day, and `PROJECT_OVERDUE_NO_CLOSURE` to the MD once the deadline passes
+with nothing filed.
+
 ## Notifications
 
 | Method | Path |

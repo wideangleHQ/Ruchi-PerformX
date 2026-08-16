@@ -283,3 +283,31 @@ of a project showing DELAYED after it was delivered.
 is correct but a day late on the one change users watch for.
 **Costs.** Two callers of the same function, so a rule change has to keep both
 in mind. The function is pure and exported specifically so they cannot drift.
+## 2026-08-16 DELAYED means the deadline passed, and nothing else
+
+**Decision.** `deriveHealth` returns `DELAYED` only when `projects.deadline` is
+in the past. Overdue checklist items, overdue milestones, and arriving in the
+last week with under 80 percent of the checklist done all return `AT_RISK`.
+**Why.** `deadline` is nullable and plenty of projects will never set one. A
+rule that let overdue items alone reach `DELAYED` would put a project with no
+deadline into the worst band, which reads as a broken filter to whoever built
+the "Overdue" view next to it.
+**Instead of.** Scoring the four inputs and thresholding the score. The weights
+would have been invented, nobody could explain a particular badge, and the
+directory filter has three values to sort into rather than a number.
+**Costs.** A project with twenty overdue items and a deadline three months out
+sits at `AT_RISK` alongside one with a single late item. Add a second threshold
+on the overdue count if the badge stops discriminating.
+
+## 2026-08-16 The MD overdue escalation repeats daily
+
+**Decision.** `PROJECT_OVERDUE_NO_CLOSURE` is sent to every active MD on every
+sweep while the project stays past its deadline with no closure report.
+**Why.** It matches the task escalation sweep next door, and a one-shot
+notification on the first overdue day is one an MD can miss entirely. There is
+no per-project reminder state to track this way.
+**Instead of.** A `last_escalated_at` column, which is schema for a problem
+nobody has reported, or a first-day-only send, which is silent from day two.
+**Costs.** An MD with ten projects stuck past their deadline gets ten
+notifications a day. The gate is one modulo on the overdue day count in
+`project-deadline.cron.ts` when somebody complains.
