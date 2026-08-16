@@ -266,7 +266,7 @@ export class DashboardService {
    */
   private async nextHoliday(scope: DepartmentScope): Promise<UpcomingHolidayRow | null> {
     const departmentFilter = scope.unrestricted
-      ? Prisma.sql``
+      ? Prisma.empty
       : Prisma.sql`AND (h.department_id IS NULL OR h.department_id = ANY(${scope.departmentIds}::uuid[]))`;
 
     const rows = await this.prisma.$queryRaw<UpcomingHolidayRow[]>(Prisma.sql`
