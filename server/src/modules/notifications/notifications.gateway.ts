@@ -13,6 +13,9 @@ import {
 } from '@nestjs/websockets';
 
 import { JwtService } from '@nestjs/jwt';
+import { role_enum } from '@prisma/client';
+import { PrismaService } from '../../prisma/prisma.service';
+import { type JwtPayload } from '../../common/types/jwt-payload.type';
 
 import { Server, Socket } from 'socket.io';
 
@@ -35,7 +38,65 @@ export class NotificationsGateway
 
   constructor(
     private readonly jwtService: JwtService,
+    private readonly prisma: PrismaService,
   ) {}
+
+  /**
+   * Whether this socket may join a room for `entity`.
+   *
+   * Joining used to be unauthorised: any valid token could join
+   * `task:<id>` or `project:<id>` and receive everything broadcast there,
+   * which is wider than the REST rules those rooms mirror. Harmless while
+   * every token holder was an employee, and not harmless now that
+   * role_enum.VENDOR logs in on the same namespace.
+   *
+   * Returns false rather than throwing. A gateway exception is delivered to
+   * the client as an unhandled error event, and a refused join should just be
+   * a refused join.
+   */
+  private async mayJoin(
+    kind: 'task' | 'project',
+    id: string,
+    user: JwtPayload | undefined,
+  ): Promise<boolean> {
+    if (!user?.sub || !id) return false;
+
+    // Vendors reach their work through the portal namespace, never a room.
+    if (user.role === role_enum.VENDOR) return false;
+
+    if (kind === 'project') {
+      // Project visibility is company-wide for internal roles: any employee
+      // may read a project, so any employee may watch its room. Membership
+      // gates writing, and writing does not happen over the socket.
+      const project = await this.prisma.projects.findFirst({
+        where: { id, deleted_at: null },
+        select: { id: true },
+      });
+      return !!project;
+    }
+
+    // Tasks are not company-wide. Mirror the REST rule: the assignee, the
+    // assigner, and management.
+    const task = await this.prisma.tasks.findFirst({
+      where: {
+        id,
+        deleted_at: null,
+        OR: [{ assigned_to_id: user.sub }, { assigned_by_id: user.sub }],
+      },
+      select: { id: true },
+    });
+    if (task) return true;
+
+    const MANAGEMENT: role_enum[] = [
+      role_enum.MD,
+      role_enum.EA,
+      role_enum.PA,
+      role_enum.HOD,
+      role_enum.DEPARTMENT_CONTROLLER,
+      role_enum.ADMIN,
+    ];
+    return MANAGEMENT.includes(user.role);
+  }
 
   async handleConnection(client: Socket) {
     try {
@@ -88,10 +149,13 @@ export class NotificationsGateway
   // =====================================================
 
   @SubscribeMessage('task:join')
-  handleJoinTask(
+  async handleJoinTask(
     @MessageBody() taskId: string,
     @ConnectedSocket() client: Socket,
   ) {
+    if (!(await this.mayJoin('task', taskId, client.data.user))) {
+      return { success: false, room: null };
+    }
     client.join(`task:${taskId}`);
 
     return {
@@ -127,16 +191,15 @@ export class NotificationsGateway
   // fix is a project_members lookup here, and it wants doing before Phase 2
   // puts external vendors on this namespace.
   @SubscribeMessage('project:join')
-  handleJoinProject(
+  async handleJoinProject(
     @MessageBody() projectId: string,
     @ConnectedSocket() client: Socket,
   ) {
+    if (!(await this.mayJoin('project', projectId, client.data.user))) {
+      return { success: false, room: null };
+    }
     client.join(`project:${projectId}`);
 
-    return {
-      success: true,
-      room: `project:${projectId}`,
-    };
   }
 
   @SubscribeMessage('project:leave')

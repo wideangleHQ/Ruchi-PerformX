@@ -1040,3 +1040,24 @@ documents a `task_attachments` row with every foreign key null.
 **Costs.** `AttachmentsService` now has a public method with a caller outside
 its own module, so its signature is no longer free to change. `uploadFiles`
 routes through it, so a bug there breaks both.
+
+## 2026-08-16 Socket rooms check membership on join
+
+**Decision.** `task:join` and `project:join` authorise before joining.
+`role_enum.VENDOR` is refused every room. A task room admits the assignee, the
+assigner, and management. A project room admits any internal role, because
+project visibility is company-wide by design and writing does not happen over
+the socket.
+**Why.** Joining previously required nothing but a valid token, so any employee
+could watch any task and receive `task:updated` and `task:comment:new` for it,
+bypassing every `ensureTaskVisible` check the REST layer makes. Harmless while
+every token holder was an employee. Not harmless once an external vendor login
+exists on the same namespace. Three separate reviews raised it independently,
+which is the signal that it was not a theoretical finding.
+**Instead of.** A guard on the gateway, which would need the same database read
+anyway and gives no better answer. Or leaving it and relying on nobody
+subscribing by hand, which is not a control.
+**Costs.** One indexed lookup per join, on an event that fires when a detail
+page mounts. `mayJoin` returns false rather than throwing, because a gateway
+exception reaches the client as an unhandled error event and a refused join
+should read as a refused join.
