@@ -33,10 +33,15 @@ jobs:
       ASSET_ENCRYPTION_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
     steps:
       - uses: actions/checkout@v4
+      # 22, not 20: @supabase/realtime-js needs a native WebSocket and the API
+      # will not boot without one.
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      - run: npm ci
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
       - name: Generate Prisma client
         run: npx prisma generate
       - name: Typecheck
@@ -53,8 +58,10 @@ jobs:
             echo "$out" | grep -E "ERROR|resolve dependencies" | head -3
             exit 1
           fi
+          # The whole output, not a tail. Nest prints the message above the
+          # stack, so `tail -5` reliably showed five frames and no reason.
           echo "$out" | grep -q "Nest application successfully started" || {
-            echo "$out" | tail -5; exit 1; }
+            echo "$out"; exit 1; }
           echo "App starts."
 
   client:
@@ -67,8 +74,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      - run: npm ci
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
       - name: Typecheck, allowing the known baseline
         run: |
           # 41 pre-existing errors on main, see docs/src/p1_known_gaps.md.

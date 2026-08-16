@@ -18,18 +18,21 @@ export interface SealedSecret {
 }
 
 /**
- * Read `ASSET_ENCRYPTION_KEY` and return it as a 32 byte buffer.
+ * Validate a raw `ASSET_ENCRYPTION_KEY` and return it as a 32 byte buffer.
  *
- * Throws when the variable is missing or does not decode to exactly 32 bytes.
+ * Throws when `raw` is missing or does not decode to exactly 32 bytes. Callers
+ * pass `process.env.ASSET_ENCRYPTION_KEY` themselves: reading the environment
+ * from a default parameter meant `loadAssetKey(undefined)` silently fell back
+ * to the ambient value, so the test for the missing case passed on a laptop and
+ * failed in CI, where `pr-checks.yaml` sets the variable job wide.
+ *
  * Called in the body of `assets.module.ts` so that a bad key kills the process
  * at boot the way `JWT_SECRET` does, rather than surfacing as a 500 on the
  * first reveal.
  *
  * Generate one with `openssl rand -base64 32`.
  */
-export function loadAssetKey(
-  raw: string | undefined = process.env.ASSET_ENCRYPTION_KEY,
-): Buffer {
+export function loadAssetKey(raw: string | undefined): Buffer {
   if (!raw) {
     throw new Error('ASSET_ENCRYPTION_KEY environment variable is required');
   }

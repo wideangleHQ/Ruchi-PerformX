@@ -1080,3 +1080,25 @@ right end state but breaks the `npm ci` in `pr-checks.yaml` in the same commit.
 typechecks through npm, the preview builds through bun, and they can drift. The
 fix is to pick one, which is a change to `pr-checks.yaml` as much as to the
 client.
+
+## 2026-08-16 bun.lock is the only lockfile
+
+**Decision.** `client/package-lock.json` and `server/package-lock.json` are
+deleted, and `pr-checks.yaml` installs both packages with `bun install
+--frozen-lockfile`. This completes the follow up named in *The Vercel preview
+installs with bun*, which only pointed Vercel at bun and left CI on npm.
+**Why.** npm records only the optional binaries it actually installed, so both
+lockfiles had been pruned to whoever last generated them, in opposite
+directions. `client` carried `lightningcss-win32-x64-msvc` and
+`@img/sharp-win32-x64` with no Linux equivalent, which is what broke the preview
+build. `server` carried `@napi-rs/lzma-linux-x64-gnu` and nothing else, which
+breaks a Windows or macOS checkout. The justfile has said `pm := "bun"` since day
+one, so npm was never the package manager here, only a second lockfile drifting
+in the corner.
+**Instead of.** Regenerating both with npm on Linux, which fixes CI and breaks
+the laptops, since the pruning happens again on whichever machine runs it next.
+**Costs.** `server/bun.lock` was stale and had to be regenerated: it was missing
+`vitest` and every platform native, because `just install` runs `bun install`
+without `--frozen-lockfile` and so never complained. CI is now stricter than the
+justfile. A `package.json` edit that skips the lockfile fails the PR rather than
+passing quietly, which is the point, but it is a new way for a PR to go red.
