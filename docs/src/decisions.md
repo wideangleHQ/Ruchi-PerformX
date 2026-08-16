@@ -438,3 +438,51 @@ screen reporting an access level the API does not honour.
 which is correct today and becomes a real gap only if the implicit grant is
 ever meant to be removable. That would mean dropping the role branch in
 `accessLevelFor` and granting them rows like everyone else.
+## 2026-08-16 Document expiry is one exported function, called from both paths
+
+**Decision.** `documentExpiryStatus` is a pure function exported from
+`vendor-work.service.ts`. The document list calls it on read and the nightly
+deadline sweep calls the same one. `vendor_documents` has no status column.
+**Why.** A stored status is wrong the morning after it is written, and two
+calculators drift by a day, at which point the list and the reminder email
+disagree and nobody can say which is right.
+**Instead of.** A status column maintained by the sweep, which is stale between
+runs; or a private method per caller, which is the two-calculator problem.
+**Costs.** Filtering documents by expiry status has to happen in memory rather
+than in the `where` clause. Fine at the row counts here; if a document list
+ever needs pagination by status, the answer is a generated column in Postgres,
+not a written one.
+
+## 2026-08-16 Vendor deadline reminders fire on fixed lead days
+
+**Decision.** The sweep notifies at 30, 14, 7, 3 and 1 days out and on the day
+itself, to the vendor's internal owner, its secondary owner, and everyone
+holding a `vendor_dashboard_access` row. Recipients are filtered against
+`users.vendor_id`, so a portal login can never receive one.
+**Why.** The window is thirty days and the sweep is daily, so notifying on
+every run is thirty emails per expiring document. These types default to
+`IN_APP` plus `EMAIL`, and the recipients would filter the sender inside a
+week and then lose the approvals with it.
+**Instead of.** Every day inside the window, which is the spam above; or a
+`last_notified_at` column per row, which is state to migrate and back-fill for
+a schedule that is six fixed numbers. MD and EA are not included implicitly
+despite holding admin access, because a daily digest of every vendor's document
+expiry is not something either asked for.
+**Costs.** An expiry created inside the window with no matching lead day gets
+no reminder until the next one comes round, and nothing goes out after a date
+has passed. The deadline view carries the overdue rows instead.
+
+## 2026-08-16 Vendor documents record an upload, they do not perform one
+
+**Decision.** `POST /vendor-documents` takes `file_url` and `storage_path` for
+a file already uploaded through the attachments module, and rejects a path
+outside the `vendors/documents/` prefix.
+**Why.** `AttachmentsService` owns the only Supabase client in the API. A
+second one here would be a second uploader with its own validation, size
+limits and signed-URL handling to keep in step with the first.
+**Instead of.** A multipart route on this controller, which needs
+`VendorsModule` to import `AttachmentsModule` and `AttachmentsService` to grow
+a vendor-shaped upload method. That is the right end state; it is one import
+line away whenever the two modules land together.
+**Costs.** Two calls from the client to attach a document, and deleting a
+vendor document drops the row while leaving the Supabase object behind.

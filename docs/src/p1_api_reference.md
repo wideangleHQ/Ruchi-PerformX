@@ -268,6 +268,64 @@ away later stops being worth writing down.
 Posting an outcome also writes a `project_activity_logs` row. Posting a message
 does not. Messages are conversation and the activity log is the audit trail, and
 the trail stays skimmable only if chat stays out of it.
+## Vendor work tracking
+
+Internal Vendor Management. The role list on every route below is every
+internal role, and it decides nothing on its own: the service calls
+`VendorScopeService.assertAccess` and the `vendor_dashboard_access` row is what
+actually grants entry. `VM` in the table means the level that row has to hold,
+with MD and EA holding admin implicitly.
+
+The external vendor role appears on none of these and must not be added.
+`just vendor-roles` fails the build if it is. See
+[Vendor management](p2_vendors.md#the-trust-boundary).
+
+| Method | Path | VM level |
+| --- | --- | --- |
+| GET | `/vendor-assignments` | manager |
+| POST | `/vendor-assignments` | manager |
+| PATCH | `/vendor-assignments/:id` | manager, or viewer if the assigner |
+| DELETE | `/vendor-assignments/:id` | manager, or viewer if the assigner |
+| GET | `/vendor-contracts` | manager |
+| POST | `/vendor-contracts` | manager |
+| PATCH | `/vendor-contracts/:id` | manager |
+| GET | `/vendor-documents` | manager |
+| POST | `/vendor-documents` | manager |
+| DELETE | `/vendor-documents/:id` | admin |
+| GET | `/vendor-deliverables` | manager |
+| POST | `/vendor-deliverables` | manager |
+| PATCH | `/vendor-deliverables/:id` | manager, or viewer if the owner |
+| GET | `/vendor-notes` | viewer |
+| POST | `/vendor-notes` | viewer |
+| GET | `/vendor-reviews` | manager |
+| POST | `/vendor-reviews` | manager |
+| GET | `/vendors/:id/deadlines` | viewer |
+| GET | `/vendors/:id/performance` | viewer |
+
+`GET /vendor-documents` rows carry a `status` of `ACTIVE`, `EXPIRING_SOON` or
+`EXPIRED`. It is computed from `expiry_date` against a 30 day window on every
+read and is not a column; the nightly deadline sweep calls the same function,
+so the list and the reminder cannot disagree by a day. A document with no
+expiry date is `ACTIVE`.
+
+`POST /vendor-documents` takes `file_url` and `storage_path` for a file already
+uploaded through the attachments module. A `storage_path` outside the
+`vendors/documents/` prefix is a 400.
+
+`GET /vendors/:id/deadlines` is a read over four tables, not a table. It unions
+contract expiry and renewal, document expiry, assignment deadlines and
+deliverable due dates, ascending, each with `days_until` and a flag of
+`OVERDUE`, `SOON` or `UPCOMING`.
+
+`GET /vendors/:id/performance` computes deliverable counts, on-time percentage
+from `submitted_date` against `due_date`, open assignments, and the rating
+averaged over `vendor_reviews`. `on_time_percentage` is `null`, not `0`, when
+no deliverable has both dates. Internal data; never returned to a vendor.
+
+`GET /vendor-notes` returns both note threads and takes an optional
+`thread=internal|shared`. The shared thread has a separate service method with
+`is_internal: false` written into it, which is what keeps the RUCHI-only thread
+off any portal query path.
 
 ## Notifications
 
