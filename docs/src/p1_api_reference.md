@@ -691,6 +691,55 @@ Portal logins are created by an admin: `POST /users` with `role: VENDOR`,
 `vendor_id` set, `department_id` null, `must_change_password: true`. There is no
 vendor registration flow and there must not be one.
 
+## Events
+
+Every route is open to all internal roles, meaning everything except VENDOR.
+The narrower rules are enforced in `EventsService` against the row, because
+they depend on who created the event rather than on anyone's role:
+
+| Method | Path | Who the service allows |
+| --- | --- | --- |
+| GET | `/events` | anyone internal |
+| POST | `/events` | anyone internal |
+| GET | `/events/:id` | anyone internal |
+| PATCH | `/events/:id` | creator, coordinators, MD |
+| DELETE | `/events/:id` | creator, coordinators, MD |
+| POST | `/events/:id/coordinators` | creator, MD |
+| DELETE | `/events/:id/coordinators/:userId` | creator, MD |
+| GET | `/events/:id/expenses` | creator, coordinators, MD |
+| POST | `/events/:id/expenses` | creator, coordinators, MD |
+| PATCH | `/events/:id/expenses/:expenseId` | the person who logged it, MD |
+| DELETE | `/events/:id/expenses/:expenseId` | the person who logged it, MD |
+| GET | `/events/:id/budget-report` | anyone internal |
+
+`POST /events/:id/expenses` is multipart/form-data: `item`, `amount`, and an
+optional `receipt` file. Receipts go to the shared Supabase bucket under an
+`events/receipts/{eventId}` prefix, and `event_expenses.receipt_url` holds the
+storage path rather than a URL. Reads sign it for an hour on the way out, so a
+`receipt_url` in a response is a download link that expires.
+
+Money is a string on both sides. `budget_estimated` and `amount` are
+`Decimal(12, 2)` columns and are sent and returned as fixed two place strings,
+never as JSON numbers. A request body with `"amount": 1200.5` is rejected by
+validation.
+
+`GET /events/:id/budget-report` is the summary the module exists for:
+
+```json
+{
+  "event": { "id": "...", "name": "Annual Day", "budget_estimated": "50000.00" },
+  "estimated": "50000.00",
+  "actual": "55000.00",
+  "variance": "5000.00",
+  "variance_pct": "10.00",
+  "over_budget": true,
+  "items": [{ "item": "Catering", "amount": "35000.00", "receipt_url": "..." }]
+}
+```
+
+`variance` is actual minus estimated, so positive is an overspend.
+`variance_pct` is null rather than `Infinity` when nothing was budgeted.
+
 ## VMS
 
 See [Visitor management](p1_vms.md) for the full list. VMS endpoints require a

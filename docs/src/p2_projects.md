@@ -342,3 +342,17 @@ existing Supabase bucket with a new prefix.
 
 The budget variance report is the deliverable the client actually wants. If
 time is short and you build only one screen for events, build that one.
+
+### What shipped
+
+Everything above except checklists, which were skipped rather than built:
+`ProjectExecutionService` gates every checklist call on project membership and
+derives project progress from the same rows, so serving events from it is a
+projects change, not an events one. `project_checklist_items.event_id` is still
+unused and no second table was added. See the decision log. Routes,
+the multipart receipt upload, and the report payload are in
+[API reference](p1_api_reference.md#events). Money is a fixed two place string
+on every boundary, never a JSON number. Nothing here sends a notification,
+because `notification_type_enum` has no event value and the schema is frozen;
+if coordinators should be told when they are added to an event, that needs an
+enum value first.
