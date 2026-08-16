@@ -21,10 +21,6 @@ jobs:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
-    defaults:
-      run:
-        working-directory: client
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -34,12 +30,15 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
       - name: Install Vercel CLI
         run: bun add --global vercel@latest
 
+      # These run from the repo root, not client. The project's Root Directory
+      # on Vercel is already client, and vercel resolves that against the
+      # working directory, so running from client looks for client/client and
+      # fails the install step with a bare "spawn sh ENOENT". Nothing installs
+      # dependencies here either, since vercel build runs the project's own
+      # install command.
       - name: Pull Vercel Preview environment
         run: |
           vercel pull \
