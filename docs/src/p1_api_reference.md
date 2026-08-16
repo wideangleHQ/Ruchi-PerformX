@@ -239,6 +239,43 @@ dashboard endpoint.
 `GET /dashboard` returns a different payload per role. It is the aggregation
 layer over tasks, self actions, requests, scores, and incentives.
 
+## Project execution
+
+Checklist, milestones, success criteria, and KPIs. Every route is open to every
+internal role; VENDOR is excluded, because a vendor reaches its projects
+through the vendor portal. Write access is decided in the service by project
+role, which `RolesGuard` cannot see. See [Projects](p2_projects.md).
+
+| Method | Path | Who |
+| --- | --- | --- |
+| GET | `/projects/:id/checklist` | any internal role |
+| POST | `/projects/:id/checklist` | Lead, Co-Lead |
+| PATCH | `/projects/:id/checklist/:itemId` | Lead/Co-Lead any field; member `is_done` only, own assignment only |
+| DELETE | `/projects/:id/checklist/:itemId` | Lead, Co-Lead |
+| GET | `/projects/:id/milestones` | any internal role |
+| POST | `/projects/:id/milestones` | Lead, Co-Lead |
+| PATCH | `/projects/:id/milestones/:milestoneId` | Lead, Co-Lead |
+| DELETE | `/projects/:id/milestones/:milestoneId` | Lead, Co-Lead |
+| GET | `/projects/:id/success-criteria` | any internal role |
+| POST | `/projects/:id/success-criteria` | Lead, Co-Lead |
+| DELETE | `/projects/:id/success-criteria/:criterionId` | Lead, Co-Lead |
+| GET | `/projects/:id/kpis` | any internal role |
+| POST | `/projects/:id/kpis` | Lead, Co-Lead |
+| PATCH | `/projects/:id/kpis/:kpiId` | Lead, Co-Lead |
+
+`GET /projects/:id/checklist` returns `{ items, progress }`. `progress` is
+`{ done, total, percent }`, computed from checklist completion on every read.
+There is no column behind it and no endpoint that sets it. Checklist items and
+milestones both carry a derived `is_overdue`, so the client does not compare
+dates itself.
+
+A member's PATCH is narrowed to `is_done` server side. A body carrying
+`due_date`, `priority`, `title`, or `assigned_to_id` is not rejected, those keys
+are dropped; a member PATCH with no `is_done` is a 400.
+
+Success criteria are one row per criterion so closure can check them off
+individually. KPIs are optional and a project with none is normal.
+
 ## VMS
 
 See [Visitor management](p1_vms.md) for the full list. VMS endpoints require a
