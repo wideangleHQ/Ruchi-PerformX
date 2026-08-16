@@ -40,3 +40,24 @@ current, and the handbook is already the thing people are told to read first.
 process for a repository with a single active developer.
 **Costs.** Every entry needs `just docs-build` to pass, so a malformed entry
 breaks the docs build rather than sitting there quietly.
+
+## 2026-08-16 Deploys are scheduled, and production is deployed by hand
+
+**Decision.** `ci.yaml` no longer deploys on push. It builds a preview on a
+daily cron and on demand, and it does not build production at all. Production
+goes out from Vercel when somebody decides the code is ready.
+**Why.** Phase 2 lands as roughly seventeen merges into `main`. Deploying each
+one put half-finished modules in front of about a hundred employees, and a
+Vercel rollback does not undo the migration that shipped with it. Keeping
+production out of the workflow means no configuration change can make it
+automatic by accident.
+**Instead of.** A `--prod` target on a `workflow_dispatch` dropdown, which was
+written and rejected: it is one wrong click from a production deploy and it
+implies the repository owns a release process that a person actually owns.
+Also rejected: deploy on push behind a feature flag per module, which is more
+moving parts than a company this size needs.
+**Costs.** The deployed site and `main` drift by up to a day, so "it works on
+the preview" is a statement about yesterday. Production releases leave no trace
+in this repository, so "what is live right now" is answered in the Vercel
+dashboard and nowhere else. GitHub also disables scheduled workflows after
+sixty days without a push, which stops the daily preview silently.
