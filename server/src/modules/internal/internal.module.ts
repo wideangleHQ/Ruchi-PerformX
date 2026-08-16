@@ -10,7 +10,7 @@ import { InternalEmployeesService } from './internal-employees.service';
 // Registered in app.module.ts by the Phase 2 spine so that feature work never
 // has to touch that file. Add this module's controller and service here.
 @Module({
-  imports: [ConfigModule, PrismaModule, NotificationsModule],
+  imports: [AuthModule, ConfigModule, PrismaModule, NotificationsModule],
   controllers: [InternalEmployeesController],
   providers: [InternalEmployeesService, InternalApiGuard],
   exports: [InternalEmployeesService],

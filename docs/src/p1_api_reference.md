@@ -498,6 +498,40 @@ renders, so the shape is load bearing.
 See [Vendor management](p2_vendors.md) for the module, and
 [Vendor roles are not employee roles](p1_auth_and_roles.md#vendor-roles-are-not-employee-roles)
 for why the external portal never appears in the table above.
+## Innovation and R&D
+
+| Method | Path | Roles |
+| --- | --- | --- |
+| GET | `/rnd/team` | MD, EA, PA |
+| POST | `/rnd/team` | MD, EA, PA |
+| DELETE | `/rnd/team/:userId` | MD, EA, PA |
+| GET | `/rnd/team/me` | authenticated |
+| POST | `/rnd/reports` | internal roles, R&D members only |
+| GET | `/rnd/reports` | internal roles, scoped by category |
+| GET | `/rnd/reports/categories` | internal roles, scoped by category |
+| GET | `/rnd/reports/:id` | internal roles, scoped by category |
+| PATCH | `/rnd/reports/:id` | the submitter, before the MD office reads it |
+
+Membership is a grant per person rather than a role, so `@Roles` cannot express
+it. The report routes are open to every internal role and `RndService` decides
+what comes back: MD, EA, and PA read every category, a team member reads the
+categories they have submitted into, and everybody else gets an empty list.
+`POST /rnd/reports` is the one place a non-member is rejected outright, with a
+403.
+
+`GET /rnd/team/me` returns `{ "isMember": boolean }`. `useNavAccess` calls it to
+decide whether the R&D sidebar item renders at all, so the shape is load
+bearing.
+
+`GET /rnd/reports/:id` is a write when the caller is MD, EA, or PA: it stamps
+`md_viewed_at`, which is what closes the submitter's `PATCH` window. Editing
+after that returns a 400.
+
+There is no delete endpoint, deliberately. R&D history is retained per category
+and removing someone from the roster leaves their reports in place.
+
+R&D projects are ordinary projects with `is_rnd = true`; they use the
+`/projects` routes rather than anything under `/rnd`.
 
 ## VMS
 
