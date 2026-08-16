@@ -5,6 +5,27 @@ import {
 } from '@nestjs/common';
 import { Resend } from 'resend';
 
+/**
+ * Escapes the five characters that let a string break out of HTML text or an
+ * attribute value.
+ *
+ * Notification bodies carry free text written by one employee and read by
+ * another: an approver's rejection remark, an HR cancellation reason, a
+ * project message. Interpolating that raw lets the author put arbitrary markup
+ * into a mail that carries RUCHI's from-address, which is a phishing link in a
+ * message the recipient has every reason to trust. Email clients block script,
+ * so this is not stored XSS; an injected anchor or form is the real risk and
+ * this closes it.
+ */
+export function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
@@ -47,22 +68,31 @@ export class EmailService {
     subject: string,
     body: string,
   ): Promise<void> {
+    // Every interpolation below is attacker-influenced. fullName is chosen at
+    // registration, subject and body come from whichever employee triggered
+    // the notification. appUrl is ours but is escaped anyway so a bad env
+    // value cannot break the attribute.
+    const appUrl = escapeHtml(
+      process.env.CLIENT_URL ?? 'https://app.ruchiperformx.in',
+    );
     const html = `
       <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px">
-        <p style="color:#0f172a;font-size:15px">Hello ${fullName},</p>
+        <p style="color:#0f172a;font-size:15px">Hello ${escapeHtml(fullName)},</p>
         <div style="background:#f8fafc;border-left:3px solid #15803d;padding:16px;margin:16px 0">
-          <p style="margin:0 0 8px;color:#0f172a;font-size:16px;font-weight:600">${subject}</p>
-          <p style="margin:0;color:#334155;font-size:14px;line-height:1.6">${body}</p>
+          <p style="margin:0 0 8px;color:#0f172a;font-size:16px;font-weight:600">${escapeHtml(subject)}</p>
+          <p style="margin:0;color:#334155;font-size:14px;line-height:1.6">${escapeHtml(body)}</p>
         </div>
         <p style="color:#64748b;font-size:13px">
-          Open <a href="${process.env.CLIENT_URL ?? 'https://app.ruchiperformx.in'}" style="color:#15803d">RUCHI PerformX</a> to act on this.
+          Open <a href="${appUrl}" style="color:#15803d">RUCHI PerformX</a> to act on this.
         </p>
       </div>`;
 
     const { error } = await this.resend.emails.send({
       from: this.fromEmail,
       to: email,
-      subject: `RUCHI PerformX - ${subject}`,
+      // Header, not markup. Strip CR and LF so a crafted subject cannot inject
+      // another header, and leave the rest unescaped so it reads as text.
+      subject: `RUCHI PerformX - ${subject.replace(/[\r\n]+/g, ' ')}`,
       html,
     });
 
