@@ -234,6 +234,40 @@ the counts of overdue checklist items and milestones. The same sweep sends
 `PROJECT_DEADLINE_NEAR` to the Lead and Co-Lead 7 days out, 1 day out, and on
 the day, and `PROJECT_OVERDUE_NO_CLOSURE` to the MD once the deadline passes
 with nothing filed.
+Every internal role is listed on these; `VENDOR` is not, and must not be added
+without the assignment scope check described in
+[Vendor management](p2_vendors.md). The route table for the rest of the module
+is in [Projects](p2_projects.md#endpoints).
+
+| Method | Path | Who |
+| --- | --- | --- |
+| GET | `/projects/:id/messages` | project members, not observers |
+| POST | `/projects/:id/messages` | project members, not observers |
+| GET | `/projects/:id/outcomes` | any internal reader |
+| POST | `/projects/:id/outcomes` | project members, not observers |
+
+Membership is a service-layer check against `project_members.role`, not
+something `RolesGuard` can express. A caller with no membership row and a caller
+with `OBSERVER` both get the same 403.
+
+The message thread is the one part of a project an observer cannot read.
+Everything else about a project is visible company-wide; a conversation is
+participation, so `GET /messages` is gated the same way `POST /messages` is.
+
+`GET /projects/:id/outcomes` returns the entries grouped, not as a flat list:
+
+```json
+{ "TRY": [...], "FAILURE": [...], "OUTCOME": [...] }
+```
+
+`POST` takes an explicit `entry_type` of `TRY`, `FAILURE`, or `OUTCOME` with no
+default. There is no update or delete route for an outcome, by design: the
+entries are the project's permanent record, and a failure that can be edited
+away later stops being worth writing down.
+
+Posting an outcome also writes a `project_activity_logs` row. Posting a message
+does not. Messages are conversation and the activity log is the audit trail, and
+the trail stays skimmable only if chat stays out of it.
 
 ## Notifications
 

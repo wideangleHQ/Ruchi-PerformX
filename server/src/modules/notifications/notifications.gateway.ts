@@ -114,6 +114,45 @@ export class NotificationsGateway
   }
 
   // =====================================================
+  // PROJECT ROOM EVENTS
+  // =====================================================
+
+  // Same shape as the task room above: the project detail page joins on mount
+  // and leaves on unmount, and every project payload goes to this room rather
+  // than to every socket.
+  //
+  // ponytail: joining is not authorised, exactly as task:join is not. Anyone
+  // holding a valid token can join project:<id> and receive its thread, which
+  // is wider than the REST rule that gives observers no read on messages. The
+  // fix is a project_members lookup here, and it wants doing before Phase 2
+  // puts external vendors on this namespace.
+  @SubscribeMessage('project:join')
+  handleJoinProject(
+    @MessageBody() projectId: string,
+    @ConnectedSocket() client: Socket,
+  ) {
+    client.join(`project:${projectId}`);
+
+    return {
+      success: true,
+      room: `project:${projectId}`,
+    };
+  }
+
+  @SubscribeMessage('project:leave')
+  handleLeaveProject(
+    @MessageBody() projectId: string,
+    @ConnectedSocket() client: Socket,
+  ) {
+    client.leave(`project:${projectId}`);
+
+    return {
+      success: true,
+      room: `project:${projectId}`,
+    };
+  }
+
+  // =====================================================
   // NOTIFICATION EVENTS
   // =====================================================
 
@@ -157,6 +196,19 @@ export class NotificationsGateway
       .emit(event, payload);
   }
 
+  sendToProject(
+    projectId: string,
+    event: string,
+    payload: unknown,
+  ) {
+    this.server
+      .to(`project:${projectId}`)
+      .emit(event, payload);
+  }
+
+  // Reaches every connected socket in the namespace, which from Phase 2 includes
+  // external vendor logins. It has no callers and should not gain one: anything
+  // company-wide wants sendToRole or a per-department fan-out instead.
   broadcast(
     event: string,
     payload: unknown,
@@ -220,6 +272,32 @@ export class NotificationsGateway
       {
         taskId,
       },
+    );
+  }
+
+  projectMessageAdded(
+    projectId: string,
+    payload: unknown,
+  ) {
+    this.sendToProject(
+      projectId,
+      'project:message:new',
+      payload,
+    );
+  }
+
+  // Called from whichever service ticks an item. Two people working the same
+  // checklist and seeing each other's ticks is the difference between this and
+  // a shared document, and it is the reason the checklist owner does not have
+  // to reach for the room name itself.
+  projectChecklistUpdated(
+    projectId: string,
+    payload: unknown,
+  ) {
+    this.sendToProject(
+      projectId,
+      'project:checklist:updated',
+      payload,
     );
   }
 }
