@@ -40,3 +40,20 @@ current, and the handbook is already the thing people are told to read first.
 process for a repository with a single active developer.
 **Costs.** Every entry needs `just docs-build` to pass, so a malformed entry
 breaks the docs build rather than sitting there quietly.
+
+## 2026-08-16 Deploys are scheduled or manual, never on push
+
+**Decision.** `ci.yaml` no longer deploys on push to `main`. A preview goes out
+on a daily cron, and production is a `workflow_dispatch` run with the target
+chosen at dispatch time.
+**Why.** Phase 2 lands as roughly seventeen merges into `main`. Deploying each
+one put half-finished modules in front of about a hundred employees, and a
+Vercel rollback does not undo the migration that shipped with it.
+**Instead of.** Deploy on push with a feature flag per module, which is more
+moving parts than a company this size needs; or a long-lived `phase-2` branch
+holding every merge back, which trades production risk for a large and
+conflict-prone merge at the end.
+**Costs.** `main` and the deployed site drift by up to a day, so "it works on
+the preview" is a statement about yesterday's `main`. GitHub also disables
+scheduled workflows after sixty days without a push, so a quiet period stops
+the daily preview silently.
