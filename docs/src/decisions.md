@@ -940,3 +940,33 @@ would be a guess that fails at integration rather than at review.
 every component instead of one function.
 **Costs.** The union type is in the signature of nine functions. Drop the array
 branch once the module lands on a shape.
+## 2026-08-16 The projects directory derives Overdue and Due This Week on the client
+
+**Decision.** `GET /projects` carries search, status, health, priority,
+department, lead, category and a date range as query params. The "Overdue" and
+"Due This Week" toggles filter the returned rows on `deadline` in the browser.
+**Why.** Both are exact functions of `deadline` and `status`, which every row
+already carries, and the client shipped ahead of the controller. Inventing
+`?overdue=true` before the DTO exists means a 400 from `forbidNonWhitelisted`
+the day the backend lands with a different name.
+**Instead of.** Two more query params, which couple the directory to names
+nobody has agreed, or a separate endpoint per toggle.
+**Costs.** The two toggles only see the page they were given, so they become
+wrong the day `/projects` paginates. Move them into the query params at that
+point.
+
+## 2026-08-16 Optional creation sections post to their own endpoints
+
+**Decision.** `POST /projects` takes the project fields only. Milestones, KPIs
+and success criteria entered on the creation form are posted afterwards to
+`/projects/:id/milestones`, `/kpis` and `/success-criteria` by the same hook.
+**Why.** Creation is meant to stay short, and the three extras are already
+first-class endpoints. A nested create DTO would be a fourth way to write the
+same rows and would need its own validation rules for arrays the detail page
+writes one at a time.
+**Instead of.** Nested arrays on the create DTO, which duplicates validation, or
+dropping the sections from creation entirely, which the scope asks for.
+**Costs.** Creation is several requests rather than one and is not atomic: a
+failed milestone post leaves the project created without it. The user lands on
+the detail page and can add the missing row there, so the failure is visible
+rather than silent.
