@@ -27,6 +27,5 @@
 - [R&D and company assets](p2_rnd_and_assets.md)
 - [Home dashboard: birthdays, holidays, polls](p2_dashboard_social.md)
 - [Vendor management](p2_vendors.md)
-- [CSR foundation](p2_csr.md)
 - [Notification engine rebuild](p2_notifications.md)
 - [CareerX and VMS integration](p2_integration.md)
