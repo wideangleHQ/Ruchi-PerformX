@@ -173,22 +173,45 @@ the policy filters rows before the query sees them.
 ```sql
 -- Once, per table
 ALTER TABLE leave_applications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE leave_applications FORCE ROW LEVEL SECURITY;
 
+-- The API keeps working exactly as it does now. Its scoping lives in the
+-- service layer and this policy must not second-guess it.
+CREATE POLICY leave_app_access ON leave_applications
+  FOR ALL TO performx_app
+  USING (true);
+
+-- The assistant is the only role the policy below constrains.
 CREATE POLICY leave_visibility ON leave_applications
-  FOR SELECT
+  FOR SELECT TO performx_assistant_readonly
   USING (
-    user_id = current_setting('app.user_id')::uuid
-    OR current_setting('app.role') IN ('MD','EA','PA','HR')
+    user_id = current_setting('app.user_id', true)::uuid
+    OR current_setting('app.role', true) IN ('MD','EA','PA','HR')
     OR (
-      current_setting('app.role') = 'HOD'
+      current_setting('app.role', true) = 'HOD'
       AND user_id IN (
         SELECT u.id FROM users u
         JOIN hod_departments hd ON hd.department_id = u.department_id
-        WHERE hd.user_id = current_setting('app.user_id')::uuid
+        WHERE hd.user_id = current_setting('app.user_id', true)::uuid
       )
     )
   );
 ```
+
+Two details in there are load bearing and easy to drop.
+
+Policies are scoped `TO` a role. An unscoped policy applies to `PUBLIC`, which
+under `FORCE` includes the application's own connection, and then the API
+inherits a permission model it already implements differently in the service
+layer. Two policies per table, one per role, keeps the assistant constrained
+without the API noticing this exists at all.
+
+`current_setting` takes a second argument. Without it, reading an unset setting
+raises rather than returning null, so a connection that forgot to stamp itself
+gets an error instead of an empty result. With `true` it returns null, the
+comparisons evaluate to null, and no rows come back. Fail closed and quiet beats
+fail loud and ambiguous here, because the loud version is indistinguishable from
+the database being down.
 
 Every assistant query then runs inside a transaction that stamps the caller:
 
@@ -218,6 +241,12 @@ every test passes, and every policy does nothing.
 Two things prevent it. `ALTER TABLE ... FORCE ROW LEVEL SECURITY` on every
 policied table, and connecting as a role that is neither the owner, a superuser,
 nor `BYPASSRLS`.
+
+`FORCE` is the half that has a cost. It removes the owner's exemption, and the
+owner here is whatever role Prisma connects as, so every policy now applies to
+the ordinary API as well. That is why the policies above are scoped `TO` a role.
+Skip that and the first `FORCE` takes the product down, on a table nobody
+thought they were changing.
 
 The red team pass must include a query that should return zero rows, run as the
 real assistant role against the real database, and confirm that it does.
