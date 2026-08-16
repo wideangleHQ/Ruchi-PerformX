@@ -104,7 +104,7 @@ not found or not active. Details on the CareerX side are in
 
 ## Roles
 
-Eight values in `role_enum`. Five of them are business roles rather than
+Ten values in `role_enum`. Five of them are business roles rather than
 permission tiers, which is why the `@Roles(...)` lists on controllers are long.
 
 | Role | What it is | Rough scope |
@@ -117,9 +117,15 @@ permission tiers, which is why the `@Roles(...)` lists on controllers are long.
 | `HOD` | Head of Department | Departments listed in `hod_departments` |
 | `EMPLOYEE` | Ordinary staff | Own work, own department |
 | `ADMIN` | System administrator | User and department CRUD, no task involvement |
+| `HR` | Human resources | Leave, holidays, and the vendor category list |
+| `VENDOR` | An external vendor's portal login | Only rows in `vendor_assignments` |
 
 `ADMIN` is a technical role. It creates users and departments and does not
 appear anywhere in the task lifecycle.
+
+`VENDOR` is the only role held by someone who does not work here, and it is the
+one that does not behave like the others. See
+[Vendor roles are not employee roles](#vendor-roles-are-not-employee-roles).
 
 The codebase groups EA, PA, and department controller into a constant:
 
@@ -154,6 +160,42 @@ rely on this deliberately, but it is easy to do by accident.
 Role is read from the JWT, not from the database, on every request. A role
 change does not take effect until the user's token expires or they log in
 again. There is no token revocation.
+
+## Vendor roles are not employee roles
+
+Three permissions share the word vendor. They are granted by different people
+for different purposes and must never collapse into one check:
+
+| Question | Controlled by | Granted by |
+| --- | --- | --- |
+| Who inside RUCHI can manage vendors? | a `vendor_dashboard_access` row | MD or EA |
+| Which vendor is working on what? | a `vendor_assignments` row | any authorised employee |
+| Can the external vendor log in? | `users.vendor_id` plus `role: VENDOR` | ADMIN |
+
+The first is a grant, not a role. It has three levels, weakest first:
+`VENDOR_VIEWER` reads, `VENDOR_MANAGER` writes, `VENDOR_ADMIN` adds reviews.
+MD and EA hold `VENDOR_ADMIN` implicitly and have no row; every other employee,
+HOD and ADMIN included, has no vendor access at all until MD or EA grants it.
+A fifth global role in `role_enum` was rejected for this, because it would leak
+the same way `VENDOR` does when it is mishandled.
+
+`VendorScopeService` is the only place that ranks the levels. Endpoints call
+`assertAccess(userId, role, minimum)`; nothing re-implements the comparison,
+and `vendor-access.spec.ts` is the test that fails if the order moves.
+
+The third is the dangerous one. `RolesGuard` knows nothing about assignments,
+so `role_enum.VENDOR` on an internal controller opens that route to every
+vendor for every record it can return, which on `/vendors` is the vendor master
+including each vendor's competitors. Every vendor-reachable route therefore
+lives in `modules/vendor-portal/` and is scoped through `vendor_assignments`,
+and `just vendor-roles` fails the build if `VENDOR` appears on a controller
+anywhere else. It runs in CI, so this is a build failure rather than a review
+promise.
+
+`GET /vendor-access/me` is the one route in the vendor namespace with no
+`@Roles`. It answers only about the caller and returns
+`{ accessLevel: null }` to anyone without a grant, which is what the sidebar
+reads to decide whether the Vendors entry renders.
 
 ## VMS access codes
 

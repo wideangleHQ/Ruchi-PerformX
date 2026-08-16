@@ -378,6 +378,50 @@ are dropped; a member PATCH with no `is_done` is a 400.
 
 Success criteria are one row per criterion so closure can check them off
 individually. KPIs are optional and a project with none is normal.
+## Vendor management
+
+Internal only. `INTERNAL` is every role except `VENDOR`; the external portal
+has its own namespace and shares no controller with these. The role list is
+the outer fence, and it is a wide one. What decides who reads the vendor book
+is the level column, checked in `VendorsService` through
+`VendorScopeService.assertAccess`. MD and EA hold every level by role and need
+no `vendor_dashboard_access` row.
+
+| Method | Path | Roles | Level |
+| --- | --- | --- | --- |
+| GET | `/vendors` | INTERNAL | VENDOR_VIEWER |
+| POST | `/vendors` | INTERNAL | VENDOR_MANAGER |
+| GET | `/vendors/pickable` | INTERNAL | none |
+| GET | `/vendors/:id` | INTERNAL | VENDOR_VIEWER |
+| PATCH | `/vendors/:id` | INTERNAL | VENDOR_MANAGER, or the vendor's internal owner |
+| PATCH | `/vendors/:id/status` | INTERNAL | VENDOR_MANAGER |
+| GET | `/vendor-categories` | INTERNAL | VENDOR_VIEWER |
+| POST | `/vendor-categories` | HR, EA, MD | none |
+| GET | `/vendor-access/me` | authenticated | none |
+| GET | `/vendor-access` | MD, EA | none |
+| POST | `/vendor-access` | MD, EA | none |
+| DELETE | `/vendor-access/:userId` | MD, EA | none |
+
+There is no `DELETE /vendors/:id` and there is not going to be one.
+`PATCH /vendors/:id/status` moves a vendor to `EXPIRED` or `TERMINATED`
+instead, because assignments, documents and contracts point at the row and
+have to outlive the relationship.
+
+`GET /vendors/pickable` returns id, name and category for ACTIVE vendors only,
+and is the one vendor read an employee without a grant can make. It exists so
+that assigning work does not require opening `GET /vendors`, whose rows carry
+internal owner, notes, contract and status.
+
+`vendor_code` is generated on create as `VEN-0001` and is not settable or
+editable. `forbidNonWhitelisted` rejects a request that sends one.
+
+`GET /vendor-access/me` returns `{ accessLevel: string | null }`. The client's
+`useNavAccess` hook reads it to decide whether the Vendors sidebar entry
+renders, so the shape is load bearing.
+
+See [Vendor management](p2_vendors.md) for the module, and
+[Vendor roles are not employee roles](p1_auth_and_roles.md#vendor-roles-are-not-employee-roles)
+for why the external portal never appears in the table above.
 
 ## VMS
 
