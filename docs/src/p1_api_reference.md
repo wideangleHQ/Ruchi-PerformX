@@ -344,6 +344,48 @@ no deliverable has both dates. Internal data; never returned to a vendor.
 `thread=internal|shared`. The shared thread has a separate service method with
 `is_internal: false` written into it, which is what keeps the RUCHI-only thread
 off any portal query path.
+## Leave
+
+`STAFF` below means every role except VENDOR: MD, EA, PA,
+DEPARTMENT_CONTROLLER, PURCHASE_HEAD, HOD, EMPLOYEE, ADMIN, HR.
+
+| Method | Path | Roles |
+| --- | --- | --- |
+| POST | `/leave/applications` | STAFF |
+| GET | `/leave/applications/pending` | HOD, HR, MD |
+| GET | `/leave/applications/mine` | STAFF |
+| GET | `/leave/applications/:id` | STAFF, own or actionable |
+| PATCH | `/leave/applications/:id/cancel` | STAFF, own and `PENDING` only |
+| PATCH | `/leave/applications/:id/approve` | HOD, HR, MD |
+| PATCH | `/leave/applications/:id/reject` | HOD, HR, MD, remark required |
+| PATCH | `/leave/applications/:id/hr-cancel` | HR, reason required, `APPROVED` only |
+| GET | `/leave/balance` | STAFF, own, current financial year |
+| GET | `/leave/calendar` | STAFF, scoped to what the caller can see |
+| GET | `/leave/types` | STAFF, inactive types shown to HR and ADMIN |
+| POST | `/leave/types` | HR, ADMIN |
+| PATCH | `/leave/types/:id` | HR, ADMIN |
+| GET | `/leave/balances` | HR |
+| PATCH | `/leave/balances/:id` | HR, manual correction |
+| GET | `/leave/reports/monthly` | HR, MD |
+| GET | `/leave/reports/export` | HR, MD, returns xlsx |
+
+The MD is on `approve` and `reject` although
+[Leave management](p2_leave.md) lists only HOD and HR. Nobody approves their own
+application, so a HOD's or an HR user's own leave has nowhere else to go.
+
+`POST /leave/applications` returns every validation failure at once in the
+`message` array, not the first one. Submission runs six rules: date order,
+overlap with an existing `PENDING` or `APPROVED` application, a range that is
+not entirely holidays and weekly offs, a day count of at least 0.5, a
+sufficient balance for paid types, and an attachment for types with
+`requires_proof`.
+
+Approve and HR-cancel both put the current status in the `where` clause of an
+`updateMany`, so the second of two concurrent approvers gets a 409 rather than a
+second deduction. HR cancellation credits the balance back.
+
+Holiday endpoints are in [Leave management](p2_leave.md#endpoints) and belong to
+the holidays module, not this one.
 
 ## Notifications
 
