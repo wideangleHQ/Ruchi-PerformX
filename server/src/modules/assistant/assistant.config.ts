@@ -1,3 +1,5 @@
+import OpenAI from 'openai';
+
 /**
  * Which gateway the assistant talks to, and as which model.
  *
@@ -82,4 +84,34 @@ export function resolveProvider(env: AssistantEnv): AssistantProvider {
     model: set(env.ASSISTANT_MODEL) ?? DEFAULT_MODEL,
     baseURL: set(env.OPENCODE_BASE_URL) ?? ZEN_BASE_URL,
   };
+}
+
+/**
+ * The gateway client, built once for the process.
+ *
+ * `AssistantService` is request-scoped, because it reaches services that depend
+ * on `DepartmentScopeService` and Nest propagates `Scope.REQUEST` up the whole
+ * dependency chain. That is correct for the scope cache and wrong for an HTTP
+ * client: without this, every question constructed a new `OpenAI` and threw
+ * away its connection pool.
+ *
+ * Lazy rather than at import time so that a module that only wants
+ * `resolveProvider` or `DEFAULT_MODEL`, including the tests, does not need a
+ * key in the environment.
+ */
+let client: OpenAI | undefined;
+
+export function assistantClient(env: AssistantEnv): OpenAI {
+  if (!client) {
+    const provider = resolveProvider(env);
+    client = new OpenAI({
+      apiKey: provider.apiKey,
+      baseURL: provider.baseURL,
+      // Zen authenticates with x-api-key. The SDK sends Authorization: Bearer,
+      // which Zen also accepts, but both are set so a change at either end does
+      // not turn into a 401 nobody can place.
+      defaultHeaders: { 'x-api-key': provider.apiKey },
+    });
+  }
+  return client;
 }

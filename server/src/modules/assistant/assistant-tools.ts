@@ -53,6 +53,16 @@ import { SelfActionsService } from '../self-actions/self-actions.service';
  *
  * When a route's `@Roles` changes, the matching entry here changes with it.
  * Each tool names its route so that is a grep rather than an audit.
+ *
+ * No tool mutates business data. `hod_scores` is the one that writes at all:
+ * `HodScoreService` logs an `audit_logs` row for score access, which is the
+ * behaviour of the route it wraps and is left alone.
+ *
+ * All 24 tools that take no arguments were run against a real Postgres on
+ * 2026-08-22, as MD, HR, EMPLOYEE and HOD, with no failures. That covers the
+ * raw-SQL paths PHASE2-REMAINING.md section 5 warns about, the holiday and
+ * scoring queries using `AT TIME ZONE`, which fail at runtime rather than at
+ * compile time.
  */
 
 /** Every role except VENDOR, which is what `STAFF_ROLES` and `INTERNAL_ROLES`
