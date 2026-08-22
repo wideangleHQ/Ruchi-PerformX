@@ -1,14 +1,19 @@
 'use client';
 
 import Link from 'next/link';
-import { CalendarDays, Plus, Users } from 'lucide-react';
+import { CalendarDays, Plus, Settings2, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
 import { leaveTypeName, toDays } from '@/api/leave';
 import { useLeaveBalance, useLeaveTypes, useMyLeaveApplications } from '@/hooks/useLeave';
 import { LeaveBalanceCards } from '@/components/leave/LeaveBalanceCards';
 import { LeaveStatusChip } from '@/components/leave/LeaveStatusChip';
-import { canActOnLeave } from '@/components/leave/access';
+import {
+  canActOnLeave,
+  canManageLeaveBalances,
+  canManageLeaveTypes,
+  canReadLeaveReports,
+} from '@/components/leave/access';
 import { formatLeaveDate } from '@/lib/leaveValidation';
 
 export default function MyLeavePage() {
@@ -34,6 +39,32 @@ export default function MyLeavePage() {
               <Button type="button" variant="outline" className="gap-2">
                 <Users size={16} />
                 Pending Approvals
+              </Button>
+            </Link>
+          ) : null}
+          {/* One button per admin screen rather than one Admin section, because
+              the three routes do not share a role list: ADMIN may define types
+              but not read balances, and the MD may read the report but not edit
+              a type. See components/leave/access.ts. */}
+          {canManageLeaveTypes(user?.role) ? (
+            <Link href="/leave/admin/types">
+              <Button type="button" variant="outline" className="gap-2">
+                <Settings2 size={16} />
+                Leave Types
+              </Button>
+            </Link>
+          ) : null}
+          {canManageLeaveBalances(user?.role) ? (
+            <Link href="/leave/admin/balances">
+              <Button type="button" variant="outline">
+                Balances
+              </Button>
+            </Link>
+          ) : null}
+          {canReadLeaveReports(user?.role) ? (
+            <Link href="/leave/admin/reports">
+              <Button type="button" variant="outline">
+                Report
               </Button>
             </Link>
           ) : null}

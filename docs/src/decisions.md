@@ -1145,3 +1145,48 @@ that `VENDOR` appears in no tool and that an employee is offered neither
 company-wide leave nor anybody else's scores. A shared role constant, rather
 than the same nine-role list written out in five files, would remove the drift
 properly. That refactor is not in this change.
+
+## 2026-08-22 Leave admin is three screens, not one
+
+**Decision.** The HR administration endpoints get three separate screens at
+`/leave/admin/types`, `/leave/admin/balances` and `/leave/admin/reports`, each
+gated by its own helper in `components/leave/access.ts`, rather than one Admin
+area behind a single role check.
+
+**Why.** The three routes do not share a role list. `POST /leave/types` is HR
+and ADMIN, `GET /leave/balances` is HR alone, and `/leave/reports/*` is HR and
+MD. A single `isLeaveHr` gate would either show ADMIN a balances button that
+403s, or hide the report from the MD who is allowed to read it. The comment at
+the top of `access.ts` already said the file exists so that nobody is shown a
+button that 403s; one gate for three role lists breaks that.
+
+**Instead of.** One `/leave/admin` page with tabs and a single guard, which is
+less code and the obvious shape. It was rejected because the guard would have to
+be the union of three role lists and then each tab would need its own check
+anyway, which is the same number of checks in a place where they are easier to
+get wrong.
+
+**Costs.** Three route files that share a header and a back link. If a fourth
+admin screen appears, the shared chrome is worth extracting; three is not enough
+to pay for it.
+
+## 2026-08-22 Leave types is the screen that unblocks leave
+
+**Decision.** `/leave/admin/types` ships before the other section 3 screens, and
+its empty state says plainly that leave is unusable until a type exists.
+
+**Why.** `leave_types` is empty in production. Until a row exists nobody in the
+company can apply for leave, seven of the assistant's tools have nothing to
+answer with, and `leave_balances` never gets created because it is seeded on
+first application. That single empty table is the root of most of what looks
+like a half-built leave module.
+
+**Instead of.** Seeding five types in a migration. Rejected because the
+entitlements, the carry-forward rules and whether proof is required per type are
+all client decisions nobody has confirmed, and a wrong seeded entitlement is
+worse than an empty table: it is silently wrong arithmetic rather than an
+obvious gap.
+
+**Costs.** Somebody still has to sit down and enter five types before leave
+works. The screen makes that ten minutes instead of a curl session, but it does
+not remove the step.

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ApplyLeavePayload, LeaveStatus, leaveApi } from '@/api/leave';
+import { ApplyLeavePayload, LeaveStatus, LeaveTypePayload, leaveApi } from '@/api/leave';
 
 export const useLeaveTypes = () =>
   useQuery({ queryKey: ['leave', 'types'], queryFn: () => leaveApi.getTypes() });
@@ -58,3 +58,45 @@ export const useRejectLeave = () =>
 
 export const useHrCancelLeave = () =>
   useLeaveMutation(({ id, reason }: { id: string; reason: string }) => leaveApi.hrCancel(id, reason));
+
+// ---------------------------------------------------------------------- admin
+
+/** Every balance for the year, HR only. Separate key from the caller's own. */
+export const useAllLeaveBalances = (
+  filters?: { user_id?: string; leave_type_id?: string; year?: number },
+  enabled = true,
+) =>
+  useQuery({
+    queryKey: ['leave', 'balances', filters],
+    queryFn: () => leaveApi.getBalances(filters),
+    enabled,
+  });
+
+export const useMonthlyLeaveReport = (
+  params: { month: number; year: number },
+  enabled = true,
+) =>
+  useQuery({
+    queryKey: ['leave', 'report', params],
+    queryFn: () => leaveApi.getMonthlyReport(params),
+    enabled,
+  });
+
+export const useCreateLeaveType = () =>
+  useLeaveMutation((payload: LeaveTypePayload) => leaveApi.createType(payload));
+
+export const useUpdateLeaveType = () =>
+  useLeaveMutation(({ id, payload }: { id: string; payload: Partial<LeaveTypePayload> }) =>
+    leaveApi.updateType(id, payload),
+  );
+
+export const useUpdateLeaveBalance = () =>
+  useLeaveMutation(
+    ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: { entitled?: number; used?: number; carried_over?: number };
+    }) => leaveApi.updateBalance(id, payload),
+  );
