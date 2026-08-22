@@ -111,6 +111,14 @@ describe('the catalog narrows by role', () => {
     expect(employee).toContain('upcoming_holidays');
   });
 
+  it('offers self actions to the roles the route allows, and not HR', () => {
+    // GET /self-actions is narrower than most: no HR, no PURCHASE_HEAD.
+    expect(names(role_enum.EMPLOYEE)).toContain('my_self_actions');
+    expect(names(role_enum.HOD)).toContain('department_self_actions');
+    expect(names(role_enum.HR)).not.toContain('my_self_actions');
+    expect(names(role_enum.PURCHASE_HEAD)).not.toContain('department_self_actions');
+  });
+
   it('gives HR the balances nobody else gets', () => {
     expect(names(role_enum.HR)).toContain('leave_balances_all');
     expect(names(role_enum.MD)).not.toContain('leave_balances_all');

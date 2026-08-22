@@ -15,6 +15,7 @@ import { HodScoreService } from '../hod-score/hod-score.service';
 import { UsersService } from '../users/users.service';
 import { DepartmentsService } from '../departments/departments.service';
 import { AssetsService } from '../assets/assets.service';
+import { SelfActionsService } from '../self-actions/self-actions.service';
 
 import { ASSISTANT_SYSTEM_PROMPT } from './assistant.prompt';
 import { AssistantProvider, resolveProvider } from './assistant.config';
@@ -103,6 +104,7 @@ export class AssistantService {
     users: UsersService,
     departments: DepartmentsService,
     assets: AssetsService,
+    selfActions: SelfActionsService,
   ) {
     // OpenCode Zen speaks the Anthropic protocol on /v1/messages and
     // authenticates with x-api-key, so the same client reaches either gateway
@@ -132,6 +134,7 @@ export class AssistantService {
       users,
       departments,
       assets,
+      selfActions,
     };
   }
 

@@ -14,6 +14,7 @@ import { HodScoreService } from '../hod-score/hod-score.service';
 import { UsersService } from '../users/users.service';
 import { DepartmentsService } from '../departments/departments.service';
 import { AssetsService } from '../assets/assets.service';
+import { SelfActionsService } from '../self-actions/self-actions.service';
 
 /**
  * The tier 1 tool catalog.
@@ -63,6 +64,17 @@ export const ALL_INTERNAL: role_enum[] = Object.values(role_enum).filter(
 
 const APPROVERS = [role_enum.HOD, role_enum.HR, role_enum.MD];
 const HR_AND_MD = [role_enum.HR, role_enum.MD];
+// GET /self-actions. Narrower than most: no HR, no PURCHASE_HEAD.
+const SELF_ACTION_VIEWERS = [
+  role_enum.EMPLOYEE,
+  role_enum.HOD,
+  role_enum.MD,
+  role_enum.EA,
+  role_enum.PA,
+  role_enum.DEPARTMENT_CONTROLLER,
+  role_enum.ADMIN,
+];
+
 const SCORE_VIEWERS = [
   role_enum.MD,
   role_enum.EA,
@@ -84,6 +96,7 @@ export interface ToolDeps {
   users: UsersService;
   departments: DepartmentsService;
   assets: AssetsService;
+  selfActions: SelfActionsService;
 }
 
 /** A JSON Schema object. Called `parameters` on the wire; kept as
@@ -469,6 +482,58 @@ export const ASSISTANT_TOOLS: AssistantTool[] = [
     input_schema: NO_ARGS,
     roles: ALL_INTERNAL, // GET /rnd/reports
     run: (_a, user, d) => d.rnd.listReports(user),
+  },
+
+  // ----------------------------------------------------------- self actions
+  {
+    name: 'my_self_actions',
+    description:
+      "The asking user's own self actions: work they logged themselves, with status, priority and dates. Use for \"what have I been working on\", \"what did I log this month\", or anything about their own record of work outside assigned tasks.",
+    input_schema: obj({
+      status: {
+        type: 'string',
+        enum: ['OPEN', 'ONGOING', 'COMPLETED', 'ABORTED'],
+      },
+      priority: {
+        type: 'string',
+        enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'],
+      },
+      search: { type: 'string', description: 'Matches the title or description.' },
+    }),
+    roles: SELF_ACTION_VIEWERS, // GET /self-actions?mine=true
+    run: (a, user, d) =>
+      d.selfActions.findAll(user, {
+        mine: true,
+        status: str(a.status),
+        priority: str(a.priority),
+        search: str(a.search),
+        limit: 50,
+      } as never),
+  },
+  {
+    name: 'department_self_actions',
+    description:
+      'Self actions across the departments the asking user can see, not just their own. Use for "what is the team working on", "what has Engineering logged", or counting logged work across people. An employee sees only their own, which is the correct scoping rather than an empty result.',
+    input_schema: obj({
+      status: {
+        type: 'string',
+        enum: ['OPEN', 'ONGOING', 'COMPLETED', 'ABORTED'],
+      },
+      priority: {
+        type: 'string',
+        enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'],
+      },
+      search: { type: 'string', description: 'Matches the title or description.' },
+    }),
+    roles: SELF_ACTION_VIEWERS, // GET /self-actions
+    run: (a, user, d) =>
+      d.selfActions.findAll(user, {
+        mine: false,
+        status: str(a.status),
+        priority: str(a.priority),
+        search: str(a.search),
+        limit: 50,
+      } as never),
   },
 
   // ------------------------------------------------------------ org and assets

@@ -12,6 +12,7 @@ import { RndModule } from '../rnd/rnd.module';
 import { ScoringModule } from '../scoring/scoring.module';
 import { TasksModule } from '../tasks/tasks.module';
 import { UsersModule } from '../users/users.module';
+import { SelfActionsModule } from '../self-actions/self-actions.module';
 import { VendorsModule } from '../vendors/vendors.module';
 
 import { AssistantController } from './assistant.controller';
@@ -48,6 +49,7 @@ resolveProvider(process.env);
     UsersModule,
     DepartmentsModule,
     AssetsModule,
+    SelfActionsModule,
   ],
   controllers: [AssistantController],
   providers: [AssistantService],
