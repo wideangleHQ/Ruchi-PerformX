@@ -107,6 +107,10 @@ export function AssistantPanel() {
               i === index ? { ...e, answer: e.answer + event.text } : e,
             ),
           );
+        } else if (event.type === 'reset') {
+          // That turn was narration, not the answer. Drop it so the real
+          // answer does not arrive glued to the model thinking out loud.
+          patch({ answer: '' });
         } else if (event.type === 'tool') {
           setExchanges((prev) =>
             prev.map((e, i) =>

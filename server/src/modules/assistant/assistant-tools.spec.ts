@@ -8,7 +8,7 @@ import {
   toolSchemas,
   toolsFor,
 } from './assistant-tools';
-import { requireAnthropicKey } from './assistant.config';
+import { DEFAULT_MODEL, ZEN_BASE_URL, resolveProvider } from './assistant.config';
 
 // The assistant reaches services in process, so the `@Roles` guard on the
 // controller each tool wraps does not run. The `roles` list on the tool is what
@@ -131,36 +131,67 @@ describe('the catalog narrows by role', () => {
 });
 
 describe('toolSchemas', () => {
-  it('sends name, description and schema, and nothing else', () => {
+  it('emits the OpenAI function shape Zen expects', () => {
     const schemas = toolSchemas(toolsFor(as(role_enum.EMPLOYEE)));
     for (const schema of schemas) {
-      expect(Object.keys(schema).sort()).toEqual([
-        'description',
-        'input_schema',
-        'name',
-      ]);
-      expect(schema.input_schema.type).toBe('object');
+      expect(schema.type).toBe('function');
+      expect(typeof schema.function.name).toBe('string');
+      expect(typeof schema.function.description).toBe('string');
+      expect(
+        (schema.function.parameters as { type?: string } | undefined)?.type,
+      ).toBe('object');
+      // The JSON Schema goes under `parameters`, never `input_schema`.
+      expect(schema.function).not.toHaveProperty('input_schema');
     }
   });
 
-  it('keeps catalog order, so the cached prefix stays byte-stable', () => {
+  it('keeps catalog order, so the prompt does not differ needlessly', () => {
     const user = as(role_enum.MD);
-    expect(toolSchemas(toolsFor(user)).map((s) => s.name)).toEqual(
+    expect(toolSchemas(toolsFor(user)).map((s) => s.function.name)).toEqual(
       toolsFor(user).map((t) => t.name),
     );
   });
+
+  it('sends only the tools this caller may use', () => {
+    expect(toolSchemas(toolsFor(as(role_enum.VENDOR)))).toEqual([]);
+  });
 });
 
-describe('requireAnthropicKey', () => {
-  it('refuses a missing key', () => {
-    expect(() => requireAnthropicKey(undefined)).toThrow(/ANTHROPIC_API_KEY/);
+describe('resolveProvider', () => {
+  it('resolves Zen from the key', () => {
+    const p = resolveProvider({ OPENCODE_API_KEY: 'zen-key' });
+    expect(p.apiKey).toBe('zen-key');
+    expect(p.baseURL).toBe(ZEN_BASE_URL);
+    expect(p.model).toBe(DEFAULT_MODEL);
   });
 
-  it('refuses an empty key rather than passing it to the SDK', () => {
-    expect(() => requireAnthropicKey('   ')).toThrow(/ANTHROPIC_API_KEY/);
+  it('defaults to a free model, so running it costs nothing', () => {
+    expect(DEFAULT_MODEL).toMatch(/-free$/);
   });
 
-  it('accepts a real one', () => {
-    expect(requireAnthropicKey('sk-ant-test')).toBe('sk-ant-test');
+  it('takes a model override', () => {
+    expect(
+      resolveProvider({ OPENCODE_API_KEY: 'k', ASSISTANT_MODEL: 'hy3-free' })
+        .model,
+    ).toBe('hy3-free');
+  });
+
+  it('takes a base URL override, for a self-hosted gateway', () => {
+    expect(
+      resolveProvider({
+        OPENCODE_API_KEY: 'k',
+        OPENCODE_BASE_URL: 'https://gateway.internal/v1',
+      }).baseURL,
+    ).toBe('https://gateway.internal/v1');
+  });
+
+  it('treats whitespace as unset rather than passing it to the SDK', () => {
+    expect(() => resolveProvider({ OPENCODE_API_KEY: '   ' })).toThrow(
+      /OPENCODE_API_KEY/,
+    );
+  });
+
+  it('refuses to boot with no key at all', () => {
+    expect(() => resolveProvider({})).toThrow(/OPENCODE_API_KEY/);
   });
 });

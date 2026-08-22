@@ -5,6 +5,9 @@ const API_URL =
 
 export type AssistantEvent =
   | { type: 'text'; text: string }
+  /** Discard the answer streamed so far. The model narrated its way into a
+   * tool call ("I'll check the leave calendar...") and that is not the answer. */
+  | { type: 'reset' }
   | { type: 'tool'; name: string }
   | { type: 'done'; exchangeId: string; toolsUsed: string[]; declined: boolean }
   | { type: 'error'; message: string };
