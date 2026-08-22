@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { AuthModule } from '../auth/auth.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { RndModule } from '../rnd/rnd.module';
 
 import { ProjectsController } from './projects.controller';
 import { ProjectsService } from './projects.service';
@@ -18,7 +19,9 @@ import { ProjectDeadlineCron } from './project-deadline.cron';
 // reason the Phase 2 spine registered the modules: this file is the one every
 // projects branch would otherwise touch.
 @Module({
-  imports: [AuthModule, PrismaModule, NotificationsModule],
+  // RndModule for RndService.isMember, which guards the `is_rnd` flag on
+  // create and update. RndModule does not import this one, so no cycle.
+  imports: [AuthModule, PrismaModule, NotificationsModule, RndModule],
   controllers: [
     ProjectsController,
     ProjectExecutionController,

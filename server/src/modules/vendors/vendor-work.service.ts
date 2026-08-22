@@ -4,11 +4,18 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, deliverable_status_enum } from '@prisma/client';
+import {
+  Prisma,
+  deliverable_status_enum,
+  notification_type_enum,
+  role_enum,
+  vendor_assignments,
+} from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
 import { attachUsers } from '../../common/helpers/user-lookup.helper';
+import { NotificationsService } from '../notifications/notifications.service';
 import { VendorScopeService } from './vendor-scope.service';
 import {
   CreateVendorAssignmentDto,
@@ -159,6 +166,7 @@ export class VendorWorkService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scope: VendorScopeService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // ---------------------------------------------------------------- assignments
@@ -189,8 +197,9 @@ export class VendorWorkService {
     await this.scope.assertAccess(user.sub, user.role, 'VENDOR_MANAGER');
     await this.assertVendorExists(dto.vendor_id);
 
+    let assignment: vendor_assignments;
     try {
-      return await this.prisma.vendor_assignments.create({
+      assignment = await this.prisma.vendor_assignments.create({
         data: {
           vendor_id: dto.vendor_id,
           entity_type: dto.entity_type,
@@ -206,6 +215,53 @@ export class VendorWorkService {
     } catch (error) {
       throw this.asConflict(error, 'This vendor is already assigned to that item');
     }
+
+    await this.announceAssignment(assignment);
+    return assignment;
+  }
+
+  /**
+   * Tells the vendor's portal logins that work landed.
+   *
+   * `VENDOR_TASK_ASSIGNED` existed in the enum and in the channel map from the
+   * start of Phase 2 with nothing emitting it, so a vendor assigned work was
+   * told nothing at all. This is the emitter.
+   *
+   * A vendor with no portal account yet is the normal case early on, and it is
+   * not an error: the assignment stands and the notification has nowhere to go.
+   * Delivery failure is NotificationsService's problem, not this method's.
+   */
+  private async announceAssignment(assignment: vendor_assignments) {
+    const accounts = await this.prisma.users.findMany({
+      where: {
+        vendor_id: assignment.vendor_id,
+        role: role_enum.VENDOR,
+        deleted_at: null,
+        is_active: true,
+      },
+      select: { id: true },
+    });
+    if (accounts.length === 0) return;
+
+    const what = assignment.description?.trim() || assignment.entity_type;
+    const due = assignment.deadline
+      ? ` It is due ${assignment.deadline.toISOString().slice(0, 10)}.`
+      : '';
+
+    await this.notifications.notifyMany(
+      accounts.map((account) => ({
+        recipientId: account.id,
+        type: notification_type_enum.VENDOR_TASK_ASSIGNED,
+        title: 'New work assigned to you',
+        message: `${what} has been assigned to you.${due}`,
+        // `NotifyEntityType` has no assignment member and widening it would
+        // touch every consumer that switches on it. The vendor is the entity;
+        // the assignment id rides in metadata for the portal's deep link.
+        entityType: 'vendor',
+        entityId: assignment.vendor_id,
+        metadata: { assignment_id: assignment.id },
+      })),
+    );
   }
 
   /**

@@ -19,6 +19,13 @@ import { type JwtPayload } from '../../common/types/jwt-payload.type';
 
 import { Server, Socket } from 'socket.io';
 
+// Every role room except the vendor one. Derived from the enum rather than
+// listed, so a role added to `role_enum` later is internal by default and a
+// second VENDOR-like role is the only thing that needs a thought here.
+export const INTERNAL_ROLE_ROOMS = Object.values(role_enum)
+  .filter((role) => role !== role_enum.VENDOR)
+  .map((role) => `role:${role}`);
+
 @WebSocketGateway({
   namespace: '/performx',
   cors: {
@@ -269,14 +276,22 @@ export class NotificationsGateway
       .emit(event, payload);
   }
 
-  // Reaches every connected socket in the namespace, which from Phase 2 includes
-  // external vendor logins. It has no callers and should not gain one: anything
-  // company-wide wants sendToRole or a per-department fan-out instead.
-  broadcast(
+  /**
+   * Company-wide, employees only.
+   *
+   * This replaces a `broadcast()` that emitted to the whole namespace. From
+   * Phase 2 that namespace includes external vendor logins, so a company-wide
+   * emit reached them too. Vendors join `role:VENDOR` on connect like everyone
+   * else, so naming the internal rooms is enough to leave them out.
+   *
+   * Socket.io deduplicates across the room list, so a socket in two of these
+   * rooms still receives one copy.
+   */
+  sendToInternal(
     event: string,
     payload: unknown,
   ) {
-    this.server.emit(event, payload);
+    this.server.to(INTERNAL_ROLE_ROOMS).emit(event, payload);
   }
 
   // =====================================================

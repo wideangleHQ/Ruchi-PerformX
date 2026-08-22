@@ -195,7 +195,7 @@ export class PollsService {
     }
 
     const [view] = await this.hydrate([poll], userId);
-    this.gateway.broadcast('poll:updated', view);
+    this.gateway.sendToInternal('poll:updated', view);
     return view!;
   }
 
@@ -217,7 +217,7 @@ export class PollsService {
     });
 
     const [view] = await this.hydrate([updated], user.sub);
-    this.gateway.broadcast('poll:updated', view);
+    this.gateway.sendToInternal('poll:updated', view);
     return view!;
   }
 
@@ -241,7 +241,7 @@ export class PollsService {
       this.prisma.polls.delete({ where: { id } }),
     ]);
 
-    this.gateway.broadcast('poll:updated', { id, deleted: true });
+    this.gateway.sendToInternal('poll:updated', { id, deleted: true });
     return { id };
   }
 
