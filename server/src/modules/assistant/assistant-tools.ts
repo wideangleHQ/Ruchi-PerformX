@@ -1,5 +1,5 @@
 import { role_enum } from '@prisma/client';
-import type Anthropic from '@anthropic-ai/sdk';
+import type OpenAI from 'openai';
 
 import { JwtPayload } from '../../common/types/jwt-payload.type';
 import { LeaveService } from '../leave/leave.service';
@@ -86,12 +86,20 @@ export interface ToolDeps {
   assets: AssetsService;
 }
 
+/** A JSON Schema object. Called `parameters` on the wire; kept as
+ * `input_schema` here because that is what it is. */
+export type ToolSchema = {
+  type: 'object';
+  properties: Record<string, unknown>;
+  required?: string[];
+};
+
 export interface AssistantTool {
   name: string;
   /** Written for the model, not for a developer. It says when to call the tool,
    * which is the part the model gets wrong, rather than what it returns. */
   description: string;
-  input_schema: Anthropic.Tool['input_schema'];
+  input_schema: ToolSchema;
   /** Mirrors the `@Roles` on the route named in the description. */
   roles: role_enum[];
   run(
@@ -113,16 +121,12 @@ const NOW = () => new Date();
 const thisMonth = () => NOW().getUTCMonth() + 1;
 const thisYear = () => NOW().getUTCFullYear();
 
-const NO_ARGS: Anthropic.Tool['input_schema'] = {
-  type: 'object',
-  properties: {},
-};
+const NO_ARGS: ToolSchema = { type: 'object', properties: {}, required: [] };
 
 const obj = (
   properties: Record<string, unknown>,
   required: string[] = [],
-): Anthropic.Tool['input_schema'] =>
-  ({ type: 'object', properties, required }) as Anthropic.Tool['input_schema'];
+): ToolSchema => ({ type: 'object', properties, required });
 
 const ID = { type: 'string', description: 'The UUID of the record.' };
 
@@ -537,11 +541,23 @@ function isVmsScoped(user: JwtPayload): boolean {
 
 export { isVmsScoped };
 
-/** The wire format, in catalog order so the cached prefix stays byte-stable. */
-export function toolSchemas(tools: AssistantTool[]): Anthropic.Tool[] {
+/**
+ * The wire format, in catalog order.
+ *
+ * OpenCode Zen speaks OpenAI on `/v1/chat/completions`, so a tool goes out as a
+ * `function` with its JSON Schema under `parameters`. Order is stable because
+ * a shuffled tool list is a needless prompt difference, and on gateways that
+ * cache a prefix it is the difference between a hit and a miss.
+ */
+export function toolSchemas(
+  tools: AssistantTool[],
+): OpenAI.Chat.Completions.ChatCompletionFunctionTool[] {
   return tools.map((tool) => ({
-    name: tool.name,
-    description: tool.description,
-    input_schema: tool.input_schema,
+    type: 'function' as const,
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.input_schema as Record<string, unknown>,
+    },
   }));
 }

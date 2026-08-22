@@ -21,17 +21,30 @@ What did get built follows the rest of this page: the tool catalog, the
 conversation design, the interface, and Haiku 4.5 as the model.
 
 One change to *Model choice and cost*: the model is reached through **OpenCode
-Zen**, not the Anthropic API directly. Zen serves an Anthropic-compatible
-`/v1/messages` and authenticates with `x-api-key`, which is what the SDK already
-sends, so this is a base URL and a key rather than a different integration. Set
-`OPENCODE_API_KEY` for Zen or `ANTHROPIC_API_KEY` to go direct; Zen wins when
-both are set. `ASSISTANT_MODEL` overrides the model on either.
+Zen**, on the OpenAI-compatible `/v1/chat/completions`, and it is **free**. Set
+`OPENCODE_API_KEY`; `ASSISTANT_MODEL` overrides the model. Zen takes the bare id.
 
-That equivalence holds for the Claude and Qwen families only. Zen puts MiniMax,
-GLM, Kimi, DeepSeek and its free tier behind `/v1/chat/completions` in OpenAI
-format, which is a different tool-call shape and a different loop.
-`assertSupportedModel` refuses those at boot rather than letting a request fail
-mid-answer.
+Zen's docs also describe an Anthropic-compatible `/v1/messages` for the Claude
+and Qwen families. It was tried and abandoned: a Zen key alone returns
+`401 Missing API key` on `claude-haiku-4-5`, because Claude models there are
+bring-your-own-Anthropic-key, and the free tier is only served over OpenAI.
+
+The default is `laguna-s-2.1-free`, chosen by measurement rather than by name.
+Nine questions over eight tools, with the real system prompt, on 2026-08-22:
+
+| Model | Routing | Latency |
+| --- | --- | --- |
+| `laguna-s-2.1-free` | 9/9 | 2.6s per question |
+| `hy3-free` | 9/9 | 4.0s |
+| `nemotron-3-ultra-free` | 8/9 | 5.4s |
+
+Two of the nine had no matching tool and had to be declined, including "how many
+days was Anil in the office last month", which is the attendance case named at
+the top of this page. The benchmark lives in `assistant.config.ts`; re-run it
+before changing the default.
+
+The cost section below is now moot for running the assistant: the model is free.
+It still applies if anyone moves to a paid model for quality.
 
 A conversational surface inside PerformX that lets MD, EA, PA, and HODs ask the
 company a question in plain language instead of assembling the answer across

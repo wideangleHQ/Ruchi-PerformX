@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
@@ -29,6 +29,8 @@ import { ChatDto } from './dto/chat.dto';
 /** Answers are a number and a sentence. 2k leaves room for a wide table. */
 const MAX_TOKENS = 2048;
 
+type Msg = OpenAI.Chat.Completions.ChatCompletionMessageParam;
+
 /**
  * How many model turns one question may take. A tier 1 question resolves in
  * two: pick a tool, then answer. Three or four happens when the model has to
@@ -42,6 +44,12 @@ const MAX_HISTORY_TURNS = 10;
 
 export type AssistantEvent =
   | { type: 'text'; text: string }
+  /** Drop everything streamed for this answer so far. Emitted when a turn that
+   * was producing prose turns out to have been narrating its way into a tool
+   * call: "I'll check the leave calendar..." is not the answer and must not be
+   * glued to the front of it. Streaming stays live; the client just discards
+   * the turn that was not the answer. */
+  | { type: 'reset' }
   | { type: 'tool'; name: string }
   | { type: 'done'; exchangeId: string; toolsUsed: string[]; declined: boolean }
   | { type: 'error'; message: string };
@@ -77,7 +85,7 @@ export type AssistantEvent =
 @Injectable()
 export class AssistantService {
   private readonly logger = new Logger(AssistantService.name);
-  private readonly client: Anthropic;
+  private readonly client: OpenAI;
   private readonly provider: AssistantProvider;
   private readonly deps: ToolDeps;
 
@@ -100,12 +108,16 @@ export class AssistantService {
     // authenticates with x-api-key, so the same client reaches either gateway
     // and only the base URL moves. baseURL is undefined for direct Anthropic.
     this.provider = resolveProvider(process.env);
-    this.client = new Anthropic({
+    this.client = new OpenAI({
       apiKey: this.provider.apiKey,
       baseURL: this.provider.baseURL,
+      // Zen authenticates with x-api-key. The SDK sends Authorization: Bearer,
+      // which Zen also accepts, but both are set so a change at either end does
+      // not turn into a 401 nobody can place.
+      defaultHeaders: { 'x-api-key': this.provider.apiKey },
     });
     this.logger.log(
-      `Assistant on ${this.provider.name}, model ${this.provider.model}`,
+      `Assistant on OpenCode Zen, model ${this.provider.model}`,
     );
     this.deps = {
       leave,
@@ -138,7 +150,8 @@ export class AssistantService {
     const tools = toolsFor(user);
     const byName = new Map(tools.map((tool) => [tool.name, tool]));
 
-    const messages: Anthropic.MessageParam[] = [
+    const messages: Msg[] = [
+      { role: 'system', content: ASSISTANT_SYSTEM_PROMPT },
       ...this.history(dto),
       { role: 'user', content: this.framedQuestion(dto, user) },
     ];
@@ -149,48 +162,50 @@ export class AssistantService {
 
     try {
       for (let turn = 0; turn < MAX_TURNS; turn += 1) {
-        const stream = this.client.messages.stream({
+        const stream = this.client.chat.completions.stream({
           model: this.provider.model,
           max_tokens: MAX_TOKENS,
-          // Renders before `messages`, and `tools` renders before this, so one
-          // breakpoint here caches the prompt and the whole catalog. Nothing
-          // that varies per request may move above this line.
-          system: [
-            {
-              type: 'text',
-              text: ASSISTANT_SYSTEM_PROMPT,
-              cache_control: { type: 'ephemeral' },
-            },
-          ],
-          tools: toolSchemas(tools),
           messages,
+          tools: toolSchemas(tools),
         });
 
-        stream.on('text', (delta) => {
-          answer += delta;
+        // Text streamed during this turn, kept separately so it can be
+        // withdrawn if the turn ends in a tool call.
+        let turnText = '';
+        stream.on('content', (delta) => {
+          turnText += delta;
           emit({ type: 'text', text: delta });
         });
 
-        const message = await stream.finalMessage();
+        const completion = await stream.finalChatCompletion();
         usage = {
-          input: usage.input + message.usage.input_tokens,
-          output: usage.output + message.usage.output_tokens,
-          cached: usage.cached + (message.usage.cache_read_input_tokens ?? 0),
+          input: usage.input + (completion.usage?.prompt_tokens ?? 0),
+          output: usage.output + (completion.usage?.completion_tokens ?? 0),
+          cached:
+            usage.cached +
+            (completion.usage?.prompt_tokens_details?.cached_tokens ?? 0),
         };
 
-        if (message.stop_reason !== 'tool_use') break;
+        const message = completion.choices[0]?.message;
+        const calls = message?.tool_calls ?? [];
+        if (!message || calls.length === 0) {
+          answer += turnText;
+          break;
+        }
 
-        const calls = message.content.filter(
-          (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use',
-        );
-        messages.push({ role: 'assistant', content: message.content });
+        // The turn was narration, not the answer. Withdraw it.
+        if (turnText) emit({ type: 'reset' });
 
-        // All results go back in one user message. Splitting them teaches the
-        // model to stop calling tools in parallel.
+        // The assistant turn carrying the calls has to go back verbatim, or the
+        // tool replies below have nothing to attach to and the gateway 400s.
+        messages.push(message);
+
+        // Executed together, appended in call order. Each reply names the call
+        // it answers, so order is for readability rather than correctness.
         const results = await Promise.all(
           calls.map((call) => this.runTool(call, byName, user, toolsUsed, emit)),
         );
-        messages.push({ role: 'user', content: results });
+        messages.push(...results);
       }
     } catch (error) {
       const message = this.explain(error);
@@ -214,44 +229,56 @@ export class AssistantService {
    * the API rejects on the next request.
    */
   private async runTool(
-    call: Anthropic.ToolUseBlock,
+    call: OpenAI.Chat.Completions.ChatCompletionMessageToolCall,
     byName: Map<string, AssistantTool>,
     user: JwtPayload,
     toolsUsed: string[],
     emit: (event: AssistantEvent) => void,
-  ): Promise<Anthropic.ToolResultBlockParam> {
-    const tool = byName.get(call.name);
+  ): Promise<Msg> {
+    const reply = (content: string): Msg => ({
+      role: 'tool',
+      tool_call_id: call.id,
+      content,
+    });
+
+    // Narrowed rather than assumed: the union covers custom tool types too.
+    if (call.type !== 'function') {
+      return reply(`Unsupported tool call type ${call.type}.`);
+    }
+
+    const tool = byName.get(call.function.name);
     if (!tool) {
       // Only reachable if the model invents a name, since the catalog it was
       // given is already filtered to this caller.
-      return {
-        type: 'tool_result',
-        tool_use_id: call.id,
-        content: `No tool named ${call.name}.`,
-        is_error: true,
-      };
+      return reply(`No tool named ${call.function.name}.`);
     }
 
-    toolsUsed.push(call.name);
-    emit({ type: 'tool', name: call.name });
+    toolsUsed.push(call.function.name);
+    emit({ type: 'tool', name: call.function.name });
+
+    let args: Record<string, unknown> = {};
+    try {
+      // Arguments arrive as a JSON string assembled from stream fragments, and
+      // a weaker model gets that wrong often enough to matter. A bad payload is
+      // told to the model rather than thrown, so it can retry or say so.
+      args = call.function.arguments
+        ? (JSON.parse(call.function.arguments) as Record<string, unknown>)
+        : {};
+    } catch {
+      return reply(
+        'Those arguments were not valid JSON. Call the tool again with a valid object.',
+      );
+    }
 
     try {
-      const args = (call.input ?? {}) as Record<string, unknown>;
       const rows = await tool.run(args, user, this.deps);
-      return {
-        type: 'tool_result',
-        tool_use_id: call.id,
-        content: JSON.stringify(rows ?? null),
-      };
+      return reply(JSON.stringify(rows ?? null));
     } catch (error) {
+      // A ForbiddenException from a service is information the model should
+      // relay ("I can only show you your own department"), not a 500.
       const reason = error instanceof Error ? error.message : 'Lookup failed.';
-      this.logger.warn(`${call.name} failed for ${user.sub}: ${reason}`);
-      return {
-        type: 'tool_result',
-        tool_use_id: call.id,
-        content: reason,
-        is_error: true,
-      };
+      this.logger.warn(`${call.function.name} failed for ${user.sub}: ${reason}`);
+      return reply(reason);
     }
   }
 
@@ -280,7 +307,7 @@ export class AssistantService {
    * tool authorises against the caller's own token rather than against anything
    * in the transcript, so the worst a user can do is confuse their own session.
    */
-  private history(dto: ChatDto): Anthropic.MessageParam[] {
+  private history(dto: ChatDto): Msg[] {
     const turns = dto.history ?? [];
     return turns.slice(-MAX_HISTORY_TURNS * 2).map((turn) => ({
       role: turn.role === 'assistant' ? ('assistant' as const) : ('user' as const),
@@ -314,20 +341,19 @@ export class AssistantService {
 
   /** Typed chain, most specific first, so a 401 does not read as a 429. */
   private explain(error: unknown): string {
-    if (error instanceof Anthropic.AuthenticationError) {
-      const key =
-        this.provider.name === 'opencode-zen'
-          ? 'OPENCODE_API_KEY'
-          : 'ANTHROPIC_API_KEY';
-      return `The assistant is not configured. ${key} was rejected by ${this.provider.name}.`;
+    if (error instanceof OpenAI.AuthenticationError) {
+      return 'The assistant is not configured. OPENCODE_API_KEY was rejected by OpenCode Zen.';
     }
-    if (error instanceof Anthropic.RateLimitError) {
+    if (error instanceof OpenAI.RateLimitError) {
       return 'The assistant is rate limited. Try again in a moment.';
     }
-    if (error instanceof Anthropic.APIConnectionError) {
+    if (error instanceof OpenAI.APIConnectionError) {
       return 'Could not reach the assistant. Check the connection and retry.';
     }
-    if (error instanceof Anthropic.APIError) {
+    if (error instanceof OpenAI.NotFoundError) {
+      return `Model ${this.provider.model} is not available on this key. Check ASSISTANT_MODEL.`;
+    }
+    if (error instanceof OpenAI.APIError) {
       return `The assistant returned an error (${error.status}).`;
     }
     return 'The assistant failed. The question was not answered.';
