@@ -25,6 +25,8 @@ import { VendorDeadlineCron } from './vendor-deadline.cron';
     VendorWorkService,
     VendorDeadlineCron,
   ],
-  exports: [VendorScopeService, VendorsService],
+  // VendorWorkService is exported for the portal, which needs findSharedNotes:
+  // the one read path that forces `is_internal: false`.
+  exports: [VendorScopeService, VendorsService, VendorWorkService],
 })
 export class VendorsModule {}
