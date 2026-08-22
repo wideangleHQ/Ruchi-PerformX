@@ -790,6 +790,39 @@ validation.
 `variance` is actual minus estimated, so positive is an overspend.
 `variance_pct` is null rather than `Infinity` when nothing was budgeted.
 
+## Assistant
+
+The conversational surface over the rest of the API. See
+[The PerformX Assistant](p2_assistant.md) for the design.
+
+| Method | Path | Roles |
+| --- | --- | --- |
+| POST | `/assistant/chat` | anyone internal, refused for a VMS-scoped token |
+| GET | `/assistant/tools` | anyone internal |
+| POST | `/assistant/exchanges/:id/feedback` | anyone internal, own exchange only |
+| GET | `/assistant/declines` | MD, ADMIN |
+
+`POST /assistant/chat` streams **server-sent events**, not JSON. One event per
+`data:` line:
+
+```
+data: {"type":"text","text":"2 casual days "}
+data: {"type":"tool","name":"leave_balance"}
+data: {"type":"reset"}
+data: {"type":"done","exchangeId":"...","toolsUsed":["leave_balance"],"declined":false}
+data: {"type":"error","message":"..."}
+```
+
+`reset` means the model narrated its way into a tool call and the text streamed
+so far is not the answer. Discard it; the panel does. Failures arrive as an
+`error` event on a 200, because by then the headers are long gone.
+
+The assistant reaches data by calling the same services the controllers call,
+with the caller's own token, so `DepartmentScopeService` scopes it exactly as it
+scopes the UI. The tool catalog is filtered per caller before it reaches the
+model, which is why an out-of-scope question comes back as prose rather than a
+403.
+
 ## VMS
 
 See [Visitor management](p1_vms.md) for the full list. VMS endpoints require a
