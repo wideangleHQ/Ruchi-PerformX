@@ -17,13 +17,14 @@ import { VendorsModule } from '../vendors/vendors.module';
 
 import { AssistantController } from './assistant.controller';
 import { AssistantService } from './assistant.service';
-import { resolveProvider } from './assistant.config';
+import { assistantClient } from './assistant.config';
 
-// Fails at boot rather than on the first question, the way assets does with
-// ASSET_ENCRYPTION_KEY and auth does with JWT_SECRET. A missing key, or a model
-// on the wrong endpoint, surfacing as an error halfway through a streamed
-// answer is worse than not starting.
-resolveProvider(process.env);
+// Builds the gateway client at module load, which is what makes the failure and
+// the log both happen at boot: a missing key kills the process the way assets
+// does with ASSET_ENCRYPTION_KEY, rather than surfacing halfway through a
+// streamed answer. Calling it here rather than leaving it to the first request
+// is the whole point, since AssistantService is request-scoped.
+assistantClient(process.env);
 
 /**
  * Tier 1 only: the assistant reaches data by calling the same services the
