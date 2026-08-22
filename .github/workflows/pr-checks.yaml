@@ -34,6 +34,8 @@ jobs:
       # The assistant module refuses to boot without one, the same as
       # assets and JWT_SECRET. Never called in CI: no test reaches the API.
       OPENCODE_API_KEY: ci-placeholder-not-a-real-key
+      # Free model. CI never calls it; no test reaches the network.
+      ASSISTANT_MODEL: laguna-s-2.1-free
     steps:
       - uses: actions/checkout@v4
       # 22, not 20: @supabase/realtime-js needs a native WebSocket and the API
