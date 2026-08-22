@@ -8,7 +8,12 @@ import {
   toolSchemas,
   toolsFor,
 } from './assistant-tools';
-import { requireAnthropicKey } from './assistant.config';
+import {
+  DEFAULT_MODEL,
+  ZEN_BASE_URL,
+  assertSupportedModel,
+  resolveProvider,
+} from './assistant.config';
 
 // The assistant reaches services in process, so the `@Roles` guard on the
 // controller each tool wraps does not run. The `roles` list on the tool is what
@@ -151,16 +156,72 @@ describe('toolSchemas', () => {
   });
 });
 
-describe('requireAnthropicKey', () => {
-  it('refuses a missing key', () => {
-    expect(() => requireAnthropicKey(undefined)).toThrow(/ANTHROPIC_API_KEY/);
+// Zen serves an Anthropic-compatible /v1/messages with x-api-key, so the same
+// SDK reaches either gateway. That equivalence is only true for the Claude and
+// Qwen families; everything else on Zen is OpenAI-shaped on /chat/completions.
+// These cover the resolution order and the refusal, because the failure they
+// prevent is a 400 in the middle of a streamed answer.
+describe('resolveProvider', () => {
+  it('prefers OpenCode Zen when its key is set', () => {
+    const p = resolveProvider({
+      OPENCODE_API_KEY: 'zen-key',
+      ANTHROPIC_API_KEY: 'sk-ant-key',
+    });
+    expect(p.name).toBe('opencode-zen');
+    expect(p.apiKey).toBe('zen-key');
+    expect(p.baseURL).toBe(ZEN_BASE_URL);
   });
 
-  it('refuses an empty key rather than passing it to the SDK', () => {
-    expect(() => requireAnthropicKey('   ')).toThrow(/ANTHROPIC_API_KEY/);
+  it('falls back to Anthropic with no base URL, so the SDK uses its own', () => {
+    const p = resolveProvider({ ANTHROPIC_API_KEY: 'sk-ant-key' });
+    expect(p.name).toBe('anthropic');
+    expect(p.baseURL).toBeUndefined();
   });
 
-  it('accepts a real one', () => {
-    expect(requireAnthropicKey('sk-ant-test')).toBe('sk-ant-test');
+  it('defaults the model on either gateway', () => {
+    expect(resolveProvider({ OPENCODE_API_KEY: 'k' }).model).toBe(DEFAULT_MODEL);
+    expect(resolveProvider({ ANTHROPIC_API_KEY: 'k' }).model).toBe(DEFAULT_MODEL);
+  });
+
+  it('takes an override', () => {
+    const p = resolveProvider({
+      OPENCODE_API_KEY: 'k',
+      ASSISTANT_MODEL: 'claude-sonnet-5',
+    });
+    expect(p.model).toBe('claude-sonnet-5');
+  });
+
+  it('treats whitespace as unset rather than passing it to the SDK', () => {
+    expect(() => resolveProvider({ OPENCODE_API_KEY: '   ' })).toThrow(
+      /needs a key/,
+    );
+  });
+
+  it('names both keys when neither is set', () => {
+    expect(() => resolveProvider({})).toThrow(/OPENCODE_API_KEY/);
+    expect(() => resolveProvider({})).toThrow(/ANTHROPIC_API_KEY/);
+  });
+});
+
+describe('assertSupportedModel', () => {
+  it.each(['claude-haiku-4-5', 'claude-sonnet-5', 'qwen3.6-plus'])(
+    'accepts %s, which Zen serves over /v1/messages',
+    (model) => {
+      expect(assertSupportedModel(model)).toBe(model);
+    },
+  );
+
+  it.each([
+    'minimax-m2.5',
+    'glm-5.2',
+    'kimi-k3',
+    'deepseek-v4-flash-free',
+    'gpt-5.5',
+  ])('refuses %s, which is OpenAI-shaped on Zen', (model) => {
+    expect(() => assertSupportedModel(model)).toThrow(/chat\/completions/);
+  });
+
+  it('refuses the opencode/ config prefix, since the API takes a bare id', () => {
+    expect(() => assertSupportedModel('opencode/claude-haiku-4-5')).toThrow();
   });
 });

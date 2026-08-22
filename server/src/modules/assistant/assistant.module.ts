@@ -16,12 +16,13 @@ import { VendorsModule } from '../vendors/vendors.module';
 
 import { AssistantController } from './assistant.controller';
 import { AssistantService } from './assistant.service';
-import { requireAnthropicKey } from './assistant.config';
+import { resolveProvider } from './assistant.config';
 
 // Fails at boot rather than on the first question, the way assets does with
-// ASSET_ENCRYPTION_KEY and auth does with JWT_SECRET. A missing key surfacing
-// as a 500 halfway through a streamed answer is worse than not starting.
-requireAnthropicKey(process.env.ANTHROPIC_API_KEY);
+// ASSET_ENCRYPTION_KEY and auth does with JWT_SECRET. A missing key, or a model
+// on the wrong endpoint, surfacing as an error halfway through a streamed
+// answer is worse than not starting.
+resolveProvider(process.env);
 
 /**
  * Tier 1 only: the assistant reaches data by calling the same services the

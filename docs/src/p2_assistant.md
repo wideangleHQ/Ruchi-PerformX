@@ -20,6 +20,19 @@ difference matters when reading the rest:
 What did get built follows the rest of this page: the tool catalog, the
 conversation design, the interface, and Haiku 4.5 as the model.
 
+One change to *Model choice and cost*: the model is reached through **OpenCode
+Zen**, not the Anthropic API directly. Zen serves an Anthropic-compatible
+`/v1/messages` and authenticates with `x-api-key`, which is what the SDK already
+sends, so this is a base URL and a key rather than a different integration. Set
+`OPENCODE_API_KEY` for Zen or `ANTHROPIC_API_KEY` to go direct; Zen wins when
+both are set. `ASSISTANT_MODEL` overrides the model on either.
+
+That equivalence holds for the Claude and Qwen families only. Zen puts MiniMax,
+GLM, Kimi, DeepSeek and its free tier behind `/v1/chat/completions` in OpenAI
+format, which is a different tool-call shape and a different loop.
+`assertSupportedModel` refuses those at boot rather than letting a request fail
+mid-answer.
+
 A conversational surface inside PerformX that lets MD, EA, PA, and HODs ask the
 company a question in plain language instead of assembling the answer across
 eight screens.

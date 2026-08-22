@@ -33,7 +33,7 @@ jobs:
       ASSET_ENCRYPTION_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
       # The assistant module refuses to boot without one, the same as
       # assets and JWT_SECRET. Never called in CI: no test reaches the API.
-      ANTHROPIC_API_KEY: sk-ant-ci-placeholder-not-a-real-key
+      OPENCODE_API_KEY: ci-placeholder-not-a-real-key
     steps:
       - uses: actions/checkout@v4
       # 22, not 20: @supabase/realtime-js needs a native WebSocket and the API

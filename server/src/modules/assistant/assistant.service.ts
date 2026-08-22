@@ -17,6 +17,7 @@ import { DepartmentsService } from '../departments/departments.service';
 import { AssetsService } from '../assets/assets.service';
 
 import { ASSISTANT_SYSTEM_PROMPT } from './assistant.prompt';
+import { AssistantProvider, resolveProvider } from './assistant.config';
 import {
   AssistantTool,
   ToolDeps,
@@ -24,17 +25,6 @@ import {
   toolsFor,
 } from './assistant-tools';
 import { ChatDto } from './dto/chat.dto';
-
-/**
- * Haiku 4.5. Chosen in `ai-assistant-price-comparison.md`: roughly a tenth of a
- * rupee per question with the tool catalog cached, and a fixed catalog of about
- * thirty tools is well inside its routing range. Move up only if the eval set
- * says tool selection is missing, not on a hunch.
- *
- * No `thinking` and no `output_config.effort`: 4.5 predates adaptive thinking
- * and rejects `effort` outright.
- */
-const MODEL = 'claude-haiku-4-5';
 
 /** Answers are a number and a sentence. 2k leaves room for a wide table. */
 const MAX_TOKENS = 2048;
@@ -88,6 +78,7 @@ export type AssistantEvent =
 export class AssistantService {
   private readonly logger = new Logger(AssistantService.name);
   private readonly client: Anthropic;
+  private readonly provider: AssistantProvider;
   private readonly deps: ToolDeps;
 
   constructor(
@@ -105,7 +96,17 @@ export class AssistantService {
     departments: DepartmentsService,
     assets: AssetsService,
   ) {
-    this.client = new Anthropic();
+    // OpenCode Zen speaks the Anthropic protocol on /v1/messages and
+    // authenticates with x-api-key, so the same client reaches either gateway
+    // and only the base URL moves. baseURL is undefined for direct Anthropic.
+    this.provider = resolveProvider(process.env);
+    this.client = new Anthropic({
+      apiKey: this.provider.apiKey,
+      baseURL: this.provider.baseURL,
+    });
+    this.logger.log(
+      `Assistant on ${this.provider.name}, model ${this.provider.model}`,
+    );
     this.deps = {
       leave,
       holidays,
@@ -149,7 +150,7 @@ export class AssistantService {
     try {
       for (let turn = 0; turn < MAX_TURNS; turn += 1) {
         const stream = this.client.messages.stream({
-          model: MODEL,
+          model: this.provider.model,
           max_tokens: MAX_TOKENS,
           // Renders before `messages`, and `tools` renders before this, so one
           // breakpoint here caches the prompt and the whole catalog. Nothing
@@ -314,7 +315,11 @@ export class AssistantService {
   /** Typed chain, most specific first, so a 401 does not read as a 429. */
   private explain(error: unknown): string {
     if (error instanceof Anthropic.AuthenticationError) {
-      return 'The assistant is not configured. ANTHROPIC_API_KEY is missing or rejected.';
+      const key =
+        this.provider.name === 'opencode-zen'
+          ? 'OPENCODE_API_KEY'
+          : 'ANTHROPIC_API_KEY';
+      return `The assistant is not configured. ${key} was rejected by ${this.provider.name}.`;
     }
     if (error instanceof Anthropic.RateLimitError) {
       return 'The assistant is rate limited. Try again in a moment.';
