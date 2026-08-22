@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import OpenAI from 'openai';
 
 /**
@@ -104,6 +105,12 @@ let client: OpenAI | undefined;
 export function assistantClient(env: AssistantEnv): OpenAI {
   if (!client) {
     const provider = resolveProvider(env);
+    // Once per process, not per request. On a hosted deploy this line is how
+    // you confirm from the logs that the key was picked up and which model
+    // answered, without a request to test it.
+    new Logger('Assistant').log(
+      `OpenCode Zen at ${provider.baseURL}, model ${provider.model}`,
+    );
     client = new OpenAI({
       apiKey: provider.apiKey,
       baseURL: provider.baseURL,
