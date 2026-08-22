@@ -15,6 +15,8 @@ import { attachUsers } from '../../common/helpers/user-lookup.helper';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { RndService } from '../rnd/rnd.service';
+import { OVERSIGHT_ROLES } from '../rnd/rnd-visibility';
 import { AddProjectMemberDto } from './dto/add-project-member.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { ProjectFilterDto } from './dto/project-filter.dto';
@@ -97,6 +99,7 @@ export class ProjectsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly rnd: RndService,
   ) {}
 
   // -------------------------------------------------------------- access
@@ -192,6 +195,7 @@ export class ProjectsService {
     }
 
     await this.assertAssignable([leadId, coLeadId]);
+    if (dto.is_rnd === true) await this.assertMayClassifyRnd(user);
 
     const project = await this.withCodeRetry(() =>
       this.prisma.$transaction(async (tx) => {
@@ -280,6 +284,9 @@ export class ProjectsService {
       dto.lead_id ?? null,
       dto.co_lead_id ?? null,
     ]);
+    if (dto.is_rnd !== undefined && dto.is_rnd !== project.is_rnd) {
+      await this.assertMayClassifyRnd(user);
+    }
 
     const data: Prisma.projectsUncheckedUpdateInput = { updated_at: new Date() };
     if (dto.title !== undefined) data.title = dto.title;
@@ -688,6 +695,28 @@ export class ProjectsService {
    *   or belongs to a vendor. Vendors reach projects through
    *   `vendor_assignments` and the vendor portal, never through membership.
    */
+  /**
+   * Guards the `is_rnd` flag, which is otherwise an ordinary column on the DTO.
+   *
+   * `p2_rnd_and_assets.md` puts the R&D team and MD/EA/PA in charge of what is
+   * R&D. Without this, any employee could create a project flagged `is_rnd` or
+   * flip an existing one, and the reports side of R&D would then scope its
+   * visibility around a classification the projects side let anybody set.
+   *
+   * Both directions are guarded on update. Clearing the flag hides a project
+   * from R&D oversight, which is the same decision as setting it.
+   *
+   * @throws ForbiddenException when the caller is neither on the R&D roster nor
+   *   holding an oversight role.
+   */
+  private async assertMayClassifyRnd(user: JwtPayload): Promise<void> {
+    if (OVERSIGHT_ROLES.includes(user.role)) return;
+    if (await this.rnd.isMember(user.sub)) return;
+    throw new ForbiddenException(
+      'Only the R&D team, MD, EA or PA can classify a project as R&D',
+    );
+  }
+
   private async assertAssignable(ids: (string | null)[]): Promise<void> {
     const wanted = [...new Set(ids.filter((id): id is string => !!id))];
     if (wanted.length === 0) return;
