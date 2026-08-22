@@ -1,4 +1,5 @@
 import axiosClient from './client';
+import { assistantChatSchema } from '@/lib/assistantValidation';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
@@ -37,18 +38,29 @@ export async function* ask(options: AskOptions): AsyncGenerator<AssistantEvent> 
   const token =
     typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
 
+  // Checked here so a malformed body fails with something readable rather than
+  // as a 400 from forbidNonWhitelisted listing field names.
+  const parsed = assistantChatSchema.safeParse({
+    conversation_id: options.conversationId,
+    question: options.question,
+    history: options.history,
+    page_context: options.pageContext,
+  });
+  if (!parsed.success) {
+    yield {
+      type: 'error',
+      message: parsed.error.issues[0]?.message ?? 'That question could not be sent.',
+    };
+    return;
+  }
+
   const response = await fetch(`${API_URL}/assistant/chat`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({
-      conversation_id: options.conversationId,
-      question: options.question,
-      history: options.history,
-      page_context: options.pageContext,
-    }),
+    body: JSON.stringify(parsed.data),
     signal: options.signal,
   });
 

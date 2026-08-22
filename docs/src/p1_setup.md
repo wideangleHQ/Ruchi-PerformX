@@ -50,6 +50,9 @@ failing later.
 | `VMS_JWT_SECRET` | yes | Throws at import time in `vms-jwt.constants.ts` if unset |
 | `VMS_JWT_EXPIRES_IN` | no | Defaults to `8h` |
 | `ASSET_ENCRYPTION_KEY` | yes | 32 bytes, base64. AES-256-GCM key for company asset secrets. Throws at import in `assets.module.ts` if unset or not 32 bytes |
+| `OPENCODE_API_KEY` | yes | OpenCode Zen key for the assistant. Throws in the module body of `assistant.module.ts` if unset. Get one at [opencode.ai/auth](https://opencode.ai/auth) |
+| `ASSISTANT_MODEL` | no | Defaults to `laguna-s-2.1-free`, which is free. See the benchmark in `assistant.config.ts` before changing it |
+| `OPENCODE_BASE_URL` | no | Defaults to `https://opencode.ai/zen/v1`. For a self-hosted OpenAI-compatible gateway |
 | `PORT` | no | Defaults to `4000` |
 | `INTERNAL_API_KEY` | yes | Shared secret CareerX sends as `x-internal-api-key` |
 | `RESEND_API_KEY` | yes | Outbound email |
@@ -66,12 +69,16 @@ The two Supabase key names are a leftover from a rename that was never
 finished. Setting both to the service role key is the safe move until the
 duplicate is cleaned up.
 
-Three of these secrets kill the process at startup rather than at first use:
+Four of these secrets kill the process at startup rather than at first use:
 `JWT_SECRET` is checked in the module body of `auth.module.ts`,
 `VMS_JWT_SECRET` at the top level of
-`common/constants/vms-jwt.constants.ts`, and `ASSET_ENCRYPTION_KEY` in the
-module body of `modules/assets/assets.module.ts`. If the API exits immediately
-with no useful stack trace, check those three first.
+`common/constants/vms-jwt.constants.ts`, `ASSET_ENCRYPTION_KEY` in the
+module body of `modules/assets/assets.module.ts`, and `OPENCODE_API_KEY` in the
+module body of `modules/assistant/assistant.module.ts`. If the API exits
+immediately with no useful stack trace, check those four first.
+
+Failing at boot is deliberate in all four cases. A missing assistant key that
+surfaced halfway through a streamed answer would be a 500 nobody could place.
 
 Generate the asset key once and keep it with the other production secrets:
 

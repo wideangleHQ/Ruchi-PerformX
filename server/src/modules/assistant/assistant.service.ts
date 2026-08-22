@@ -15,9 +15,14 @@ import { HodScoreService } from '../hod-score/hod-score.service';
 import { UsersService } from '../users/users.service';
 import { DepartmentsService } from '../departments/departments.service';
 import { AssetsService } from '../assets/assets.service';
+import { SelfActionsService } from '../self-actions/self-actions.service';
 
 import { ASSISTANT_SYSTEM_PROMPT } from './assistant.prompt';
-import { AssistantProvider, resolveProvider } from './assistant.config';
+import {
+  AssistantProvider,
+  assistantClient,
+  resolveProvider,
+} from './assistant.config';
 import {
   AssistantTool,
   ToolDeps,
@@ -103,22 +108,13 @@ export class AssistantService {
     users: UsersService,
     departments: DepartmentsService,
     assets: AssetsService,
+    selfActions: SelfActionsService,
   ) {
-    // OpenCode Zen speaks the Anthropic protocol on /v1/messages and
-    // authenticates with x-api-key, so the same client reaches either gateway
-    // and only the base URL moves. baseURL is undefined for direct Anthropic.
+    // Resolved per instance because this service is request-scoped, but the
+    // client itself is a process singleton: see assistantClient.
     this.provider = resolveProvider(process.env);
-    this.client = new OpenAI({
-      apiKey: this.provider.apiKey,
-      baseURL: this.provider.baseURL,
-      // Zen authenticates with x-api-key. The SDK sends Authorization: Bearer,
-      // which Zen also accepts, but both are set so a change at either end does
-      // not turn into a 401 nobody can place.
-      defaultHeaders: { 'x-api-key': this.provider.apiKey },
-    });
-    this.logger.log(
-      `Assistant on OpenCode Zen, model ${this.provider.model}`,
-    );
+    this.client = assistantClient(process.env);
+
     this.deps = {
       leave,
       holidays,
@@ -132,6 +128,7 @@ export class AssistantService {
       users,
       departments,
       assets,
+      selfActions,
     };
   }
 

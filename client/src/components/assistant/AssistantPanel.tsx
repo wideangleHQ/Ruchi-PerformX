@@ -39,11 +39,31 @@ interface Exchange {
   rated?: 1 | -1;
 }
 
-/** New id per panel open. Groups the exchange log into one conversation. */
-const newConversationId = () =>
-  typeof crypto !== 'undefined' && crypto.randomUUID
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+/**
+ * New id per panel open. Groups the exchange log into one conversation.
+ *
+ * The server validates this with `@IsUUID()`, so the fallback has to produce a
+ * real v4 and not just something unique. `crypto.randomUUID` is undefined
+ * outside a secure context, and serving the app on a LAN address rather than
+ * localhost is exactly that case, which would otherwise 400 every question.
+ */
+const newConversationId = (): string => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+
+  const bytes = new Uint8Array(16);
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < 16; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+  bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 10
+
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+};
 
 export function AssistantPanel() {
   const pathname = usePathname();
