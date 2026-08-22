@@ -4,6 +4,7 @@ import { role_enum } from '@prisma/client';
 import {
   ALL_INTERNAL,
   ASSISTANT_TOOLS,
+  isVmsScoped,
   toolSchemas,
   toolsFor,
 } from './assistant-tools';
@@ -56,6 +57,33 @@ describe('vendors reach nothing', () => {
   it('keeps VENDOR out of ALL_INTERNAL and everyone else in', () => {
     expect(ALL_INTERNAL).not.toContain(role_enum.VENDOR);
     expect(ALL_INTERNAL).toHaveLength(Object.values(role_enum).length - 1);
+  });
+});
+
+// A RECEPTION kiosk token is minted as role_enum.ADMIN by access.service.ts,
+// and JwtAuthGuard accepts a VMS token on any path outside /vms/. ADMIN is in
+// ALL_INTERNAL, so without this the front desk terminal would reach the whole
+// admin catalog. Finding 2.3 in PHASE2-REMAINING.md is the real fix; this is
+// the assistant refusing to be one more thing that hole reaches.
+describe('a VMS kiosk token reaches nothing', () => {
+  const kiosk = (role: role_enum) =>
+    ({ sub: 'a1', role, scope: 'vms' }) as never;
+
+  it('gives a reception kiosk, which carries ADMIN, an empty catalog', () => {
+    expect(toolsFor(kiosk(role_enum.ADMIN))).toEqual([]);
+  });
+
+  it('gives an employee kiosk an empty catalog too', () => {
+    expect(toolsFor(kiosk(role_enum.EMPLOYEE))).toEqual([]);
+  });
+
+  it('still serves the same role without the vms scope', () => {
+    expect(toolsFor(as(role_enum.ADMIN)).length).toBeGreaterThan(0);
+  });
+
+  it('reads the scope claim, not the role', () => {
+    expect(isVmsScoped(kiosk(role_enum.ADMIN))).toBe(true);
+    expect(isVmsScoped(as(role_enum.ADMIN))).toBe(false);
   });
 });
 

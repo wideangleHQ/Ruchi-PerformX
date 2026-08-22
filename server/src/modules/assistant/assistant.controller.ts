@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Param,
   ParseUUIDPipe,
@@ -19,7 +20,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
 
 import { AssistantService, AssistantEvent } from './assistant.service';
-import { ALL_INTERNAL, toolsFor } from './assistant-tools';
+import { ALL_INTERNAL, isVmsScoped, toolsFor } from './assistant-tools';
 import { ChatDto, FeedbackDto } from './dto/chat.dto';
 
 /**
@@ -51,6 +52,12 @@ export class AssistantController {
     @CurrentUser() user: JwtPayload,
     @Res() res: Response,
   ): Promise<void> {
+    // A kiosk token would otherwise arrive here as ADMIN. See isVmsScoped.
+    // Refused rather than handed an empty catalog, so it reads as a refusal.
+    if (isVmsScoped(user)) {
+      throw new ForbiddenException('The assistant is not available from a VMS session');
+    }
+
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-transform',

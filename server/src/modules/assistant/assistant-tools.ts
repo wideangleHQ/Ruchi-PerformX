@@ -511,8 +511,31 @@ export const ASSISTANT_TOOLS: AssistantTool[] = [
  */
 export function toolsFor(user: JwtPayload): AssistantTool[] {
   if (user.role === role_enum.VENDOR) return [];
+  if (isVmsScoped(user)) return [];
   return ASSISTANT_TOOLS.filter((tool) => tool.roles.includes(user.role));
 }
+
+/**
+ * Whether this principal is a VMS kiosk token rather than a signed-in employee.
+ *
+ * `JwtAuthGuard` verifies the main secret first and falls back to the VMS secret
+ * on any path outside `/vms/`. A `VmsJwtPayload` carries a real `role`, and
+ * `access.service.ts` mints a RECEPTION kiosk as `role_enum.ADMIN`, so a token
+ * from the front desk terminal reaches the main API as an admin. The VMS client
+ * sends that token to every endpoint while the user is on a `/vms` page, so the
+ * fallback is load bearing and cannot simply be deleted: the reception audit
+ * screen calls `/audit`, which is missing its `/vms` prefix, and depends on it.
+ *
+ * That is finding 2.3 in `PHASE2-REMAINING.md`, it predates the assistant, and
+ * fixing it properly means changing the guard and shipping the VMS client in the
+ * same release. This check is not that fix. It only keeps the assistant, which
+ * is new surface, from being one more thing a kiosk token can reach.
+ */
+function isVmsScoped(user: JwtPayload): boolean {
+  return (user as JwtPayload & { scope?: string }).scope === 'vms';
+}
+
+export { isVmsScoped };
 
 /** The wire format, in catalog order so the cached prefix stays byte-stable. */
 export function toolSchemas(tools: AssistantTool[]): Anthropic.Tool[] {
