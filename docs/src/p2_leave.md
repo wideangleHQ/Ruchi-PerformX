@@ -229,6 +229,30 @@ HR administration:
 | GET | `/leave/reports/monthly` | HR, MD |
 | GET | `/leave/reports/export` | HR, MD |
 
+All seven now have a screen. They shipped without one, so configuring leave was
+an API-only operation and `leave_types` stayed empty, which meant nobody could
+apply for leave at all.
+
+| Screen | Route | Who |
+| --- | --- | --- |
+| Leave types | `/leave/admin/types` | HR, ADMIN |
+| Balances | `/leave/admin/balances` | HR |
+| Monthly report | `/leave/admin/reports` | HR, MD |
+
+Three screens rather than one Admin section, because the three routes do not
+share a role list. ADMIN may define a leave type but not read everybody's
+balances; the MD may read the report but not edit a type. `access.ts` mirrors
+`@Roles` per route so nobody is shown a button that 403s.
+
+Two things the screens say out loud, because the number is otherwise quietly
+wrong to whoever is reading it:
+
+- Editing `annual_entitlement` does not restate balances that already exist.
+  The server sets the column and leaves `leave_balances` alone.
+- A balance correction sets the column outright and leaves no application
+  behind it. It is for migrated numbers that are wrong, not for leave somebody
+  actually took.
+
 Holidays:
 
 | Method | Path | Roles |

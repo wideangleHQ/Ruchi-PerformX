@@ -20,6 +20,54 @@ export const applyLeaveSchema = z
 export type ApplyLeaveFormData = z.infer<typeof applyLeaveSchema>;
 
 /**
+ * Mirrors CreateLeaveTypeDto. `forbidNonWhitelisted` is on, so a field here
+ * without the matching DTO field is a 400 listing field names.
+ *
+ * `max_carry_forward` above `annual_entitlement` is refused here rather than on
+ * the server, which accepts it: carrying more than a year's entitlement is
+ * always a typo, and the balance arithmetic would quietly honour it.
+ */
+export const leaveTypeSchema = z
+  .object({
+    name: z.string().trim().min(1, 'Name is required').max(60),
+    annual_entitlement: z.coerce
+      .number()
+      .min(0, 'Entitlement cannot be negative')
+      .max(365, 'That is more days than there are in a year'),
+    is_paid: z.boolean(),
+    carry_forward: z.boolean(),
+    max_carry_forward: z.coerce.number().min(0).max(365),
+    requires_proof: z.boolean(),
+    is_active: z.boolean(),
+  })
+  .refine((d) => !d.carry_forward || d.max_carry_forward > 0, {
+    message: 'Set how many days may carry forward, or turn carry forward off',
+    path: ['max_carry_forward'],
+  })
+  .refine((d) => d.max_carry_forward <= d.annual_entitlement, {
+    message: 'Carry forward cannot exceed the annual entitlement',
+    path: ['max_carry_forward'],
+  });
+
+export type LeaveTypeFormData = z.infer<typeof leaveTypeSchema>;
+
+/**
+ * A balance correction. Every field optional: HR edits one column at a time and
+ * the server sets what it is given.
+ */
+export const leaveBalanceSchema = z
+  .object({
+    entitled: z.coerce.number().min(0).max(365).optional(),
+    used: z.coerce.number().min(0).max(365).optional(),
+    carried_over: z.coerce.number().min(0).max(365).optional(),
+  })
+  .refine((d) => Object.values(d).some((v) => v !== undefined), {
+    message: 'Change at least one value',
+  });
+
+export type LeaveBalanceFormData = z.infer<typeof leaveBalanceSchema>;
+
+/**
  * ponytail: weekly offs are a single company-wide constant, as p2_leave.md asks.
  * Sunday only. Per-employee shift calendars are the attendance module's job.
  */

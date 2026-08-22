@@ -38,6 +38,44 @@ export interface LeaveBalance {
   carried_over: Days;
 }
 
+/** `GET /leave/balances`, HR only. The list rows carry the person and the type
+ * resolved, which the per-user `/leave/balance` rows do not. */
+export interface LeaveBalanceRow extends LeaveBalance {
+  user_id_user?: LeaveUserSummary | null;
+  remaining: Days;
+  leave_type: LeaveType | null;
+}
+
+/** One person, one leave type, for the month asked for. */
+export interface MonthlyReportRow {
+  user_id: string;
+  employee_name: string;
+  employee_email: string;
+  leave_type_id: string;
+  leave_type_name: string;
+  days_taken: number;
+  days_remaining: number;
+  unpaid_days: number;
+}
+
+export interface MonthlyReport {
+  year: number;
+  month: number;
+  financial_year: number;
+  rows: MonthlyReportRow[];
+}
+
+/** Mirrors CreateLeaveTypeDto. Every field optional server side except the name. */
+export interface LeaveTypePayload {
+  name: string;
+  annual_entitlement: number;
+  is_paid: boolean;
+  carry_forward: boolean;
+  max_carry_forward: number;
+  requires_proof: boolean;
+  is_active: boolean;
+}
+
 /** Phase 2 tables carry plain FK columns, so type names are resolved from `/leave/types`. */
 export const leaveTypeName = (types: LeaveType[], id: string) =>
   types.find((type) => type.id === id)?.name ?? 'Leave';
@@ -164,5 +202,65 @@ export const leaveApi = {
       cancellation_reason,
     });
     return response.data;
+  },
+
+  // ------------------------------------------------------------------- admin
+
+  /**
+   * Creates a leave type. HR and ADMIN only.
+   *
+   * Nothing in the company can apply for leave until at least one of these
+   * exists, which is why this screen exists at all: the endpoint shipped in
+   * Phase 2 with no form in front of it.
+   */
+  createType: async (payload: LeaveTypePayload): Promise<LeaveType> => {
+    const response = await axiosClient.post<LeaveType>('/leave/types', payload);
+    return response.data;
+  },
+
+  /** Edits a type. Changing `annual_entitlement` does not restate existing balances. */
+  updateType: async (id: string, payload: Partial<LeaveTypePayload>): Promise<LeaveType> => {
+    const response = await axiosClient.patch<LeaveType>(`/leave/types/${id}`, payload);
+    return response.data;
+  },
+
+  /** Every balance for the financial year, or one person's. HR only. */
+  getBalances: (params?: { user_id?: string; leave_type_id?: string; year?: number }) =>
+    getList<LeaveBalanceRow>('/leave/balances', params),
+
+  /**
+   * HR's manual correction of one row. Sets the columns outright rather than
+   * incrementing, because this exists for migrated numbers that are wrong.
+   */
+  updateBalance: async (
+    id: string,
+    payload: { entitled?: number; used?: number; carried_over?: number },
+  ): Promise<LeaveBalanceRow> => {
+    const response = await axiosClient.patch<LeaveBalanceRow>(`/leave/balances/${id}`, payload);
+    return response.data;
+  },
+
+  /** Approved leave for one month, per person and type. HR and MD only. */
+  getMonthlyReport: async (params: { month: number; year: number }): Promise<MonthlyReport> => {
+    const response = await axiosClient.get<MonthlyReport>('/leave/reports/monthly', { params });
+    return response.data;
+  },
+
+  /**
+   * The same report as xlsx. Returned as a blob and saved from the browser,
+   * because the endpoint sets its own filename in the content-disposition and
+   * axios will not follow that on its own.
+   */
+  exportMonthly: async (params: { month: number; year: number }): Promise<void> => {
+    const response = await axiosClient.get('/leave/reports/export', {
+      params,
+      responseType: 'blob',
+    });
+    const url = URL.createObjectURL(response.data as Blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `leave-${String(params.month).padStart(2, '0')}-${params.year}.xlsx`;
+    link.click();
+    URL.revokeObjectURL(url);
   },
 };

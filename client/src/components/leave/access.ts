@@ -15,3 +15,27 @@ const APPROVER_ROLES = [...HR_ROLES, 'HOD', 'MD'];
 export const isLeaveHr = (role?: string | null) => Boolean(role && HR_ROLES.includes(role));
 
 export const canActOnLeave = (role?: string | null) => Boolean(role && APPROVER_ROLES.includes(role));
+
+/**
+ * The three admin routes do not share a role list, so neither do these.
+ * Mirrors `@Roles` on `leave.controller.ts` exactly:
+ *
+ *   POST/PATCH /leave/types      HR, ADMIN
+ *   GET/PATCH  /leave/balances   HR
+ *   GET        /leave/reports/*  HR, MD
+ *
+ * ADMIN can define leave types but not read everybody's balances, and the MD
+ * can read the report but not edit a type. Showing one screen's button on
+ * another's role is exactly the 403 this file exists to avoid.
+ */
+export const canManageLeaveTypes = (role?: string | null) =>
+  Boolean(role && HR_ROLES.includes(role));
+
+export const canManageLeaveBalances = (role?: string | null) => role === 'HR';
+
+export const canReadLeaveReports = (role?: string | null) =>
+  Boolean(role && (role === 'HR' || role === 'MD'));
+
+/** Whether to show the Admin entry point at all. */
+export const canAdminLeave = (role?: string | null) =>
+  canManageLeaveTypes(role) || canManageLeaveBalances(role) || canReadLeaveReports(role);
