@@ -80,6 +80,17 @@ immediately with no useful stack trace, check those four first.
 Failing at boot is deliberate in all four cases. A missing assistant key that
 surfaced halfway through a streamed answer would be a 500 nobody could place.
 
+On a hosted deploy this means the service will crash-loop rather than start, so
+`OPENCODE_API_KEY` has to be set before the deploy that first contains the
+assistant module, not after it. When it is set, the log line to look for is:
+
+```
+[Assistant] OpenCode Zen at https://opencode.ai/zen/v1, model laguna-s-2.1-free
+```
+
+It prints once per process, so it is also the quickest way to confirm which
+model a running deployment is actually answering with.
+
 Generate the asset key once and keep it with the other production secrets:
 
 ```bash
