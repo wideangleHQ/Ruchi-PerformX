@@ -1417,3 +1417,34 @@ model event_expenses {
 
   @@index([event_id])
 }
+
+/// One question and its answer. Serves four jobs that would otherwise be four
+/// tables: the decline log that says which tool to write next, the eval set,
+/// the thumbs feedback, and per-question token cost.
+///
+/// Conversation history is sent by the client rather than reassembled here, so
+/// nothing reads this table on the request path. It is written after the answer
+/// is complete and read only by whoever is building the next tool.
+///
+/// ponytail: no relations, matching every other Phase 2 table. Names come
+/// through user-lookup.helper like everywhere else.
+model assistant_exchanges {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversation_id String   @db.Uuid
+  user_id         String   @db.Uuid
+  question        String
+  answer          String
+  /// Tool names in call order. Empty when the model answered without one,
+  /// which for a tier 1 assistant almost always means it declined.
+  tools_used      String[]
+  declined        Boolean  @default(false)
+  feedback        Int?     @db.SmallInt
+  input_tokens    Int      @default(0)
+  output_tokens   Int      @default(0)
+  cached_tokens   Int      @default(0)
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([user_id, created_at])
+  @@index([declined, created_at])
+  @@index([conversation_id])
+}

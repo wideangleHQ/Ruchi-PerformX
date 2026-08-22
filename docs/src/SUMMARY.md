@@ -29,7 +29,7 @@
 - [Vendor management](p2_vendors.md)
 - [Notification engine rebuild](p2_notifications.md)
 - [CareerX and VMS integration](p2_integration.md)
-- [The PerformX Assistant (proposed)](p2_assistant.md)
+- [The PerformX Assistant](p2_assistant.md)
 
 ---
 

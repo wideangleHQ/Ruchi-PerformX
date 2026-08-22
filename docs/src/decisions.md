@@ -1102,3 +1102,46 @@ the laptops, since the pruning happens again on whichever machine runs it next.
 without `--frozen-lockfile` and so never complained. CI is now stricter than the
 justfile. A `package.json` edit that skips the lockfile fails the PR rather than
 passing quietly, which is the point, but it is a new way for a PR to go red.
+
+## 2026-08-22 The assistant is tier 1 only, and there is no RLS
+
+**Decision.** The PerformX Assistant ships with tier 1 and tier 3 from
+[The PerformX Assistant](p2_assistant.md) and without tier 2. Around thirty
+read-only tools call the same services the controllers call, passing the
+caller's own `JwtPayload`. The model never writes SQL, and no row level security
+policy was created. A question no tool covers is declined and logged.
+
+**Why.** Tier 2 was made safe by RLS, and RLS means writing the permission model
+a second time, in SQL, in the database. `DepartmentScopeService` says in its own
+header that it is the only location allowed to determine accessible departments,
+and forbids business services from reading `users.department_id`,
+`assistant_departments` or `hod_departments` directly. A policy set doing the
+same work is exactly the second location that file exists to prevent, and two
+copies of an authorization model drift.
+
+The cost was also understated. The API connects as `postgres`, which has
+`rolbypassrls`, so policies would not have engaged at all without a new database
+role, a session identity threaded through the Supabase pooler, and a red team
+suite running on every schema change forever. Meanwhile every module already
+exported the service its tools needed, so tier 1 was close to a wrapper job.
+
+**Instead of.** The full three tier design. That buys the analytical tail, the
+questions nobody wrote a tool for, and it is a real loss: "does leave correlate
+with missed deadlines" is now a decline. The judgement is that a second
+permission model is the more expensive thing to own.
+
+**Costs.** Novel analytical questions are declined rather than answered. The
+plan was to read a generated-SQL log to decide which tools to add next; with no
+tier 2 there is no such log, so `assistant_exchanges.declined` is the signal
+instead and `GET /assistant/declines` is the queue. A shape that keeps appearing
+there is the next tool to write.
+
+The other cost is subtler. Reaching services in process means the controller's
+`@Roles` guard does not run, so each tool carries the role list of the route it
+wraps. That is a copy, and copies drift. It is mitigated rather than solved:
+every tool names its route in a comment so a guard change is a grep, the catalog
+is filtered per caller before it is sent, and `assistant-tools.spec.ts` asserts
+that `VENDOR` appears in no tool and that an employee is offered neither
+company-wide leave nor anybody else's scores. A shared role constant, rather
+than the same nine-role list written out in five files, would remove the drift
+properly. That refactor is not in this change.

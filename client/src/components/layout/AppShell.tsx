@@ -2,6 +2,7 @@
 
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { AssistantPanel } from '../assistant/AssistantPanel';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -19,6 +20,9 @@ export function AppShell({ children }: AppShellProps) {
           </div>
         </main>
       </div>
+      {/* Every screen inside the shell, so the panel is reachable without
+          leaving what the user was doing. */}
+      <AssistantPanel />
     </div>
   );
 }

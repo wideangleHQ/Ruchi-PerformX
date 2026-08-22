@@ -30,6 +30,7 @@ import { PollsModule } from './modules/polls/polls.module';
 import { VendorsModule } from './modules/vendors/vendors.module';
 import { VendorPortalModule } from './modules/vendor-portal/vendor-portal.module';
 import { EventsModule } from './modules/events/events.module';
+import { AssistantModule } from './modules/assistant/assistant.module';
 import { InternalModule } from './modules/internal/internal.module';
 
 @Module({
@@ -66,6 +67,7 @@ import { InternalModule } from './modules/internal/internal.module';
     VendorsModule,
     VendorPortalModule,
     EventsModule,
+    AssistantModule,
     InternalModule,
   ],
   providers: [

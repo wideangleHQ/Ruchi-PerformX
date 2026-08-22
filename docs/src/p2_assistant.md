@@ -1,9 +1,24 @@
 # The PerformX Assistant
 
-**Status: proposed, not committed.** This is not one of the six Phase 2 modules
-in [Plan and sequencing](p2_plan.md). It was asked for separately and is scoped
-here so the engineering shape is settled before anyone quotes it. Nothing on
-this page is in the four week plan.
+**Status: built, tier 1 only, 2026-08-22.** Shipped as `modules/assistant/` on
+the server and `components/assistant/` on the client.
+
+This page is the design as proposed. Two parts of it were not built, and the
+difference matters when reading the rest:
+
+- **Tier 2, the model writing scoped SQL, does not exist.** Nor does the row
+  level security that was to make it safe. The reasoning is in
+  [Decisions](decisions.md), *The assistant is tier 1 only, and there is no
+  RLS*: the policies would have been a second copy of `DepartmentScopeService`,
+  and that file exists to be the only copy. Everything below under *How tier 2
+  stays safe* is unbuilt design, kept because it is the argument to revisit if
+  the decline log ever justifies it.
+- **The eval set does not exist.** The 150 question set under *Evaluation* was
+  to be built from what the client actually asks, and nobody has asked yet.
+  `assistant_exchanges` is where it accumulates.
+
+What did get built follows the rest of this page: the tool catalog, the
+conversation design, the interface, and Haiku 4.5 as the model.
 
 A conversational surface inside PerformX that lets MD, EA, PA, and HODs ask the
 company a question in plain language instead of assembling the answer across
@@ -149,7 +164,7 @@ so `GET /leave/applications` scopes to their department exactly as it does in
 the UI. Fast, cheap, and correct by construction. This covers the routine
 questions: balances, task counts, project status, vendor deadlines, holidays.
 
-**Tier 2, scoped SQL for the analytical tail.** When the question is genuinely
+**Tier 2, scoped SQL for the analytical tail. Not built, see the status note above.** When the question is genuinely
 novel, such as whether leave correlates with missed deadlines, the model writes
 a read-only `SELECT`. This is what makes it a chatbot rather than a menu.
 
