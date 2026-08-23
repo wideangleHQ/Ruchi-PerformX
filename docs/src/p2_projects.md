@@ -301,6 +301,22 @@ health badge, and the deadline with an overdue indicator.
 checklist, milestones, KPIs, messages, outcomes, and activity log. Progress,
 health, and deadline visible at the top regardless of which panel is open.
 
+**Project edit.** `/projects/:id/edit`, reached from the Edit button on the
+detail page. A flat list of what `PATCH /projects/:id` accepts. Three fields it
+deliberately leaves out:
+
+- `status`, which the lifecycle control on the detail page owns because it moves
+  through the transition table and a select that refuses half its options
+  belongs next to what it describes.
+- `lead_id`. Handing a project to somebody else is not a select buried in a form
+  the Co-Lead can also submit.
+- `is_rnd` and `rnd_category` for anyone outside the R&D team. The server
+  refuses the change, so the fields render only when `GET /rnd/membership`
+  says the caller is a member.
+
+Deleting lives at the bottom of the same screen behind a confirm, and is gated
+separately: editing is the Lead or the Co-Lead, deleting is the Lead or the MD.
+
 **Closure report form.** All closure fields from the section above. Only
 reachable by the Lead/Co-Lead and only when the project is `ACTIVE`. After
 submission the project moves to `COMPLETED` and the form becomes a read-only

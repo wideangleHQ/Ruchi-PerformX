@@ -1256,3 +1256,34 @@ parse lands in the `unchecked` list, which is asserted, so the failure is a
 noisy one rather than a silent pass. Two vendor portal calls that build their
 body with a conditional spread are listed in `READ_BY_HAND` and were checked
 against their DTOs by hand.
+
+## 2026-08-23 Project editing is its own form, not the creation form reused
+
+**Decision.** `ProjectEditForm` is a separate component from `ProjectForm`.
+
+**Why.** They are different shapes. Creation is a wizard: three required fields
+up front and collapsible sections for milestones, KPIs and success criteria that
+`useCreateProject` posts to their own endpoints once the project exists. Editing
+is a flat list of what one PATCH accepts, and those extras already have their
+own tabs on the detail page. One component with a mode flag would branch on that
+flag in the defaults, the submit handler, the redirect and half the JSX.
+
+**Instead of.** The vendor pattern, where `VendorForm` takes an optional
+`vendor` and serves both screens. That works there because vendor creation and
+vendor editing take the same fields. Here they do not.
+
+**Costs.** Two forms for one entity, so a new field on the project has two
+places to add it. The `ponytail:` note on the component says to merge them if a
+third caller appears or the field lists converge.
+
+## 2026-08-23 Deleting a project is gated apart from editing it
+
+**Decision.** The delete panel on the edit screen checks Lead or MD, separately
+from the Lead or Co-Lead check that lets the caller onto the screen at all.
+
+**Why.** `ProjectsService.remove` refuses a Co-Lead, and `update` does not. A
+single check would either show a Co-Lead a button that always 403s, or keep the
+MD off a screen they are entitled to use.
+
+**Costs.** Two permission expressions on one page, which reads as an
+inconsistency until you know the service enforces exactly that.

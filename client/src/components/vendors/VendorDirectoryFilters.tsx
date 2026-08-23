@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { VendorFilters, VendorStatus } from '@/api/vendors';
 import { useVendorCategories } from '@/hooks/useVendors';
-import { useDepartmentOptions, useUserOptions } from './pickers';
+import { useDepartmentOptions, useUserOptions } from '@/components/pickers';
 
 const selectClass =
   'h-8 rounded-lg border border-input bg-white px-3 text-sm text-slate-700 outline-none';

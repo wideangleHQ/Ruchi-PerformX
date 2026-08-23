@@ -24,6 +24,35 @@ export const createProjectSchema = z.object({
 
 export type CreateProjectFormData = z.infer<typeof createProjectSchema>;
 
+/**
+ * The editable surface of an existing project. It is not `createProjectSchema`
+ * made partial: creation and editing differ in what they may touch.
+ *
+ * `status` is absent because the lifecycle control on the detail page owns it
+ * and runs it through the transition table. `lead_id` is absent because
+ * handing a project to somebody else deserves its own control rather than a
+ * select buried in a form a co-lead can submit. `is_rnd` is here but only
+ * rendered for an R&D team member, because the server rejects the change from
+ * anybody else.
+ */
+export const updateProjectSchema = z.object({
+  title: z.string().min(1, 'Project name is required').max(255, 'Project name is too long'),
+  project_type: z.string().max(100).optional(),
+  category: z.string().max(100).optional(),
+  priority,
+  objective: z.string().min(1, 'Objective is required').max(500, 'Keep the objective short'),
+  description: z.string().min(1, 'Description is required').max(4000),
+  tags: z.array(z.string()).optional(),
+  start_date: z.string().optional(),
+  deadline: z.string().optional(),
+  co_lead_id: z.string().optional(),
+  department_id: z.string().optional(),
+  is_rnd: z.boolean().optional(),
+  rnd_category: z.string().max(100).optional(),
+});
+
+export type UpdateProjectFormData = z.infer<typeof updateProjectSchema>;
+
 export const checklistItemSchema = z.object({
   title: z.string().min(1, 'Title is required').max(255),
   description: z.string().max(2000).optional(),
