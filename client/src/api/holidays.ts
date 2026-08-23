@@ -23,8 +23,17 @@ export interface CreateHolidayInput {
   departmentId?: string;
 }
 
-/** No `departmentId`: moving tiers is a delete plus a create, and the API 400s on it. */
-export type UpdateHolidayInput = Partial<Omit<CreateHolidayInput, 'departmentId'>>;
+export interface UpdateHolidayInput {
+  name?: string;
+  date?: string;
+  isOptional?: boolean;
+  /**
+   * Moves the holiday between tiers. A department id sets the department-wise
+   * tier, `null` returns it to the company-wide tier, and omitting the field
+   * leaves the tier alone. A HOD may only move between their own departments.
+   */
+  departmentId?: string | null;
+}
 
 export const holidaysApi = {
   getHolidays: async (year?: number): Promise<Holiday[]> => {

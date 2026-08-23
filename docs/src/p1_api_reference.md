@@ -503,9 +503,16 @@ gets a 403. HR is treated as company-wide here and only here; it is not in
 `DepartmentScopeService`'s unrestricted list, because for tasks and scores it is
 not unrestricted.
 
-`PATCH` takes `name`, `date`, and `isOptional` only. There is no `departmentId`,
-so moving a holiday between tiers is a delete plus a create, and sending one
-returns a 400 from `forbidNonWhitelisted`.
+`PATCH` takes `name`, `date`, `isOptional` and `departmentId`. The last one
+moves the holiday between tiers: a department id sets the department-wise tier,
+an explicit `null` returns it to the common tier, and omitting the field leaves
+the tier alone.
+
+A move is checked against both tiers, the one being left and the one being
+joined, so a HOD cannot promote their department's holiday to company-wide or
+hand it to a department that is not theirs. The pair of checks is what makes it
+safe; a single check on the existing row would let a HOD give the whole company
+a day off. `holiday-tier-move.spec.ts` covers all four cases.
 
 Dates are `YYYY-MM-DD` in both directions. A duplicate returns 409 rather than
 500: the model's `[holiday_date, name, department_id]` unique index catches the

@@ -1287,3 +1287,36 @@ MD off a screen they are entitled to use.
 
 **Costs.** Two permission expressions on one page, which reads as an
 inconsistency until you know the service enforces exactly that.
+
+## 2026-08-23 A holiday tier move is one PATCH, checked against both tiers
+
+**Decision.** `UpdateHolidayDto` takes `departmentId`, where a UUID sets the
+department-wise tier and an explicit null returns the holiday to the common
+tier. `HolidaysService.update` runs `assertCanWrite` against the tier being left
+and again against the tier being joined.
+
+**Why.** The previous answer was a delete plus a create, written down in the DTO
+as a deliberate choice. It is not one anybody can follow: two calls with no
+transaction between them, and if the create fails on a duplicate the holiday is
+gone. The move is also the operation most likely to be wanted, because the usual
+reason to touch a holiday is that it was filed against the wrong tier.
+
+The pair of checks is the whole safety argument. Checking only the existing row
+would let a HOD move their department's holiday to the common tier and give the
+company a day off, which is a larger power than anything else the role has.
+`holiday-tier-move.spec.ts` fails on both permission cases if the second check is
+removed, which was verified rather than assumed.
+
+**Instead of.** A dedicated `PATCH /holidays/:id/tier`. Rejected because the
+authorisation is the same shape as the rest of the update and would be written
+twice.
+
+**Costs.** `@IsOptional()` skips null as well as undefined, which is what lets
+null mean "move to common". That is not obvious from reading the DTO, so it is
+written above the field. Anyone adding a nullable field to another DTO should
+know the same trick applies.
+
+`assertCanWrite` now also checks the department exists for HR and ADMIN. They
+were the only callers who could pass an arbitrary id, and it reached Postgres as
+a foreign key violation and surfaced as a 500. A HOD's id was already proven by
+the scope check.
