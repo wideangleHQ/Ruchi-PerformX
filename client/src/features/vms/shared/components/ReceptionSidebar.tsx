@@ -21,7 +21,7 @@ export function ReceptionSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const resetAccess = useAccessStore((state) => state.reset);
+  const clearAccessCode = useAccessStore((state) => state.clear);
 
   const navigation = [
     { label: 'Dashboard', href: '/vms/reception/dashboard', icon: LayoutDashboard },
@@ -40,7 +40,7 @@ export function ReceptionSidebar() {
     localStorage.removeItem('vmsAccessToken');
     localStorage.removeItem('vmsAccessType');
     queryClient.clear();
-    resetAccess();
+    clearAccessCode();
     router.push('/vms');
   };
 

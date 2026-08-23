@@ -51,11 +51,11 @@ export default function DashboardPage() {
   const chartData = data?.chartData ?? [];
   const departmentSummary = data?.departmentSummary ?? [];
   const kpis = data
-    ? kpiConfig.map(({ key, title, subtitle, icon, prefix = '', suffix = '' }) => ({
+    ? kpiConfig.map(({ key, title, subtitle, icon, suffix }) => ({
         title,
         subtitle,
         icon,
-        value: `${prefix}${Number(data[key]).toLocaleString()}${suffix}`,
+        value: `${Number(data[key]).toLocaleString()}${suffix}`,
       }))
     : [];
   const criticalActions = data

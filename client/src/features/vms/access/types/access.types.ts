@@ -16,8 +16,12 @@ export interface VerifyAccessResponse {
 
 export type AccessSubmitHandler = (code: string) => Promise<void> | void;
 
+// The keypad holds the code, so it is always a string and never null. Digits
+// go in one at a time and `clear` empties it, both on backspace-to-empty and
+// on sign-out.
 export interface AccessStore {
-  code: string | null;
-  setCode: (code: string | null) => void;
-  clearCode: () => void;
+  code: string;
+  appendDigit: (digit: string) => void;
+  removeDigit: () => void;
+  clear: () => void;
 }

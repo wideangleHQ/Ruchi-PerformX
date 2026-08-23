@@ -66,7 +66,7 @@ export function UserTable({
               key={user.id}
               className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
             >
-              <td className="px-6 py-4 text-sm text-gray-900">{user.name}</td>
+              <td className="px-6 py-4 text-sm text-gray-900">{user.fullName}</td>
               <td className="px-6 py-4 text-sm text-gray-600">{user.email}</td>
               <td className="px-6 py-4 text-sm text-gray-600">{user.username}</td>
               <td className="px-6 py-4">

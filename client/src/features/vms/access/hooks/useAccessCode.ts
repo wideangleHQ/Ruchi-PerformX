@@ -10,7 +10,6 @@ export const useAccessCode = ({ onSubmit }: UseAccessCodeProps = {}) => {
   const appendDigit = useAccessStore((state) => state.appendDigit);
   const removeDigit = useAccessStore((state) => state.removeDigit);
   const clear = useAccessStore((state) => state.clear);
-  const reset = useAccessStore((state) => state.reset);
 
   const canSubmit = code.length === 3 || code.length === 4;
 
@@ -25,7 +24,6 @@ export const useAccessCode = ({ onSubmit }: UseAccessCodeProps = {}) => {
     appendDigit,
     removeDigit,
     clear,
-    reset,
     canSubmit,
     submit,
   };
