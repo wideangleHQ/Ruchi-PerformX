@@ -60,6 +60,16 @@ with `forbidNonWhitelisted: true`, so a property that is not on the DTO causes a
 400 rather than being stripped. When a frontend form gains a field, the DTO has
 to gain it in the same change.
 
+Field casing is not consistent across modules and cannot be made so cheaply. The
+Phase 1 modules and `events`, `holidays`, `polls` and `assets` are camelCase.
+`leave`, `rnd`, `projects` and the vendor work tables are snake_case, matching
+their columns. `vendors` is both: the vendor row is camelCase and the work rows
+under it are snake_case.
+
+Do not guess which a module uses. `server/src/common/api-contract.spec.ts` reads
+every DTO and every call in `client/src/api`, and fails the build when the two
+disagree. It runs in the ordinary `vitest` job.
+
 ### Services
 
 Inject `PrismaService`. Throw Nest HTTP exceptions directly:
@@ -147,6 +157,12 @@ client is `AuthContext` only; the API is the real gate.
 in `client/src/lib/validation.ts` and `taskValidation.ts`. Keep the zod schema
 and the backend DTO in agreement, because `forbidNonWhitelisted` turns a
 mismatch into a 400 with an unhelpful message.
+
+Where the form field names and the DTO field names differ, map them in one named
+function at the submit boundary, the way `VendorForm.toPayload` does, rather
+than relying on the two lists happening to match. A cast to the payload type at
+the call site hides exactly this mistake from `tsc`, which is how the projects
+module shipped unable to write.
 
 ### UI
 

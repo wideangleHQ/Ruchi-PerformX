@@ -1225,3 +1225,34 @@ level with a real purpose.
 **Costs.** A manager who has lost access sees the tabs quietly change shape
 rather than being told why. The vendor access screen is where that is visible,
 and the API is still the real gate either way.
+
+## 2026-08-23 The client and server field names are checked, not agreed
+
+**Decision.** `server/src/common/api-contract.spec.ts` parses every DTO in the
+server and every call in `client/src/api`, and fails when a call sends a field
+its route would reject. The server keeps its mixed casing.
+
+**Why.** Two chapters of this handbook already told people to keep the zod
+schema and the DTO in step, and the whole projects module still shipped unable
+to write: `POST /projects` sent `projectType` where the DTO declares
+`project_type`, and `forbidNonWhitelisted` turned that into a 400. Password
+reset, leave approval, vendor creation, vendor access grants and all six vendor
+work tab reads were wrong the same way. A rule nothing enforces is a rule that
+holds until the first person who has not read it.
+
+**Instead of.** Normalising the server on one convention, which is the fix that
+removes the problem rather than detecting it. Rejected for size: it touches
+DTOs, services and every client call at once, days before a demo, with no test
+suite on the client to catch what it breaks. Worth doing later, and the spec is
+what makes it safe to attempt.
+
+Also rejected: a global interceptor that rewrites incoming keys. There is no
+single direction to rewrite in, because the server genuinely uses both, so it
+would have to know which module it was serving.
+
+**Costs.** It is regex over two source trees, not a TypeScript program, so it
+reads the shapes those trees use today. A call written in a shape it cannot
+parse lands in the `unchecked` list, which is asserted, so the failure is a
+noisy one rather than a silent pass. Two vendor portal calls that build their
+body with a conditional spread are listed in `READ_BY_HAND` and were checked
+against their DTOs by hand.

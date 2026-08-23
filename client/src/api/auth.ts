@@ -7,6 +7,7 @@ import type {
   ForgotPasswordRequest,
   VerifyResetOtpRequest,
   ResetPasswordRequest,
+  VerifyResetOtpResponse,
   MessageResponse,
   JwtUser,
 } from './types';
@@ -38,8 +39,8 @@ export const authApi = {
   },
 
   /** Inactive while OTP is disabled. Keep for future use. */
-  verifyResetOtp: async (data: VerifyResetOtpRequest): Promise<MessageResponse> => {
-    const response = await axiosClient.post<MessageResponse>('/auth/verify-reset-otp', data);
+  verifyResetOtp: async (data: VerifyResetOtpRequest): Promise<VerifyResetOtpResponse> => {
+    const response = await axiosClient.post<VerifyResetOtpResponse>('/auth/verify-reset-otp', data);
     return response.data;
   },
 

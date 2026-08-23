@@ -68,7 +68,7 @@ export function OutcomesPanel({
 
   const submit = async () => {
     if (!entryType) return;
-    const parsed = outcomeSchema.safeParse({ entryType, content: content.trim() });
+    const parsed = outcomeSchema.safeParse({ entry_type: entryType, content: content.trim() });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? 'Write what happened');
       return;

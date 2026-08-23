@@ -48,7 +48,7 @@ export function MilestonesPanel({
 
   const form = useForm<MilestoneFormData>({
     resolver: zodResolver(milestoneSchema),
-    defaultValues: { name: '', description: '', ownerId: '', startDate: '', dueDate: '', status: 'PLANNED' },
+    defaultValues: { name: '', description: '', owner_id: '', start_date: '', due_date: '', status: 'PLANNED' },
   });
 
   const onAdd = async (values: MilestoneFormData) => {
@@ -102,7 +102,7 @@ export function MilestonesPanel({
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">Owner</label>
-              <select {...form.register('ownerId')} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+              <select {...form.register('owner_id')} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
                 <option value="">Unassigned</option>
                 {users.map((user) => (
                   <option key={user.id} value={user.id}>
@@ -123,11 +123,11 @@ export function MilestonesPanel({
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">Start date</label>
-              <Input type="date" {...form.register('startDate')} />
+              <Input type="date" {...form.register('start_date')} />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">Due date</label>
-              <Input type="date" {...form.register('dueDate')} />
+              <Input type="date" {...form.register('due_date')} />
             </div>
           </div>
           <div className="mt-4 flex justify-end">

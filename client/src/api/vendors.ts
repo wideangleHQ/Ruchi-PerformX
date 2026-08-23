@@ -235,21 +235,26 @@ export interface VendorFilters {
 }
 
 /** POST /vendors. Section 1 fields only — contracts carry their own dates. */
+/**
+ * `CreateVendorDto` is camelCase, unlike the vendor work DTOs below it, which
+ * are snake_case. The rows that come back are snake_case either way, because
+ * those are column names. Mapping happens in `VendorForm.toPayload`.
+ */
 export interface CreateVendorPayload {
   name: string;
-  owner_id: string;
-  vendor_type?: string;
-  category_id?: string;
+  ownerId: string;
+  vendorType?: string;
+  categoryId?: string;
   description?: string;
-  contact_person?: string;
-  contact_email?: string;
-  contact_phone?: string;
-  alternate_contact?: string;
-  company_address?: string;
+  contactPerson?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  alternateContact?: string;
+  companyAddress?: string;
   website?: string;
-  start_date?: string;
-  department_id?: string;
-  secondary_owner_id?: string;
+  startDate?: string;
+  departmentId?: string;
+  secondaryOwnerId?: string;
   notes?: string;
   tags?: string[];
 }
@@ -411,7 +416,7 @@ export const vendorsApi = {
   getAssignments: async (vendorId: string): Promise<VendorAssignment[]> => {
     const response = await axiosClient.get<VendorAssignment[] | PaginatedResponse<VendorAssignment>>(
       '/vendor-assignments',
-      { params: { vendorId } },
+      { params: { vendor_id: vendorId } },
     );
     return toList(response.data);
   },
@@ -419,7 +424,7 @@ export const vendorsApi = {
   getContracts: async (vendorId: string): Promise<VendorContract[]> => {
     const response = await axiosClient.get<VendorContract[] | PaginatedResponse<VendorContract>>(
       '/vendor-contracts',
-      { params: { vendorId } },
+      { params: { vendor_id: vendorId } },
     );
     return toList(response.data);
   },
@@ -427,7 +432,7 @@ export const vendorsApi = {
   getDocuments: async (vendorId: string): Promise<VendorDocument[]> => {
     const response = await axiosClient.get<VendorDocument[] | PaginatedResponse<VendorDocument>>(
       '/vendor-documents',
-      { params: { vendorId } },
+      { params: { vendor_id: vendorId } },
     );
     return toList(response.data);
   },
@@ -435,7 +440,7 @@ export const vendorsApi = {
   getDeliverables: async (vendorId: string): Promise<VendorDeliverable[]> => {
     const response = await axiosClient.get<VendorDeliverable[] | PaginatedResponse<VendorDeliverable>>(
       '/vendor-deliverables',
-      { params: { vendorId } },
+      { params: { vendor_id: vendorId } },
     );
     return toList(response.data);
   },
@@ -443,7 +448,7 @@ export const vendorsApi = {
   getNotes: async (vendorId: string): Promise<VendorNote[]> => {
     const response = await axiosClient.get<VendorNote[] | PaginatedResponse<VendorNote>>(
       '/vendor-notes',
-      { params: { vendorId } },
+      { params: { vendor_id: vendorId } },
     );
     return toList(response.data);
   },
@@ -461,7 +466,7 @@ export const vendorsApi = {
   getReviews: async (vendorId: string): Promise<VendorReview[]> => {
     const response = await axiosClient.get<VendorReview[] | PaginatedResponse<VendorReview>>(
       '/vendor-reviews',
-      { params: { vendorId } },
+      { params: { vendor_id: vendorId } },
     );
     return toList(response.data);
   },
@@ -497,7 +502,7 @@ export const vendorsApi = {
 
   updateContract: async (
     id: string,
-    payload: Partial<CreateContractPayload>,
+    payload: Partial<Omit<CreateContractPayload, 'vendor_id'>>,
   ): Promise<VendorContract> => {
     const response = await axiosClient.patch<VendorContract>(`/vendor-contracts/${id}`, payload);
     return response.data;
@@ -525,7 +530,7 @@ export const vendorsApi = {
 
   updateDeliverable: async (
     id: string,
-    payload: Partial<CreateDeliverablePayload>,
+    payload: Partial<Omit<CreateDeliverablePayload, 'vendor_id'>>,
   ): Promise<VendorDeliverable> => {
     const response = await axiosClient.patch<VendorDeliverable>(`/vendor-deliverables/${id}`, payload);
     return response.data;
@@ -552,8 +557,8 @@ export const vendorsApi = {
   },
 
   grantAccess: async (payload: {
-    user_id: string;
-    access_level: VendorAccessLevel;
+    userId: string;
+    accessLevel: VendorAccessLevel;
   }): Promise<VendorAccessGrant> => {
     const response = await axiosClient.post<VendorAccessGrant>('/vendor-access', payload);
     return response.data;

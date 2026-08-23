@@ -21,7 +21,6 @@ export type CreateTaskFormData = z.infer<typeof createTaskSchema>;
 export const updateTaskSchema = z.object({
   title: z.string().min(1, 'Title is required').max(255).optional(),
   description: z.string().min(1).max(2000).optional(),
-  status: z.enum(['TODO', 'IN_PROGRESS', 'COMPLETED', 'BLOCKED']).optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional(),
   dueDate: z.string().optional(),
 });

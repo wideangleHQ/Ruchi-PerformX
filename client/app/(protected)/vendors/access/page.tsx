@@ -83,7 +83,7 @@ function AccessManagement() {
             disabled={!userId || grant.isPending}
             onClick={() =>
               grant.mutate(
-                { user_id: userId, access_level: accessLevel },
+                { userId, accessLevel },
                 { onSuccess: () => setUserId('') },
               )
             }

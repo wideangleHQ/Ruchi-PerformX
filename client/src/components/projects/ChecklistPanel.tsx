@@ -48,7 +48,7 @@ export function ChecklistPanel({
 
   const form = useForm<ChecklistItemFormData>({
     resolver: zodResolver(checklistItemSchema),
-    defaultValues: { title: '', description: '', assignedToId: '', dueDate: '' },
+    defaultValues: { title: '', description: '', assigned_to_id: '', due_date: '' },
   });
 
   const onAdd = async (values: ChecklistItemFormData) => {
@@ -98,7 +98,7 @@ export function ChecklistPanel({
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">Assignee</label>
               <select
-                {...form.register('assignedToId')}
+                {...form.register('assigned_to_id')}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
               >
                 <option value="">Unassigned</option>
@@ -111,7 +111,7 @@ export function ChecklistPanel({
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">Due date</label>
-              <Input type="date" {...form.register('dueDate')} />
+              <Input type="date" {...form.register('due_date')} />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">Priority</label>
@@ -150,7 +150,7 @@ export function ChecklistPanel({
                   checked={item.is_done}
                   disabled={!canTick(item) || updateItem.isPending}
                   onChange={(event) =>
-                    updateItem.mutate({ itemId: item.id, payload: { isDone: event.target.checked } })
+                    updateItem.mutate({ itemId: item.id, payload: { is_done: event.target.checked } })
                   }
                   className="mt-1 h-4 w-4 rounded border-gray-300 accent-green-600 disabled:opacity-40"
                 />

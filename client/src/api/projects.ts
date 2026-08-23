@@ -174,23 +174,29 @@ export interface ProjectFilters {
   departmentId?: string;
   leadId?: string;
   category?: string;
-  from?: string;
-  to?: string;
+  dateFrom?: string;
+  dateTo?: string;
   page?: number;
   limit?: number;
 }
 
+/**
+ * The projects DTOs are snake_case, matching their columns. `main.ts` sets
+ * `forbidNonWhitelisted`, so a camelCase key here is a 400 rather than a field
+ * the server quietly ignores. The forms keep their own names and map at the
+ * boundary; `api-contract.spec.ts` on the server holds the two in agreement.
+ */
 export interface CreateProjectPayload {
   title: string;
-  projectType?: string;
+  project_type?: string;
   category?: string;
   priority: ProjectPriority;
   objective: string;
   description: string;
   tags?: string[];
-  startDate?: string;
+  start_date?: string;
   deadline?: string;
-  coLeadId?: string;
+  co_lead_id?: string;
 }
 
 export interface UpdateProjectPayload extends Partial<CreateProjectPayload> {
@@ -201,22 +207,22 @@ export interface ChecklistItemPayload {
   title: string;
   description?: string;
   priority?: ProjectPriority;
-  assignedToId?: string;
-  dueDate?: string;
-  sortOrder?: number;
+  assigned_to_id?: string;
+  due_date?: string;
+  sort_order?: number;
 }
 
 /** Lead and Co-Lead may send any field; a member may only send `isDone`. */
 export interface UpdateChecklistItemPayload extends Partial<ChecklistItemPayload> {
-  isDone?: boolean;
+  is_done?: boolean;
 }
 
 export interface MilestonePayload {
   name: string;
   description?: string;
-  ownerId?: string;
-  startDate?: string;
-  dueDate?: string;
+  owner_id?: string;
+  start_date?: string;
+  due_date?: string;
   status?: MilestoneStatus;
 }
 
@@ -284,7 +290,7 @@ export const projectsApi = {
   },
 
   /** POST /projects/:id/members */
-  addMember: async (id: string, payload: { userId: string; role: ProjectMemberRole }): Promise<ProjectMember> => {
+  addMember: async (id: string, payload: { user_id: string; role: ProjectMemberRole }): Promise<ProjectMember> => {
     const response = await axiosClient.post<ProjectMember>(`/projects/${id}/members`, payload);
     return response.data;
   },
@@ -357,7 +363,7 @@ export const projectsApi = {
   /** POST /projects/:id/success-criteria */
   createSuccessCriterion: async (
     id: string,
-    payload: { criterion: string; isMet?: boolean; sortOrder?: number },
+    payload: { criterion: string; sort_order?: number },
   ): Promise<SuccessCriterion> => {
     const response = await axiosClient.post<SuccessCriterion>(`/projects/${id}/success-criteria`, payload);
     return response.data;
@@ -402,7 +408,7 @@ export const projectsApi = {
   /** POST /projects/:id/outcomes */
   createOutcome: async (
     id: string,
-    payload: { entryType: OutcomeType; content: string },
+    payload: { entry_type: OutcomeType; content: string },
   ): Promise<ProjectOutcome> => {
     const response = await axiosClient.post<ProjectOutcome>(`/projects/${id}/outcomes`, payload);
     return response.data;
