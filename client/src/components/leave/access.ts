@@ -9,8 +9,15 @@
  */
 const HR_ROLES = ['HR', 'ADMIN'];
 
-/** Approve and reject. MD is here because an approver's own leave routes to them. */
-const APPROVER_ROLES = [...HR_ROLES, 'HOD', 'MD'];
+/**
+ * Approve and reject. MD is here because an approver's own leave routes to them.
+ *
+ * Built independently of `HR_ROLES` rather than spread from it. ADMIN belongs in
+ * that list because it may define a leave type, but `APPROVER_ROLES` on
+ * `leave.controller.ts` is HOD, HR, MD only, so spreading it showed an ADMIN a
+ * Pending Approvals button that 403s on arrival.
+ */
+const APPROVER_ROLES = ['HR', 'HOD', 'MD'];
 
 export const isLeaveHr = (role?: string | null) => Boolean(role && HR_ROLES.includes(role));
 

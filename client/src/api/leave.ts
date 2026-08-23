@@ -1,4 +1,5 @@
 import axiosClient from './client';
+import type { Holiday } from './holidays';
 
 export type LeaveStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 
@@ -107,31 +108,41 @@ export interface LeaveApplication {
   approved_by_id_user?: LeaveUserSummary | null;
   cancelled_by_id_user?: LeaveUserSummary | null;
   /** Only on the pending-approvals response: the applicant's remaining days for this type. */
-  remaining_balance?: Days | null;
-  attachments?: Array<{ id: string; file_name: string; file_url: string }>;
+  /** The applicant's remaining balance for this type, sent on the pending list. */
+  applicant_balance?: Days | null;
+  /** Proof is a link on the row, not a `task_attachments` join. */
+  attachment_url?: string | null;
 }
 
-export interface Holiday {
-  id: string;
-  name: string;
-  holiday_date: string;
-  is_optional: boolean;
-  department_id: string | null;
-  year: number;
-}
+// The holiday wire shape lives in `api/holidays.ts` and is camelCase, unlike
+// the rest of this module. A second snake_case copy here read `holiday_date`,
+// which the server has never sent, and the apply form's day-count preview threw
+// on `undefined.slice(0, 10)` as soon as both dates were filled in.
+export type { Holiday } from './holidays';
 
 export interface ApplyLeavePayload {
   leave_type_id: string;
   start_date: string;
   end_date: string;
   reason: string;
-  attachments?: File[];
+  /** A link, not a file. See `apply` below. */
+  attachment_url?: string;
 }
 
-/** Endpoints return either a bare array or a paginated envelope depending on the module. */
+/**
+ * Endpoints return a bare array or one of three envelopes, depending on the
+ * handler. `/leave/applications/mine` and `/pending` wrap in `items`,
+ * `/leave/balance` wraps in `balances`, and `/leave/calendar` wraps in `items`
+ * too. Reading only `data` meant every leave list on every screen rendered its
+ * empty state no matter how many rows existed, with nothing logged.
+ */
 async function getList<T>(url: string, params?: Record<string, unknown>): Promise<T[]> {
-  const response = await axiosClient.get<T[] | { data?: T[] }>(url, { params });
-  return Array.isArray(response.data) ? response.data : response.data.data ?? [];
+  const response = await axiosClient.get<
+    T[] | { items?: T[]; balances?: T[]; data?: T[] }
+  >(url, { params });
+  const body = response.data;
+  if (Array.isArray(body)) return body;
+  return body.items ?? body.balances ?? body.data ?? [];
 }
 
 export const leaveApi = {
@@ -152,7 +163,10 @@ export const leaveApi = {
   },
 
   /** Approved leave overlapping the month, scoped to what the caller may see. */
-  getCalendar: (params: { month: number; year: number }) =>
+  // `LeaveCalendarQueryDto` declares `from` and `to` only, and
+  // `forbidNonWhitelisted` turns a stray `month` into a 400 for the whole
+  // request, which the dialog then rendered as "nobody is on leave".
+  getCalendar: (params: { from: string; to: string }) =>
     getList<LeaveApplication>('/leave/calendar', params),
 
   /**
@@ -162,15 +176,15 @@ export const leaveApi = {
   getHolidays: (year: number) => getList<Holiday>('/holidays', { year }),
 
   /**
-   * Submits an application. Multipart because a type with `requires_proof` needs
-   * the attachment in the same request, which is how `/requests` uploads too.
+   * Submits an application as JSON. Not multipart: `POST /leave/applications`
+   * takes `@Body()` with no file interceptor, so a FormData body arrives empty
+   * and every field fails validation at once. Proof is `attachment_url`, a
+   * link, because `task_attachments` has no leave column to upload into.
+   *
    * Throws 400 when the server-side validation set in p2_leave.md fails.
    */
-  apply: async ({ attachments, ...fields }: ApplyLeavePayload): Promise<LeaveApplication> => {
-    const formData = new FormData();
-    Object.entries(fields).forEach(([key, value]) => formData.append(key, value));
-    attachments?.forEach((file) => formData.append('attachments', file, file.name));
-    const response = await axiosClient.post<LeaveApplication>('/leave/applications', formData);
+  apply: async (payload: ApplyLeavePayload): Promise<LeaveApplication> => {
+    const response = await axiosClient.post<LeaveApplication>('/leave/applications', payload);
     return response.data;
   },
 

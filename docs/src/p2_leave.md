@@ -313,7 +313,11 @@ touches the balance in the opposite direction, and is HR-only.
 
 ## Screens
 
-**Apply for leave.** Type selector, date range, reason, optional attachment.
+**Apply for leave.** Type selector, date range, reason, optional proof link.
+The application is posted as JSON, not multipart: the handler takes `@Body()`
+with no `FileInterceptor`, so a `FormData` body arrives empty and every field
+fails validation at once. Proof is `attachment_url`, a link, because
+`task_attachments` has no leave column to upload into.
 Show the remaining balance for the selected type as soon as the type is
 picked, and show the computed working days as soon as the dates are picked,
 with holidays visibly excluded. Employees will not trust the balance if they

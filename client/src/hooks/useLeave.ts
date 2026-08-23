@@ -23,12 +23,22 @@ export const useLeaveApplication = (id: string) =>
 export const usePendingLeave = (enabled = true) =>
   useQuery({ queryKey: ['leave', 'pending'], queryFn: () => leaveApi.getPending(), enabled });
 
-export const useLeaveCalendar = (params: { month: number; year: number }, enabled = true) =>
-  useQuery({
-    queryKey: ['leave', 'calendar', params],
-    queryFn: () => leaveApi.getCalendar(params),
+/**
+ * The dialog thinks in months; the endpoint takes a date range. Converted here
+ * so one place owns the month-to-range arithmetic. `Date.UTC` with day 0 of the
+ * next month gives the last day of this one, leap years included.
+ */
+export const useLeaveCalendar = (params: { month: number; year: number }, enabled = true) => {
+  const from = `${params.year}-${String(params.month).padStart(2, '0')}-01`;
+  const lastDay = new Date(Date.UTC(params.year, params.month, 0)).getUTCDate();
+  const to = `${params.year}-${String(params.month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+  return useQuery({
+    queryKey: ['leave', 'calendar', from, to],
+    queryFn: () => leaveApi.getCalendar({ from, to }),
     enabled,
   });
+};
 
 export const useHolidays = (year: number) =>
   useQuery({ queryKey: ['holidays', year], queryFn: () => leaveApi.getHolidays(year) });

@@ -96,22 +96,19 @@ export default function LeaveDetailPage() {
           ) : null}
         </dl>
 
-        {application.attachments?.length ? (
+        {application.attachment_url ? (
           <div className="mt-6 border-t border-slate-100 pt-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Attachments</p>
-            <div className="mt-2 space-y-1 text-sm">
-              {application.attachments.map((file) => (
-                <a
-                  key={file.id}
-                  href={file.file_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block text-green-700 hover:underline"
-                >
-                  {file.file_name}
-                </a>
-              ))}
-            </div>
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Supporting document
+            </p>
+            <a
+              href={application.attachment_url}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 block break-all text-sm text-green-700 hover:underline"
+            >
+              {application.attachment_url}
+            </a>
           </div>
         ) : null}
 
