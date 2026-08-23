@@ -189,14 +189,26 @@ export class NotificationsService {
       }),
     ]);
 
+    // Mapped rather than returned raw. This module is the one place that sent
+    // Prisma's snake_case straight out, so the bell read `is_read` while every
+    // client in the repo expects `isRead`, and every row rendered unread with an
+    // "Invalid Date" under it. The envelope is flat for the same reason: the
+    // client's `PaginatedResponse` has no `pagination` key.
     return {
-      data: notifications,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      data: notifications.map((row) => ({
+        id: row.id,
+        userId: row.user_id,
+        type: row.type,
+        title: row.title,
+        message: row.message,
+        isRead: row.is_read ?? false,
+        taskId: row.task_id ?? undefined,
+        createdAt: row.created_at,
+      })),
+      total,
+      page,
+      limit,
+      hasMore: page * limit < total,
     };
   }
 
