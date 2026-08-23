@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { BarChart3, Loader2, Plus, Trash2, X } from 'lucide-react';
 import type { Poll } from '@/api/polls';
 import { useAuth } from '@/context/AuthContext';
@@ -65,15 +66,24 @@ export function PollsSection({ polls }: PollsSectionProps) {
           <BarChart3 size={18} className="text-green-700" />
           <h2 className="text-lg font-bold text-slate-900">Polls</h2>
         </div>
-        {/* Any employee can raise one, not just management. */}
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm font-semibold text-green-700 transition hover:bg-green-100"
-        >
-          <Plus size={15} />
-          New poll
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Closed polls drop off this section, so the archive is the way back to them. */}
+          <Link
+            href="/polls"
+            className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+          >
+            All polls
+          </Link>
+          {/* Any employee can raise one, not just management. */}
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm font-semibold text-green-700 transition hover:bg-green-100"
+          >
+            <Plus size={15} />
+            New poll
+          </button>
+        </div>
       </div>
 
       {polls.length === 0 ? (

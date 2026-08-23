@@ -111,6 +111,12 @@ a poll feel worth using. Broadcast to everyone; polls are company wide.
 options with vote counts and bars, and the total. Before voting, the options are
 buttons. After voting, they are results with the caller's choice marked.
 
+The dashboard shows open polls only, so `/polls` is the archive: every poll
+newest first, filtered to all, open or closed. It is `GET /polls` and the same
+card, because a closed poll already renders as results. Reached from the All
+polls link in the dashboard's poll header rather than a sidebar entry, which is
+where somebody looking for a poll they voted in last week goes first.
+
 ## Scoring and analytics
 
 Builds on the existing engines rather than replacing them. Read
