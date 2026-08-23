@@ -15,7 +15,7 @@ import { ChevronDown, ChevronRight, Plus, X } from 'lucide-react';
 
 interface MilestoneDraft {
   name: string;
-  dueDate: string;
+  due_date: string;
 }
 
 interface KpiDraft {
@@ -78,14 +78,14 @@ export function ProjectForm() {
     resolver: zodResolver(createProjectSchema),
     defaultValues: {
       title: '',
-      projectType: '',
+      project_type: '',
       category: '',
       priority: 'MEDIUM',
       objective: '',
       description: '',
-      startDate: '',
+      start_date: '',
       deadline: '',
-      coLeadId: '',
+      co_lead_id: '',
     },
   });
 
@@ -103,7 +103,7 @@ export function ProjectForm() {
         project: compactPayload({ ...values, tags }) as CreateProjectPayload,
         milestones: milestones
           .filter((item) => item.name.trim())
-          .map((item) => compactPayload({ name: item.name.trim(), dueDate: item.dueDate }) as MilestonePayload),
+          .map((item) => compactPayload({ name: item.name.trim(), due_date: item.due_date }) as MilestonePayload),
         kpis: kpis
           .filter((item) => item.metric.trim())
           .map((item) => compactPayload({ metric: item.metric.trim(), target: item.target }) as KpiPayload),
@@ -133,7 +133,7 @@ export function ProjectForm() {
 
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">Project Type</label>
-            <Input {...form.register('projectType')} placeholder="e.g. Product launch" />
+            <Input {...form.register('project_type')} placeholder="e.g. Product launch" />
           </div>
 
           <div>
@@ -173,7 +173,7 @@ export function ProjectForm() {
 
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">Start Date</label>
-            <Input type="date" {...form.register('startDate')} />
+            <Input type="date" {...form.register('start_date')} />
           </div>
         </div>
       </div>
@@ -183,7 +183,7 @@ export function ProjectForm() {
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">Co-Lead</label>
             <select
-              {...form.register('coLeadId')}
+              {...form.register('co_lead_id')}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             >
               <option value="">No Co-Lead</option>
@@ -250,10 +250,10 @@ export function ProjectForm() {
               />
               <Input
                 type="date"
-                value={milestone.dueDate}
+                value={milestone.due_date}
                 onChange={(event) =>
                   setMilestones(
-                    milestones.map((item, i) => (i === index ? { ...item, dueDate: event.target.value } : item)),
+                    milestones.map((item, i) => (i === index ? { ...item, due_date: event.target.value } : item)),
                   )
                 }
                 className="max-w-[180px]"
@@ -271,7 +271,7 @@ export function ProjectForm() {
             type="button"
             variant="outline"
             className="gap-2"
-            onClick={() => setMilestones([...milestones, { name: '', dueDate: '' }])}
+            onClick={() => setMilestones([...milestones, { name: '', due_date: '' }])}
           >
             <Plus size={14} />
             Add milestone

@@ -49,8 +49,8 @@ export default function ProjectsPage() {
     departmentId: departmentId || undefined,
     leadId: leadId || undefined,
     category: category || undefined,
-    from: from || undefined,
-    to: to || undefined,
+    dateFrom: from || undefined,
+    dateTo: to || undefined,
   };
 
   const mineOnly = toggles.includes('MINE');

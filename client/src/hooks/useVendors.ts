@@ -192,7 +192,7 @@ export const useVendorAccessGrants = (enabled = true) =>
 export const useGrantVendorAccess = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: { user_id: string; access_level: VendorAccessLevel }) =>
+    mutationFn: (payload: { userId: string; accessLevel: VendorAccessLevel }) =>
       vendorsApi.grantAccess(payload),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['vendor-access'] }),
   });
@@ -245,7 +245,7 @@ export const useCreateDeliverable = () =>
 
 export const useUpdateDeliverable = () =>
   useVendorWorkMutation(
-    ({ id, payload }: { id: string; payload: Partial<CreateDeliverablePayload> }) =>
+    ({ id, payload }: { id: string; payload: Partial<Omit<CreateDeliverablePayload, 'vendor_id'>> }) =>
       vendorsApi.updateDeliverable(id, payload),
   );
 

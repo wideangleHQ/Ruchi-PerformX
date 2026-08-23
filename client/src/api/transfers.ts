@@ -30,10 +30,9 @@ export const transfersApi = {
   },
 
   createTransfer: async (data: {
-    fromDepartmentId: string;
+    taskId: string;
     toDepartmentId: string;
-    userId: string;
-    reason: string;
+    reason?: string;
   }): Promise<Transfer> => {
     const response = await axiosClient.post<Transfer>('/transfers', data);
     return response.data;

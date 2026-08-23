@@ -96,8 +96,13 @@ export interface VerifyResetOtpRequest {
 }
 
 export interface ResetPasswordRequest {
-  email: string;
+  resetToken: string;
   newPassword: string;
+}
+
+/** `POST /auth/verify-reset-otp` answers with the token that authorises the reset. */
+export interface VerifyResetOtpResponse {
+  resetToken: string;
 }
 
 export interface MessageResponse {

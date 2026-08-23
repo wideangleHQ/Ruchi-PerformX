@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { resetPasswordSchema, ResetPasswordFormData } from '@/lib/validation';
@@ -11,27 +11,32 @@ import { Input } from '@/components/ui/input';
 
 function ResetPasswordForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const email = searchParams.get('email') || '';
+  const [resetToken, setResetToken] = useState<string | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  // The token is minted by verify-reset-otp and lasts fifteen minutes. Arriving
+  // here without one means the OTP step was skipped or the tab is stale.
   useEffect(() => {
-    if (!email) router.replace('/forgot-password');
-  }, [email, router]);
+    const stored = sessionStorage.getItem('resetToken');
+    if (!stored) router.replace('/forgot-password');
+    else setResetToken(stored);
+  }, [router]);
 
   const form = useForm<ResetPasswordFormData>({
     resolver: zodResolver(resetPasswordSchema),
-    defaultValues: { email, newPassword: '', confirmPassword: '' },
+    defaultValues: { newPassword: '', confirmPassword: '' },
   });
 
   const onSubmit = async (data: ResetPasswordFormData) => {
     try {
       setError(null);
       setIsLoading(true);
-      await authApi.resetPassword({ email: data.email, newPassword: data.newPassword });
+      if (!resetToken) throw new Error('Your reset link has expired. Start again.');
+      await authApi.resetPassword({ resetToken, newPassword: data.newPassword });
+      sessionStorage.removeItem('resetToken');
       setSuccess(true);
       setTimeout(() => router.push('/login'), 2000);
     } catch (err: any) {
@@ -63,7 +68,7 @@ function ResetPasswordForm() {
       <div className="w-full max-w-md">
         <div className="mb-8">
           <h1 className="text-3xl font-bold tracking-tight text-gray-900">Reset Password</h1>
-          <p className="mt-2 text-gray-600">Enter your new password for <span className="font-medium">{email}</span></p>
+          <p className="mt-2 text-gray-600">Choose a new password.</p>
         </div>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -72,8 +77,6 @@ function ResetPasswordForm() {
               <p className="text-sm text-red-800">{error}</p>
             </div>
           )}
-
-          <input type="hidden" {...form.register('email')} />
 
           <div>
             <label className="block text-sm font-medium text-gray-700">New Password</label>

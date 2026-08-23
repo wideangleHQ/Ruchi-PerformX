@@ -11,15 +11,15 @@ const milestoneStatus = z.enum(['PLANNED', 'IN_PROGRESS', 'DONE', 'MISSED']);
  */
 export const createProjectSchema = z.object({
   title: z.string().min(1, 'Project name is required').max(255, 'Project name is too long'),
-  projectType: z.string().max(100).optional(),
+  project_type: z.string().max(100).optional(),
   category: z.string().max(100).optional(),
   priority,
   objective: z.string().min(1, 'Objective is required').max(500, 'Keep the objective short'),
   description: z.string().min(1, 'Description is required').max(4000),
   tags: z.array(z.string()).optional(),
-  startDate: z.string().optional(),
+  start_date: z.string().optional(),
   deadline: z.string().min(1, 'Deadline is required'),
-  coLeadId: z.string().optional(),
+  co_lead_id: z.string().optional(),
 });
 
 export type CreateProjectFormData = z.infer<typeof createProjectSchema>;
@@ -28,8 +28,8 @@ export const checklistItemSchema = z.object({
   title: z.string().min(1, 'Title is required').max(255),
   description: z.string().max(2000).optional(),
   priority: priority.optional(),
-  assignedToId: z.string().optional(),
-  dueDate: z.string().optional(),
+  assigned_to_id: z.string().optional(),
+  due_date: z.string().optional(),
 });
 
 export type ChecklistItemFormData = z.infer<typeof checklistItemSchema>;
@@ -37,9 +37,9 @@ export type ChecklistItemFormData = z.infer<typeof checklistItemSchema>;
 export const milestoneSchema = z.object({
   name: z.string().min(1, 'Milestone name is required').max(255),
   description: z.string().max(2000).optional(),
-  ownerId: z.string().optional(),
-  startDate: z.string().optional(),
-  dueDate: z.string().optional(),
+  owner_id: z.string().optional(),
+  start_date: z.string().optional(),
+  due_date: z.string().optional(),
   status: milestoneStatus.optional(),
 });
 
@@ -55,7 +55,7 @@ export const kpiSchema = z.object({
 export type KpiFormData = z.infer<typeof kpiSchema>;
 
 export const outcomeSchema = z.object({
-  entryType: z.enum(['TRY', 'FAILURE', 'OUTCOME']),
+  entry_type: z.enum(['TRY', 'FAILURE', 'OUTCOME']),
   content: z.string().min(1, 'Write what happened').max(4000),
 });
 

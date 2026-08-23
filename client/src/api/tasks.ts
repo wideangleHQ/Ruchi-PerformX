@@ -90,7 +90,6 @@ export const tasksApi = {
     data: Partial<{
       title: string;
       description: string;
-      status: string;
       priority: string;
       dueDate: string;
     }>

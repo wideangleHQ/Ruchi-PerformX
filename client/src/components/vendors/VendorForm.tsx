@@ -65,12 +65,30 @@ function Field({
   );
 }
 
-/** Tags round-trip as a comma separated string, which is what the input holds. */
+/**
+ * The form fields are named after the columns, because that is what the vendor
+ * row it is editing looks like. `CreateVendorDto` is camelCase, so the two are
+ * mapped here rather than anywhere the names would have to agree by accident.
+ * Tags round-trip as a comma separated string, which is what the input holds.
+ */
 function toPayload(values: VendorFormValues): CreateVendorPayload {
-  const { tags, ...rest } = values;
   return {
-    ...rest,
-    tags: (tags ?? '')
+    name: values.name,
+    ownerId: values.owner_id,
+    vendorType: values.vendor_type,
+    categoryId: values.category_id,
+    description: values.description,
+    contactPerson: values.contact_person,
+    contactEmail: values.contact_email,
+    contactPhone: values.contact_phone,
+    alternateContact: values.alternate_contact,
+    companyAddress: values.company_address,
+    website: values.website,
+    startDate: values.start_date,
+    departmentId: values.department_id,
+    secondaryOwnerId: values.secondary_owner_id,
+    notes: values.notes,
+    tags: (values.tags ?? '')
       .split(',')
       .map((tag) => tag.trim())
       .filter(Boolean),

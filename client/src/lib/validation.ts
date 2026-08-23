@@ -45,7 +45,6 @@ export const forgotPasswordSchema = z.object({
 export type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
 
 export const resetPasswordSchema = z.object({
-  email: z.string().min(1, 'Email is required').email('Enter a valid email'),
   newPassword: z.string().min(8, 'Password must be at least 8 characters'),
   confirmPassword: z.string().min(1, 'Password confirmation is required'),
 }).refine((data) => data.newPassword === data.confirmPassword, {

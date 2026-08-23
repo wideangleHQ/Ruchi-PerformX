@@ -181,17 +181,17 @@ export const leaveApi = {
   },
 
   /** Approves and deducts. 409 when someone else already closed the application. */
-  approve: async (id: string, approval_remark?: string): Promise<LeaveApplication> => {
+  approve: async (id: string, remark?: string): Promise<LeaveApplication> => {
     const response = await axiosClient.patch<LeaveApplication>(`/leave/applications/${id}/approve`, {
-      approval_remark: approval_remark || undefined,
+      remark: remark || undefined,
     });
     return response.data;
   },
 
   /** Rejects. The remark is mandatory: the applicant is told why. */
-  reject: async (id: string, approval_remark: string): Promise<LeaveApplication> => {
+  reject: async (id: string, remark: string): Promise<LeaveApplication> => {
     const response = await axiosClient.patch<LeaveApplication>(`/leave/applications/${id}/reject`, {
-      approval_remark,
+      remark,
     });
     return response.data;
   },

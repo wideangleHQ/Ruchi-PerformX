@@ -73,9 +73,9 @@ function VerifyOtpForm() {
       setIsLoading(true);
 
       if (type === 'reset') {
-        await authApi.verifyResetOtp({ email, otp: otpValue });
-        // Redirect to reset-password page with email
-        router.push(`/reset-password?email=${encodeURIComponent(email)}`);
+        const { resetToken } = await authApi.verifyResetOtp({ email, otp: otpValue });
+        sessionStorage.setItem('resetToken', resetToken);
+        router.push('/reset-password');
         return;
       }
 

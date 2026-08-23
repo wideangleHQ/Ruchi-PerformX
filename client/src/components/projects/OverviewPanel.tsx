@@ -216,7 +216,7 @@ export function OverviewPanel({
                 className="w-full gap-2"
                 disabled={!memberId || addMember.isPending}
                 onClick={async () => {
-                  await addMember.mutateAsync({ userId: memberId, role: memberRole });
+                  await addMember.mutateAsync({ user_id: memberId, role: memberRole });
                   setMemberId('');
                 }}
               >

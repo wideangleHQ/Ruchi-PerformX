@@ -72,6 +72,11 @@ Two different flows exist, and the client uses both.
 Storing a hash of the reset token as well as verifying its signature is belt and
 braces, and it is what makes the token single use.
 
+The client holds the token in `sessionStorage` between step 2 and step 3 and
+clears it on success. It is a credential, so it does not travel in the query
+string, where it would reach browser history, referrer headers and any proxy log
+on the way.
+
 **Approver-driven.** An employee asks a superior to reset for them. The request
 lands in `password_reset_requests`. `GET /users/password-reset-requests` lists
 them for MD, HOD, EA, and PA. `PATCH /users/:id/reset-password` generates a

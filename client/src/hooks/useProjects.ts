@@ -159,7 +159,7 @@ export const useUpdateProject = (projectId: string) =>
   useProjectMutation((payload: UpdateProjectPayload) => projectsApi.updateProject(projectId, payload));
 
 export const useAddProjectMember = (projectId: string) =>
-  useProjectMutation((payload: { userId: string; role: ProjectMemberRole }) =>
+  useProjectMutation((payload: { user_id: string; role: ProjectMemberRole }) =>
     projectsApi.addMember(projectId, payload),
   );
 
@@ -205,7 +205,7 @@ export const usePostProjectMessage = (projectId: string) =>
   useProjectMutation((content: string) => projectsApi.postMessage(projectId, { content }));
 
 export const useCreateOutcome = (projectId: string) =>
-  useProjectMutation((payload: { entryType: OutcomeType; content: string }) =>
+  useProjectMutation((payload: { entry_type: OutcomeType; content: string }) =>
     projectsApi.createOutcome(projectId, payload),
   );
 
