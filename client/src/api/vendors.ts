@@ -294,6 +294,71 @@ function toList<T>(payload: T[] | PaginatedResponse<T> | undefined): T[] {
   return payload?.data ?? [];
 }
 
+/** Mirrors CreateVendorAssignmentDto. */
+export interface CreateAssignmentPayload {
+  vendor_id: string;
+  entity_type: 'task' | 'project' | 'deliverable' | 'service';
+  entity_id?: string;
+  start_date?: string;
+  deadline?: string;
+  status?: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+  description?: string;
+  priority?: string;
+}
+
+/** Mirrors CreateVendorContractDto. */
+export interface CreateContractPayload {
+  vendor_id: string;
+  contract_number: string;
+  contract_type?: string;
+  start_date: string;
+  end_date?: string;
+  renewal_date?: string;
+  status?: 'DRAFT' | 'ACTIVE' | 'EXPIRED' | 'TERMINATED';
+  description?: string;
+}
+
+/**
+ * Mirrors CreateVendorDocumentDto. `file_url` and `storage_path` are required
+ * because the endpoint records an already-stored file rather than uploading one.
+ */
+export interface CreateDocumentPayload {
+  vendor_id: string;
+  contract_id?: string;
+  category: 'LEGAL' | 'OPERATIONAL';
+  document_type: string;
+  document_name: string;
+  issue_date?: string;
+  expiry_date?: string;
+  file_url: string;
+  storage_path: string;
+}
+
+/** Mirrors CreateVendorDeliverableDto. */
+export interface CreateDeliverablePayload {
+  vendor_id: string;
+  name: string;
+  description?: string;
+  project_id?: string;
+  owner_id: string;
+  due_date?: string;
+  status?: string;
+  remarks?: string;
+}
+
+/** Mirrors CreateVendorReviewDto. Sub-scores are optional, `rating` is not. */
+export interface CreateReviewPayload {
+  vendor_id: string;
+  review_date: string;
+  rating: number;
+  quality?: number;
+  timeliness?: number;
+  communication?: number;
+  reliability?: number;
+  remarks?: string;
+  action_required?: string;
+}
+
 export const vendorsApi = {
   /** GET /vendors — the directory, section 17. */
   getVendors: async (filters?: VendorFilters): Promise<Vendor[]> => {
@@ -402,6 +467,75 @@ export const vendorsApi = {
   },
 
   /** GET /vendor-access/me. Null for an employee with no grant and no MD/EA role. */
+  // ------------------------------------------------------------------ writes
+  //
+  // The five work entities shipped read-only: the endpoints existed and the
+  // forms did not. Notes already had a write path, which is why it is absent
+  // here.
+
+  createAssignment: async (payload: CreateAssignmentPayload): Promise<VendorAssignment> => {
+    const response = await axiosClient.post<VendorAssignment>('/vendor-assignments', payload);
+    return response.data;
+  },
+
+  updateAssignment: async (
+    id: string,
+    payload: Partial<Pick<CreateAssignmentPayload, 'start_date' | 'deadline' | 'status' | 'description' | 'priority'>>,
+  ): Promise<VendorAssignment> => {
+    const response = await axiosClient.patch<VendorAssignment>(`/vendor-assignments/${id}`, payload);
+    return response.data;
+  },
+
+  removeAssignment: async (id: string): Promise<void> => {
+    await axiosClient.delete(`/vendor-assignments/${id}`);
+  },
+
+  createContract: async (payload: CreateContractPayload): Promise<VendorContract> => {
+    const response = await axiosClient.post<VendorContract>('/vendor-contracts', payload);
+    return response.data;
+  },
+
+  updateContract: async (
+    id: string,
+    payload: Partial<CreateContractPayload>,
+  ): Promise<VendorContract> => {
+    const response = await axiosClient.patch<VendorContract>(`/vendor-contracts/${id}`, payload);
+    return response.data;
+  },
+
+  /**
+   * Records a document that is already stored somewhere, rather than uploading
+   * one. `POST /vendor-documents` takes a URL and a storage path, not
+   * multipart: AttachmentsService could not be imported across the branch
+   * boundary in Phase 2. The form says so instead of pretending otherwise.
+   */
+  createDocument: async (payload: CreateDocumentPayload): Promise<VendorDocument> => {
+    const response = await axiosClient.post<VendorDocument>('/vendor-documents', payload);
+    return response.data;
+  },
+
+  removeDocument: async (id: string): Promise<void> => {
+    await axiosClient.delete(`/vendor-documents/${id}`);
+  },
+
+  createDeliverable: async (payload: CreateDeliverablePayload): Promise<VendorDeliverable> => {
+    const response = await axiosClient.post<VendorDeliverable>('/vendor-deliverables', payload);
+    return response.data;
+  },
+
+  updateDeliverable: async (
+    id: string,
+    payload: Partial<CreateDeliverablePayload>,
+  ): Promise<VendorDeliverable> => {
+    const response = await axiosClient.patch<VendorDeliverable>(`/vendor-deliverables/${id}`, payload);
+    return response.data;
+  },
+
+  createReview: async (payload: CreateReviewPayload): Promise<VendorReview> => {
+    const response = await axiosClient.post<VendorReview>('/vendor-reviews', payload);
+    return response.data;
+  },
+
   getMyAccess: async (): Promise<VendorAccessLevel | null> => {
     const response = await axiosClient.get<{ accessLevel: VendorAccessLevel | null }>(
       '/vendor-access/me',

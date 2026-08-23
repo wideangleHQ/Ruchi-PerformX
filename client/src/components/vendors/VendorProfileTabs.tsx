@@ -1,10 +1,18 @@
 'use client';
 
 import { ReactNode, useState } from 'react';
-import { Lock, MessagesSquare, Send } from 'lucide-react';
+import { Lock, MessagesSquare, Plus, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  AssignmentForm,
+  ContractForm,
+  DeliverableForm,
+  DocumentForm,
+  ReviewForm,
+} from './VendorWorkForms';
+import { useVendorAccess } from '@/hooks/useVendors';
 import {
   VendorAssignment,
   VendorContract,
@@ -40,6 +48,31 @@ const TABS = [
   'activity',
   'reviews',
 ] as const;
+
+/**
+ * The heading strip above a writable panel.
+ *
+ * The button is hidden rather than disabled without VENDOR_MANAGER, because a
+ * disabled button invites a question about how to enable it and the answer is
+ * an access grant somebody else has to make.
+ */
+function PanelHeader({
+  label, onAdd, canWrite,
+}: {
+  label: string;
+  onAdd: () => void;
+  canWrite: boolean;
+}) {
+  if (!canWrite) return null;
+  return (
+    <div className="mb-3 flex items-center justify-end">
+      <Button type="button" size="sm" variant="outline" className="gap-1.5" onClick={onAdd}>
+        <Plus size={14} />
+        {label}
+      </Button>
+    </div>
+  );
+}
 
 function Panel({ children }: { children: ReactNode }) {
   return (
@@ -204,6 +237,15 @@ export function VendorProfileTabs({ vendorId }: { vendorId: string }) {
   const { data: notes = [] } = useVendorNotes(vendorId);
   const { data: reviews = [] } = useVendorReviews(vendorId);
   const addNote = useAddVendorNote(vendorId);
+  // All five creates need VENDOR_MANAGER, which `canWrite` already means and
+  // which VENDOR_ADMIN and the MD and EA satisfy too. The read tabs are open to
+  // VENDOR_VIEWER, so the panels render for everyone and only the buttons
+  // differ. Only document deletion needs VENDOR_ADMIN, and there is no delete
+  // button here.
+  const { canWrite } = useVendorAccess();
+  const [form, setForm] = useState<
+    'assignment' | 'contract' | 'document' | 'deliverable' | 'review' | null
+  >(null);
 
   // A project assignment is a vendor_assignments row with entity_type project,
   // not a separate table. Same list, split for the tab the spec asks for.
@@ -229,6 +271,7 @@ export function VendorProfileTabs({ vendorId }: { vendorId: string }) {
       </TabsList>
 
       <TabsContent value="assignments">
+        <PanelHeader label="Assign work" canWrite={canWrite} onAdd={() => setForm('assignment')} />
         {otherAssignments.length === 0 ? (
           <Empty>No assignments recorded for this vendor.</Empty>
         ) : (
@@ -253,6 +296,7 @@ export function VendorProfileTabs({ vendorId }: { vendorId: string }) {
       </TabsContent>
 
       <TabsContent value="deliverables">
+        <PanelHeader label="New deliverable" canWrite={canWrite} onAdd={() => setForm('deliverable')} />
         {deliverables.length === 0 ? (
           <Empty>No deliverables recorded.</Empty>
         ) : (
@@ -286,6 +330,7 @@ export function VendorProfileTabs({ vendorId }: { vendorId: string }) {
       </TabsContent>
 
       <TabsContent value="documents">
+        <PanelHeader label="Record document" canWrite={canWrite} onAdd={() => setForm('document')} />
         {documents.length === 0 ? (
           <Empty>No documents uploaded.</Empty>
         ) : (
@@ -325,6 +370,7 @@ export function VendorProfileTabs({ vendorId }: { vendorId: string }) {
       </TabsContent>
 
       <TabsContent value="contracts">
+        <PanelHeader label="New contract" canWrite={canWrite} onAdd={() => setForm('contract')} />
         {contracts.length === 0 ? (
           <Empty>No contracts recorded.</Empty>
         ) : (
@@ -380,6 +426,7 @@ export function VendorProfileTabs({ vendorId }: { vendorId: string }) {
       </TabsContent>
 
       <TabsContent value="reviews">
+        <PanelHeader label="Record review" canWrite={canWrite} onAdd={() => setForm('review')} />
         {reviews.length === 0 ? (
           <Empty>No reviews recorded.</Empty>
         ) : (
@@ -432,6 +479,15 @@ export function VendorProfileTabs({ vendorId }: { vendorId: string }) {
           </div>
         )}
       </TabsContent>
+      {form === 'assignment' && (
+        <AssignmentForm vendorId={vendorId} onClose={() => setForm(null)} />
+      )}
+      {form === 'contract' && <ContractForm vendorId={vendorId} onClose={() => setForm(null)} />}
+      {form === 'document' && <DocumentForm vendorId={vendorId} onClose={() => setForm(null)} />}
+      {form === 'deliverable' && (
+        <DeliverableForm vendorId={vendorId} onClose={() => setForm(null)} />
+      )}
+      {form === 'review' && <ReviewForm vendorId={vendorId} onClose={() => setForm(null)} />}
     </Tabs>
   );
 }
