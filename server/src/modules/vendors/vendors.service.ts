@@ -11,6 +11,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { attachUsers } from '../../common/helpers/user-lookup.helper';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
 import { VendorScopeService } from './vendor-scope.service';
+import { VendorWorkService, daysUntil } from './vendor-work.service';
 import { CreateVendorDto } from './dto/vendor/create-vendor.dto';
 import { UpdateVendorDto } from './dto/vendor/update-vendor.dto';
 import { UpdateVendorStatusDto } from './dto/vendor/update-vendor-status.dto';
@@ -54,6 +55,7 @@ export class VendorsService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scope: VendorScopeService,
+    private readonly work: VendorWorkService,
   ) {}
 
   /**
@@ -193,24 +195,32 @@ export class VendorsService implements OnModuleInit {
     const vendor = await this.prisma.vendors.findUnique({ where: { id } });
     if (!vendor) throw new NotFoundException('Vendor not found');
 
-    const [categories, contract, department, withUsers] = await Promise.all([
-      this.categoryMap([vendor.category_id]),
-      this.prisma.vendor_contracts.findFirst({
-        where: { vendor_id: id, status: 'ACTIVE' },
-        orderBy: { end_date: 'desc' },
-      }),
-      vendor.department_id
-        ? this.prisma.departments.findUnique({
-            where: { id: vendor.department_id },
-            select: { id: true, name: true },
-          })
-        : Promise.resolve(null),
-      attachUsers(this.prisma, [vendor], [
-        'owner_id',
-        'secondary_owner_id',
-        'created_by_id',
-      ]),
-    ]);
+    const [categories, contract, department, withUsers, assignments, deadlines] =
+      await Promise.all([
+        this.categoryMap([vendor.category_id]),
+        this.prisma.vendor_contracts.findFirst({
+          where: { vendor_id: id, status: 'ACTIVE' },
+          orderBy: { end_date: 'desc' },
+        }),
+        vendor.department_id
+          ? this.prisma.departments.findUnique({
+              where: { id: vendor.department_id },
+              select: { id: true, name: true },
+            })
+          : Promise.resolve(null),
+        attachUsers(this.prisma, [vendor], [
+          'owner_id',
+          'secondary_owner_id',
+          'created_by_id',
+        ]),
+        this.prisma.vendor_assignments.findMany({
+          where: { vendor_id: id },
+          select: { status: true, deadline: true },
+        }),
+        this.work.findDeadlines(id, user),
+      ]);
+
+    const today = new Date();
 
     return {
       ...withUsers[0],
@@ -219,6 +229,20 @@ export class VendorsService implements OnModuleInit {
         : null,
       department,
       current_contract: contract,
+      // The four tiles at the top of the profile, section 16. `upcoming` comes
+      // from `findDeadlines` rather than a second count, so the tile and the
+      // deadlines screen cannot disagree about what is due.
+      counts: {
+        active_assignments: assignments.filter((row) => row.status === 'ACTIVE').length,
+        completed: assignments.filter((row) => row.status === 'COMPLETED').length,
+        overdue: assignments.filter(
+          (row) =>
+            row.status === 'ACTIVE' &&
+            row.deadline !== null &&
+            daysUntil(row.deadline, today) < 0,
+        ).length,
+        upcoming_deadlines: deadlines.filter((row) => row.flag === 'SOON').length,
+      },
     };
   }
 

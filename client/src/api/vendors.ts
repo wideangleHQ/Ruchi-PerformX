@@ -188,24 +188,30 @@ export interface VendorPerformance {
   last_review_date?: string | null;
 }
 
+/**
+ * The five `findDeadlines` actually unions. Project deadlines, review dates and
+ * compliance are in the section 8 wish list and have no producer, so they are
+ * not listed here: a value the server cannot send is not part of the type.
+ */
 export type VendorDeadlineSource =
-  | 'CONTRACT_EXPIRY'
-  | 'CONTRACT_RENEWAL'
-  | 'DOCUMENT_EXPIRY'
-  | 'ASSIGNMENT_DEADLINE'
-  | 'PROJECT_DEADLINE'
-  | 'DELIVERABLE_DUE'
-  | 'REVIEW_DATE'
-  | 'COMPLIANCE';
+  | 'contract_expiry'
+  | 'contract_renewal'
+  | 'document_expiry'
+  | 'assignment_deadline'
+  | 'deliverable_due';
+
+export type VendorDeadlineFlag = 'OVERDUE' | 'SOON' | 'UPCOMING';
 
 /** One row of GET /vendors/:id/deadlines. Already sorted ascending by date. */
 export interface VendorDeadline {
   source: VendorDeadlineSource;
+  /** Id of the contract, document, assignment or deliverable behind the row. */
+  id: string;
   label: string;
   date: string;
-  is_soon: boolean;
-  is_overdue: boolean;
-  entity_id?: string | null;
+  /** Negative once the date has passed. */
+  days_until: number;
+  flag: VendorDeadlineFlag;
 }
 
 /** GET /vendors/:id. The profile screen, section 16, in one request. */
