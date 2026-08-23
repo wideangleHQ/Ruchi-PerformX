@@ -1,19 +1,19 @@
-name: Vercel Preview Deployment
+name: Vercel Production Deployment
 
 on:
-  schedule:
-    # 12:00 AM IST every day
-    - cron: "30 18 * * *"
+  push:
+    branches:
+      - main
 
   workflow_dispatch:
 
 concurrency:
-  group: vercel-preview
-  cancel-in-progress: true
+  group: vercel-production
+  cancel-in-progress: false
 
 jobs:
-  deploy-preview:
-    name: Deploy Preview
+  deploy-production:
+    name: Deploy Production
     runs-on: ubuntu-latest
 
     env:
@@ -33,26 +33,22 @@ jobs:
       - name: Install Vercel CLI
         run: bun add --global vercel@latest
 
-      # These run from the repo root, not client. The project's Root Directory
-      # on Vercel is already client, and vercel resolves that against the
-      # working directory, so running from client looks for client/client and
-      # fails the install step with a bare "spawn sh ENOENT". Nothing installs
-      # dependencies here either, since vercel build runs the project's own
-      # install command.
-      - name: Pull Vercel Preview environment
+      - name: Pull Vercel Production environment
         run: |
           vercel pull \
             --yes \
-            --environment=preview \
+            --environment=production \
             --token="$VERCEL_TOKEN"
 
-      - name: Build Preview
+      - name: Build Production
         run: |
           vercel build \
+            --prod \
             --token="$VERCEL_TOKEN"
 
-      - name: Deploy Preview
+      - name: Deploy Production
         run: |
           vercel deploy \
             --prebuilt \
+            --prod \
             --token="$VERCEL_TOKEN"
