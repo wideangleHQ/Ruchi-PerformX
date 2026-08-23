@@ -1320,3 +1320,37 @@ know the same trick applies.
 were the only callers who could pass an arbitrary id, and it reached Postgres as
 a foreign key violation and surfaced as a 500. A HOD's id was already proven by
 the scope check.
+
+## 2026-08-23 The five leave types are seeded, and two of them start at zero
+
+**Decision.** `just seed-leave-types` creates Casual 12, Sick 12, Earned 15
+carrying up to 30, Unpaid 0 unpaid, and Compensatory Off 0 paid. It skips a
+type that already exists rather than updating it.
+
+**Why.** `leave_types` was empty, so nobody could apply for leave at all, and
+the module had never run against a database. The numbers are the ordinary
+private-sector set; they are defaults for HR to correct on the leave types
+screen, not policy this repository is entitled to set.
+
+The two zeroes are the part worth reading. The balance check in
+`LeaveService.apply` runs only `if (type.is_paid && days > 0)`, so Unpaid Leave
+at zero entitlement is never blocked, while Compensatory Off at zero *is*, until
+HR credits the earned day on the balances screen. Comp-off being unusable until
+credited is the rule, not a gap.
+
+Sick Leave carries no proof requirement, which looks wrong and is not.
+`requires_proof` is checked on every application, so turning it on demands a
+medical certificate for one sick day. The rule people actually follow starts at
+the third consecutive day, and the column cannot say that.
+
+**Instead of.** Seeding balances for every user at the same time. Rejected
+because `ensureBalance` already creates a balance lazily at first use, at the
+entitlement current at that moment, so 121 users times five types of rows would
+be work that buys nothing and freezes today's numbers into next year's rows.
+
+**Costs.** The entitlements are a guess until the client confirms them. That is
+cheap now and expensive later: while `leave_balances` is empty a change costs
+nothing, and once people have applied it only affects rows created after it.
+Verified end to end against the shadow database before seeding production: apply
+three days of casual leave, approve, balance moves to 3 of 12; unpaid at zero is
+allowed; comp-off at zero is refused.

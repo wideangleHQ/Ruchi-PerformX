@@ -244,6 +244,41 @@ share a role list. ADMIN may define a leave type but not read everybody's
 balances; the MD may read the report but not edit a type. `access.ts` mirrors
 `@Roles` per route so nobody is shown a button that 403s.
 
+### The seeded types
+
+`just seed-leave-types` creates the five the module was specified around.
+`just seed-leave-types --dry-run` prints them without writing. It never edits a
+type that already exists, because these are defaults and HR's edit wins.
+
+| Type | Days | Paid | Carry forward | Why |
+| --- | ---: | --- | --- | --- |
+| Casual Leave | 12 | yes | no | Lapses at the year end |
+| Sick Leave | 12 | yes | no | See the proof note below |
+| Earned Leave | 15 | yes | up to 30 | The only type that accumulates |
+| Unpaid Leave | 0 | no | no | The balance check skips unpaid types |
+| Compensatory Off | 0 | yes | no | Earned, not granted |
+
+Two of these look wrong until you read the balance check in `LeaveService.apply`,
+which runs only `if (type.is_paid && days > 0)`:
+
+- **Unpaid Leave** at zero entitlement is never blocked, because it is not paid
+  and the check is skipped entirely.
+- **Compensatory Off** at zero entitlement *is* blocked, because it is paid. An
+  employee cannot take comp-off until HR credits the day they earned, on the
+  balances screen. That is the intended rule, not an oversight.
+
+**Sick Leave carries no proof requirement.** `requires_proof` is all or nothing
+and is checked on every application, so turning it on would demand a medical
+certificate for a single sick day. The usual rule is a certificate from the
+third consecutive day, which the column cannot express. HR asks out of band, or
+turns the flag on from the leave types screen and accepts that it applies from
+day one.
+
+Changing an entitlement is cheap while `leave_balances` is empty: balances are
+created lazily by `ensureBalance` on first use, at whatever the type says then.
+Once people have applied, a change only affects rows created after it, and
+`PATCH /leave/balances/:id` is the tool for fixing a year already under way.
+
 Two things the screens say out loud, because the number is otherwise quietly
 wrong to whoever is reading it:
 
