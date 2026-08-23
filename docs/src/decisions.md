@@ -1354,3 +1354,113 @@ nothing, and once people have applied it only affects rows created after it.
 Verified end to end against the shadow database before seeding production: apply
 three days of casual leave, approve, balance moves to 3 of 12; unpaid at zero is
 allowed; comp-off at zero is refused.
+
+---
+
+## 2026-08-23 The client type baseline is zero, and the four role dashboards are gone
+
+**Decision.** The 40 pre-existing client type errors are fixed rather than
+counted, the CI gate goes back to a plain `tsc --noEmit`, and
+`EmployeeDashboard`, `HODDashboard`, `MDDashboard`, `AdminDashboard` and their
+shared `StatCard` are deleted along with the four `*DashboardData` types.
+**Why.** Twenty-six of the forty errors were in those four components. Nothing
+imports any of them: `app/(protected)/dashboard/page.tsx` is the real screen and
+it reads `DashboardData`. They were typed against four per-role payloads that
+`GET /dashboard` has never returned, so repairing them meant inventing four
+endpoints. A counted baseline also only holds while somebody keeps lowering it,
+and nobody had.
+**Instead of.** Keeping them and widening the types to match the one real
+payload, which would have left four unreachable screens to maintain and a
+`PerformanceScore` type with no producer. Scoring already has its own types in
+`api/scoring.ts`.
+**Costs.** If a per-role home screen is wanted later it starts from the one
+endpoint rather than from this scaffolding. That is the right starting point
+anyway, because the scope changes with the caller's departments and the shape
+does not.
+
+---
+
+## 2026-08-23 `GET /users` is a bare array, and the client says so
+
+**Decision.** `usersApi.getUsers` returns `User[]` and accepts only `active`.
+**Why.** The route returns `users.map(toUserResponse)` and reads no filter but
+`active`. The client declared `PaginatedResponse<User>` and every caller read
+`.data` off an array, which is `undefined`, so the R&D member picker, the
+self-actions creator filter, the event coordinator picker and the shared
+`useUserOptions` all rendered empty with no error. The projects module had
+already worked around it locally with
+`Array.isArray(page) ? page : page?.data ?? []`, and `assets.ts` had declared a
+second correct type with a comment saying the envelope "has never been sent".
+Two local workarounds and four broken screens is the cost of not fixing the
+source.
+**Instead of.** Paginating the route to match the client. Rejected because
+nothing asked for pagination, 121 users is one small response, and it would
+change a working contract to match a wrong guess about it.
+**Costs.** The directory is unpaginated, so it grows linearly with headcount.
+At the scale this runs at that is not worth an endpoint change.
+
+---
+
+## 2026-08-23 Leave applications are JSON, and proof is a link
+
+**Decision.** `POST /leave/applications` is called with a JSON body, and the
+apply form collects `attachment_url` as a URL rather than a file.
+**Why.** The client posted `FormData` to a handler that has `@Body()` and no
+`FileInterceptor`. Express parses no `multipart/form-data` without one, so the
+body arrived empty and every declared field failed validation at once:
+`leave_type_id must be a UUID`, both dates, and three errors on `reason`. Nobody
+could apply for leave at all. `CreateLeaveApplicationDto` takes
+`attachment_url`, a link, because `task_attachments` has no leave column to
+upload into, so the file input could never have reached the server.
+**Instead of.** Adding `FilesInterceptor` to the handler, the way `/requests`
+does. Rejected because there is nowhere to put a leave file: the schema stores a
+URL, and adding an upload path is a schema decision, not a form fix.
+**Costs.** Applying for a proof-requiring type means hosting the document
+somewhere first and pasting the link. No seeded type sets `requires_proof`, so
+nothing is blocked today. If HR turns it on and asks for real uploads, that is a
+`task_attachments` column and an upload route, decided together.
+
+---
+
+## 2026-08-23 The contract test checks content type, not just field names
+
+**Decision.** `api-contract.spec.ts` gains a third assertion: a client call that
+builds a `FormData` must target a handler carrying a `FileInterceptor`.
+**Why.** The leave bug above sent exactly the right field names, so the existing
+name check passed while no leave could be submitted. Names agreeing is not the
+whole contract. The check was verified by reintroducing the multipart call and
+watching it fail, not just by passing on a clean tree.
+**Instead of.** Trusting review to catch it. That is what happened the first
+time.
+**Costs.** Another regex over two source trees. Same ceiling as the rest of that
+file: generate the client from the DTOs if this surface outgrows it.
+
+---
+
+## 2026-08-23 The vendor deadlines screen reads the server's flag, and the profile serves its counts
+
+**Decision.** `VendorDeadline` on the client matches what `findDeadlines`
+returns, and `GET /vendors/:id` returns the four `counts` the profile header
+renders.
+**Why.** Two independent breakages on the same screen. The client declared
+`is_soon` and `is_overdue` with uppercase sources; the server sends `flag`,
+`days_until`, `id` and lowercase sources, so every row rendered "Scheduled" and
+neither OVERDUE nor DUE SOON could ever appear. Separately `findOne` never
+returned `counts` at all, and the client reads `counts.upcoming_deadlines ?? 0`,
+so all four tiles at the top of the vendor profile were a hardcoded zero
+whatever the data said. Between them the deadline tracking that section 8 calls
+one of the main reasons the module exists reported nothing.
+**Instead of.** Deriving the flag on the client from `date`. Rejected for the
+reason the calculator is centralised in the first place: two of them drift by a
+day and then nobody can say which screen is lying. `upcoming_deadlines` counts
+`findDeadlines` rows rather than running its own query, so the tile and the
+screen cannot disagree.
+**Costs.** `findOne` now injects `VendorWorkService` and does two more reads on
+a screen that was already doing four. Same module, no cycle, and `just
+boot-check` covers the injection. `overdue` counts assignments only, matching
+the directory's `next_deadline`; deliverables have their own overdue count on
+the performance panel.
+
+**Also.** The empty state on the deadlines screen now says where deadlines come
+from. There is no deadline entity to create, and "Nothing scheduled for this
+vendor" read as a missing feature rather than an empty union of four tables.

@@ -73,14 +73,24 @@ const navItems: NavItem[] = [
   },
   { href: '/events', label: 'Events', icon: <CalendarHeart size={20} /> },
   { href: '/notifications', label: 'Notifications', icon: <Bell size={20} /> },
-  { href: '/scoring', label: 'Scoring', icon: <Trophy size={20} /> },
-  {
-    href: '/hod-score',
-    label: 'HOD Scores',
-    icon: <BarChart3 size={20} />,
-    roles: ['MD', 'EA', 'PA', 'DEPARTMENT_CONTROLLER', 'HOD'],
-  },
-  { href: '/analytics', label: 'Analytics', icon: <BarChart3 size={20} /> },
+  // Scoring, HOD Scores and Analytics are hidden until the employee score model
+  // is settled. The employee score is unbounded points, not a percentage, and
+  // the HOD score is a weighted 0..1 scaled for display, so the two are not
+  // comparable and neither reads as a rating out of anything. Showing them
+  // invites the one complaint no amount of UI work fixes.
+  //
+  // The sidebar is the only entry point to all three, so commenting these out
+  // takes them out of the product. The routes still resolve if typed directly.
+  // Restore by uncommenting; nothing else was changed.
+  //
+  // { href: '/scoring', label: 'Scoring', icon: <Trophy size={20} /> },
+  // {
+  //   href: '/hod-score',
+  //   label: 'HOD Scores',
+  //   icon: <BarChart3 size={20} />,
+  //   roles: ['MD', 'EA', 'PA', 'DEPARTMENT_CONTROLLER', 'HOD'],
+  // },
+  // { href: '/analytics', label: 'Analytics', icon: <BarChart3 size={20} /> },
   { href: '/profile', label: 'Profile', icon: <UserCircle2 size={20} /> },
   { href: '/admin', label: 'Admin', icon: <Users size={20} />, roles: ['ADMIN'] },
 ];
