@@ -62,8 +62,25 @@ export interface User {
   departmentId?: string | null;
   departmentIds?: string[];
   departmentName?: string | null;
-  department?: { id: string; name: string } | null;
+  // `toUserResponse` sends a display string, not a relation. For the four
+  // multi-department roles it is a comma-joined list, so it is never an id.
+  department?: string | null;
   canAccessCareerHR?: boolean;
+}
+
+/**
+ * A row from either assignee picker. Not a `User`: the two `meta/assignees`
+ * routes send `department` as a relation, where `GET /users` sends a display
+ * string. Same word, two shapes, so they get two types.
+ */
+export interface Assignee {
+  id: string;
+  username: string;
+  fullName: string;
+  email?: string;
+  role: Role;
+  departmentId?: string | null;
+  department?: { id: string; name: string } | null;
 }
 
 export interface LoginRequest {
@@ -76,7 +93,16 @@ export interface RegisterRequest {
   email: string;
   fullName: string;
   password: string;
-  role: 'MD' | 'HOD' | 'EMPLOYEE' | 'EA' | 'PA' | 'DEPARTMENT_CONTROLLER';
+  // The seven the signup form offers. The server takes any `role_enum`, but
+  // ADMIN and HR are created by an admin and a VENDOR never self-registers.
+  role:
+    | 'MD'
+    | 'EA'
+    | 'PA'
+    | 'PURCHASE_HEAD'
+    | 'DEPARTMENT_CONTROLLER'
+    | 'HOD'
+    | 'EMPLOYEE';
   departmentId?: string;
   departmentIds?: string[];
 }
@@ -257,62 +283,10 @@ export interface Notification {
   createdAt: string;
 }
 
-// ─── Scoring ──────────────────────────────────────────────────────────────────
-export interface PerformanceScore {
-  id: string;
-  userId: string;
-  month: number;
-  year: number;
-  selfProductivityScore: number;
-  assignedTaskScore: number;
-  finalScore: number;
-  selfActionsCompleted: number;
-  selfActionsTotal: number;
-  consistencyDays: number;
-  totalWorkingDays: number;
-  assignedTasksCompleted: number;
-  assignedTasksTotal: number;
-  overdueTasksCount: number;
-  isFinalized: boolean;
-  user?: User;
-}
-
 // ─── Dashboard ────────────────────────────────────────────────────────────────
-export interface MDDashboardData {
-  totalTasks: number;
-  completedTasks: number;
-  pendingTasks: number;
-  overdueTasks: number;
-  completionRate: number;
-  departmentBreakdown: Array<{ deptId: string; name: string; completionRate: number; taskCount: number }>;
-  topPerformers: Array<{ userId: string; name: string; score: number; dept: string }>;
-  criticalPendingTasks: Task[];
-  escalationAlerts: any[];
-}
-
-export interface HODDashboardData {
-  deptStats: { active: number; completed: number; pending: number };
-  employeeScores: Array<{ userId: string; name: string; selfScore: number; assignedScore: number; finalScore: number }>;
-  pendingEscalations: any[];
-  transferRequests: any[];
-  productivityTrend: Array<{ week: string; completionRate: number }>;
-}
-
-export interface EmployeeDashboardData {
-  todaysActions: any[];
-  assignedTasks: Task[];
-  pendingTasks: Task[];
-  completionPercent: number;
-  monthlyScore?: PerformanceScore;
-  unreadNotifications: number;
-}
-
-export interface AdminDashboardData {
-  totalUsers: number;
-  totalDepartments: number;
-  recentAuditLogs: any[];
-}
-
+// `GET /dashboard` returns one payload for every role. The scope changes with
+// the caller's departments, the shape does not, so there is no per-role type
+// here. Scoring has its own types in `api/scoring.ts`.
 export interface Birthday {
   id: string;
   fullName: string;

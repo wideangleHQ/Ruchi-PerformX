@@ -1,5 +1,5 @@
 import axiosClient from './client';
-import { Task, Comment, PaginatedResponse, User } from './types';
+import { Task, Comment, PaginatedResponse, Assignee } from './types';
 
 export interface TaskDepartment {
   id: string;
@@ -46,8 +46,8 @@ export const tasksApi = {
     return response.data;
   },
 
-  getAssignees: async (departmentIds: string[]): Promise<User[]> => {
-    const response = await axiosClient.get<User[]>('/tasks/meta/assignees', {
+  getAssignees: async (departmentIds: string[]): Promise<Assignee[]> => {
+    const response = await axiosClient.get<Assignee[]>('/tasks/meta/assignees', {
       params: { departmentIds: departmentIds.join(',') },
     });
     return response.data;
@@ -159,8 +159,8 @@ export const tasksApi = {
       const response = await axiosClient.get<TaskDepartment[]>('/tasks/employee-sharing/departments');
       return response.data;
     },
-    getAssignees: async (departmentId?: string): Promise<User[]> => {
-      const response = await axiosClient.get<User[]>('/tasks/employee-sharing/assignees', {
+    getAssignees: async (departmentId?: string): Promise<Assignee[]> => {
+      const response = await axiosClient.get<Assignee[]>('/tasks/employee-sharing/assignees', {
         params: departmentId ? { departmentId } : undefined,
       });
       return response.data;

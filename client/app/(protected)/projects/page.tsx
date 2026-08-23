@@ -35,11 +35,10 @@ export default function ProjectsPage() {
     queryKey: ['departments'],
     queryFn: () => usersApi.getDepartments(),
   });
-  const { data: leadOptions } = useQuery({
-    queryKey: ['users', { limit: 200 }],
-    queryFn: () => usersApi.getUsers({ limit: 200 }),
+  const { data: leads = [] } = useQuery({
+    queryKey: ['users', { active: true }],
+    queryFn: () => usersApi.getUsers({ active: true }),
   });
-  const leads = Array.isArray(leadOptions) ? leadOptions : (leadOptions?.data ?? []);
 
   const filters: ProjectFilters = {
     search: search || undefined,

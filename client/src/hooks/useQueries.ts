@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { dashboardApi } from '@/api/dashboard';
 import { tasksApi } from '@/api/tasks';
 import { notificationsApi } from '@/api/notifications';
@@ -55,7 +55,6 @@ export const useTaskComments = (taskId: string) => {
 export const useNotifications = (params?: {
   page?: number;
   limit?: number;
-  read?: boolean;
 }) => {
   return useQuery({
     queryKey: ['notifications', params],
@@ -63,13 +62,32 @@ export const useNotifications = (params?: {
   });
 };
 
+/**
+ * Drives the header bell. The socket invalidates `['notifications']` when one
+ * arrives, so this refetches on delivery rather than on a poll.
+ */
+export const useUnreadNotificationCount = () => {
+  return useQuery({
+    queryKey: ['notifications', 'unread-count'],
+    queryFn: () => notificationsApi.getUnreadCount(),
+  });
+};
+
+/**
+ * Marks one notification read. There is no mark-all-read route on this API, so
+ * the list clears a row at a time. Invalidates the list and the bell count.
+ */
+export const useMarkNotificationRead = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => notificationsApi.markAsRead(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+};
+
 // User Queries
-export const useUsers = (params?: {
-  page?: number;
-  limit?: number;
-  role?: string;
-  departmentId?: string;
-}) => {
+export const useUsers = (params?: { active?: boolean }) => {
   return useQuery({
     queryKey: ['users', params],
     queryFn: () => usersApi.getUsers(params),

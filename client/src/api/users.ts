@@ -1,5 +1,5 @@
 import axiosClient from './client';
-import { User, PaginatedResponse, Role } from './types';
+import { User, Role } from './types';
 
 export interface Department {
   id: string;
@@ -9,15 +9,13 @@ export interface Department {
 }
 
 export const usersApi = {
-  getUsers: async (params?: {
-    page?: number;
-    limit?: number;
-    role?: string;
-    departmentId?: string;
-  }): Promise<PaginatedResponse<User>> => {
-    const response = await axiosClient.get<PaginatedResponse<User>>('/users', {
-      params,
-    });
+  /**
+   * The whole directory as a bare array. `GET /users` is not paginated and
+   * reads no filter but `active`, so page, limit, role and department are not
+   * accepted here rather than sent and silently ignored.
+   */
+  getUsers: async (params?: { active?: boolean }): Promise<User[]> => {
+    const response = await axiosClient.get<User[]>('/users', { params });
     return response.data;
   },
 

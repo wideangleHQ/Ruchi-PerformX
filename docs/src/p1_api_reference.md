@@ -32,6 +32,12 @@ Abbreviations: `ASSISTANTS` means EA, PA, and DEPARTMENT_CONTROLLER.
 
 ## Users
 
+`GET /users` is a bare array and is not paginated. It reads one filter,
+`?active=true`, and ignores anything else. `department` on each row is a display
+string, comma-joined for the four multi-department roles, not a relation and
+never an id. The two `meta/assignees` routes send `department` as `{ id, name }`
+instead, which is why the client types them separately as `Assignee`.
+
 | Method | Path | Roles |
 | --- | --- | --- |
 | GET | `/users` | MD, ADMIN, HOD, EA, PA, PURCHASE_HEAD, EMPLOYEE, HR |

@@ -17,6 +17,7 @@
 - [API reference](p1_api_reference.md)
 - [Code conventions](p1_conventions.md)
 - [Known gaps and dead code](p1_known_gaps.md)
+- [UX audit backlog](p1_ux_audit.md)
 
 # Phase 2 (to build)
 

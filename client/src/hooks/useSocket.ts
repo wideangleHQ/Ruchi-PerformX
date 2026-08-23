@@ -15,11 +15,12 @@ export const useSocket = () => {
       return;
     }
 
-    // Get token from cookies
-    const token = document.cookie
-      .split('; ')
-      .find((row) => row.startsWith('token='))
-      ?.split('=')[1];
+    // `AuthContext` stores the JWT in localStorage under `accessToken`. This
+    // read used to look for a `token=` cookie that nothing in the app has ever
+    // written, so it bailed on every render and no socket was opened at all:
+    // no live notifications, no live poll tallies, no task or comment
+    // invalidation anywhere in the product.
+    const token = localStorage.getItem('accessToken');
 
     if (!token) {
       return;

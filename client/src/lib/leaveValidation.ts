@@ -98,7 +98,7 @@ export interface LeaveDayBreakdown {
 export function computeLeaveDays(
   start: string,
   end: string,
-  holidays: ReadonlyArray<{ holiday_date: string; name: string }> = [],
+  holidays: ReadonlyArray<{ date: string; name: string }> = [],
 ): LeaveDayBreakdown | null {
   if (!start || !end) return null;
 
@@ -106,7 +106,7 @@ export function computeLeaveDays(
   const to = toUtcDay(end);
   if (Number.isNaN(from) || Number.isNaN(to) || to < from) return null;
 
-  const holidayNames = new Map(holidays.map((holiday) => [dayKey(holiday.holiday_date), holiday.name]));
+  const holidayNames = new Map(holidays.map((holiday) => [dayKey(holiday.date), holiday.name]));
   const excluded: LeaveDayBreakdown['excluded'] = [];
   let workingDays = 0;
 

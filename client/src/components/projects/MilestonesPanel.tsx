@@ -39,12 +39,11 @@ export function MilestonesPanel({
   const updateMilestone = useUpdateMilestone(projectId);
   const deleteMilestone = useDeleteMilestone(projectId);
 
-  const { data: userPage } = useQuery({
-    queryKey: ['users', { limit: 200 }],
-    queryFn: () => usersApi.getUsers({ limit: 200 }),
+  const { data: users = [] } = useQuery({
+    queryKey: ['users', { active: true }],
+    queryFn: () => usersApi.getUsers({ active: true }),
     enabled: canManage,
   });
-  const users = Array.isArray(userPage) ? userPage : (userPage?.data ?? []);
 
   const form = useForm<MilestoneFormData>({
     resolver: zodResolver(milestoneSchema),

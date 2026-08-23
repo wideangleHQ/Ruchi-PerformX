@@ -2,10 +2,11 @@ import axiosClient from './client';
 import { Notification, PaginatedResponse } from './types';
 
 export const notificationsApi = {
+  // The server reads `page` and `limit` only. There is no filter by read state
+  // and no mark-all-read route; the bell is cleared one row at a time.
   getNotifications: async (params?: {
     page?: number;
     limit?: number;
-    read?: boolean;
   }): Promise<PaginatedResponse<Notification>> => {
     const response = await axiosClient.get<PaginatedResponse<Notification>>('/notifications', {
       params,
@@ -13,13 +14,14 @@ export const notificationsApi = {
     return response.data;
   },
 
-  markAsRead: async (id: string): Promise<Notification> => {
-    const response = await axiosClient.put<Notification>(`/notifications/${id}/read`);
+  getUnreadCount: async (): Promise<{ unreadCount: number }> => {
+    const response = await axiosClient.get<{ unreadCount: number }>('/notifications/unread-count');
     return response.data;
   },
 
-  markAllAsRead: async (): Promise<void> => {
-    await axiosClient.put('/notifications/mark-all-read');
+  markAsRead: async (id: string): Promise<Notification> => {
+    const response = await axiosClient.patch<Notification>(`/notifications/${id}/read`);
+    return response.data;
   },
 
   deleteNotification: async (id: string): Promise<void> => {

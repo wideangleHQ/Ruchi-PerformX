@@ -16,7 +16,4 @@ export const useAccessStore = create<AccessStore>((set, get) => ({
   clear: () => {
     set({ code: "" });
   },
-  reset: () => {
-    set({ code: "" });
-  },
 }));

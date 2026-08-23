@@ -168,6 +168,13 @@ function readServerDtos(): Map<string, Set<string>> {
 interface ServerRoute {
   bodyDto?: string;
   queryDto?: string;
+  /**
+   * Whether the handler carries a `FileInterceptor`. Express parses no
+   * `multipart/form-data` without one, so a FormData body arrives empty and
+   * every declared DTO field fails validation at once. That is what shipped on
+   * `POST /leave/applications`.
+   */
+  multipart: boolean;
 }
 
 /** `POST /projects` and `GET /vendor-assignments` to the DTOs sitting behind them. */
@@ -192,9 +199,8 @@ function readServerRoutes(): Map<string, ServerRoute> {
 
       const body = signature.match(/@Body\(\)\s*\w+:\s*(\w+)/);
       const query = signature.match(/@Query\(\)\s*\w+:\s*(\w+)/);
-      if (!body && !query) continue;
 
-      const route: ServerRoute = {};
+      const route: ServerRoute = { multipart: /\w+Interceptor\s*\(/.test(signature) };
       if (body) route.bodyDto = group(body, 1);
       if (query) route.queryDto = group(query, 1);
 
@@ -296,6 +302,8 @@ interface ClientCall {
   path: string;
   bodyType?: string;
   queryKeys?: string[];
+  /** The call assembles a `FormData`, so it goes out as multipart. */
+  multipart?: boolean;
 }
 
 /** Every write, and every read that sends query parameters, in the client api layer. */
@@ -321,6 +329,7 @@ function readClientCalls(): ClientCall[] {
       const verb = group(call, 1).toUpperCase();
       const path = normalisePath(call[2] ?? call[3] ?? '');
       const rest = group(call, 4);
+      const multipart = /new FormData\(\)/.test(body);
 
       if (verb === 'GET' || verb === 'DELETE') {
         const params = rest.match(/\{\s*params:\s*\{([^}]*)\}/);
@@ -335,13 +344,24 @@ function readClientCalls(): ClientCall[] {
       if (literal) {
         const keys = objectKeys(group(literal, 1));
         if (!keys) continue;
-        calls.push({ where, verb, path, bodyType: `{${keys.map((key) => `${key}:`).join('')}}` });
+        calls.push({
+          where,
+          verb,
+          path,
+          multipart,
+          bodyType: `{${keys.map((key) => `${key}:`).join('')}}`,
+        });
         continue;
       }
 
       const payload = lastParamType(params);
-      if (payload === undefined) continue;
-      calls.push({ where, verb, path, bodyType: payload });
+      // A multipart call is still recorded when its payload type cannot be
+      // read, because the interceptor check below does not need the fields.
+      if (payload === undefined) {
+        if (multipart) calls.push({ where, verb, path, multipart });
+        continue;
+      }
+      calls.push({ where, verb, path, multipart, bodyType: payload });
     }
   }
 
@@ -368,10 +388,18 @@ describe('client and server agree on field names', () => {
 
   const unchecked: string[] = [];
   const problems: string[] = [];
+  const unparsedMultipart: string[] = [];
 
   for (const call of calls) {
     const route = routes.get(`${call.verb} ${call.path}`);
     if (!route) continue; // A route with no DTO has nothing to disagree about.
+
+    if (call.multipart && !route.multipart) {
+      unparsedMultipart.push(
+        `${call.where} -> ${call.verb} ${call.path} posts FormData, ` +
+          'but the handler has no FileInterceptor, so the body arrives empty',
+      );
+    }
 
     const dtoName = call.queryKeys ? route.queryDto : route.bodyDto;
     if (dtoName === undefined) continue;
@@ -412,6 +440,16 @@ describe('client and server agree on field names', () => {
 
   it('sends no field the receiving DTO would reject', () => {
     expect(problems).toEqual([]);
+  });
+
+  /**
+   * Names agreeing is not enough. `POST /leave/applications` took the right
+   * keys as multipart against a handler that could not parse them, so every
+   * field came back "must be a string" at once and no leave could be applied
+   * for.
+   */
+  it('posts multipart only where a FileInterceptor can read it', () => {
+    expect(unparsedMultipart).toEqual([]);
   });
 
   /**

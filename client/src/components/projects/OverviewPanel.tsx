@@ -53,12 +53,11 @@ export function OverviewPanel({
   const removeMember = useRemoveProjectMember(project.id);
   const addCriterion = useCreateSuccessCriterion(project.id);
 
-  const { data: userPage } = useQuery({
-    queryKey: ['users', { limit: 200 }],
-    queryFn: () => usersApi.getUsers({ limit: 200 }),
+  const { data: users = [] } = useQuery({
+    queryKey: ['users', { active: true }],
+    queryFn: () => usersApi.getUsers({ active: true }),
     enabled: canManage,
   });
-  const users = Array.isArray(userPage) ? userPage : (userPage?.data ?? []);
 
   const overdueItems = checklist.filter((item) => !item.is_done && (daysUntil(item.due_date) ?? 1) < 0);
   const overdueMilestones = milestones.filter(

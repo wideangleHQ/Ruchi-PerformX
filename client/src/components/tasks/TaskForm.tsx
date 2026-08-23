@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { tasksApi, TaskDepartment } from '@/api/tasks';
-import { User } from '@/api/types';
+import { Assignee } from '@/api/types';
 import { useAuth } from '@/context/AuthContext';
 import { createTaskSchema, CreateTaskFormData } from '@/lib/taskValidation';
 import { prepareAttachmentFiles } from '@/lib/attachmentUpload';
@@ -64,7 +64,7 @@ export function TaskForm({ onSuccess, taskType = 'OFFICIAL' }: TaskFormProps) {
   const selectAllEmployees = form.watch('assignAllEmployees') ?? false;
   const selectedDelegateDepartment = delegationDepartments.find((department) => department.id === selectedDelegateDepartmentId);
 
-  const { data: assignees = [] } = useQuery<User[]>({
+  const { data: assignees = [] } = useQuery<Assignee[]>({
     queryKey: ['task-assignees', selectedDepartmentIds, taskType, assignmentMode],
     queryFn: () => {
       if (isEmployeeShared) {
@@ -90,7 +90,7 @@ export function TaskForm({ onSuccess, taskType = 'OFFICIAL' }: TaskFormProps) {
     if (!isEmployeeShared || !selectedAssigneeIds.length) return [];
     return selectedAssigneeIds
       .map((id) => assignees.find((a) => a.id === id))
-      .filter(Boolean) as User[];
+      .filter(Boolean) as Assignee[];
   }, [assignees, isEmployeeShared, selectedAssigneeIds]);
 
   useEffect(() => {
@@ -480,7 +480,7 @@ export function TaskForm({ onSuccess, taskType = 'OFFICIAL' }: TaskFormProps) {
                     />
                     <span className="font-medium text-gray-900">{assignee.fullName}</span>
                     <span className="text-xs text-gray-500">
-                      {assignee.department?.name ?? assignee.departmentId ?? ''}
+                      {assignee.department?.name ?? ''}
                     </span>
                   </label>
                 );

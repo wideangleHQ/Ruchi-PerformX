@@ -122,10 +122,10 @@ function PendingRow({ application, types }: { application: LeaveApplication; typ
         <p className="line-clamp-3">{application.reason}</p>
       </td>
       <td className="whitespace-nowrap px-5 py-4">
-        {application.remaining_balance === null || application.remaining_balance === undefined ? (
+        {application.applicant_balance === null || application.applicant_balance === undefined ? (
           <span className="text-slate-400">-</span>
         ) : (
-          <span className="font-semibold text-slate-900">{toDays(application.remaining_balance)} days</span>
+          <span className="font-semibold text-slate-900">{toDays(application.applicant_balance)} days</span>
         )}
       </td>
       <td className="px-5 py-4">

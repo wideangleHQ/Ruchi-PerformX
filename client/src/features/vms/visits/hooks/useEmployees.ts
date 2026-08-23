@@ -15,7 +15,6 @@ export const useEmployees = () => {
     queryKey: ['employees'],
     queryFn: async () => {
       const data = await getEmployees();
-      console.log("Fetched Users:", data);
       return data || [];
     },
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes

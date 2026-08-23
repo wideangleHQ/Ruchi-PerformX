@@ -25,10 +25,7 @@ export function useUserOptions(): User[] {
   const { data } = useQuery({
     queryKey: ['users', 'options'],
     queryFn: () =>
-      usersApi
-        .getUsers({ page: 1, limit: 200 })
-        .then((page) => page.data)
-        .catch((): User[] => []),
+      usersApi.getUsers().catch((): User[] => []),
     staleTime: 5 * 60 * 1000,
   });
   return data ?? [];

@@ -11,8 +11,11 @@ import { PurposeField } from './PurposeField';
 import { VisitSummary } from './VisitSummary';
 import { CheckInCard } from './CheckInCard';
 import { useVisitors } from '../../visitors/hooks/useVisitors';
+import { useToast } from '@/hooks/useToast';
+import { apiMessage } from '@/lib/apiError';
 
 export function QuickEntryCard() {
+  const toast = useToast();
   const [step, setStep] = useState<1 | 2>(1);
   const [createdVisitId, setCreatedVisitId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -26,7 +29,7 @@ export function QuickEntryCard() {
   const { mutateAsync: createVisit, isPending: isCreating } = useCreateVisit();
   const { mutateAsync: checkIn, isPending: isCheckingIn } = useCheckIn();
 
-  const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm<CreateVisitFormValues>({
+  const { control, handleSubmit, watch, setValue, reset, formState: { errors } } = useForm<CreateVisitFormValues>({
     resolver: zodResolver(createVisitSchema),
     defaultValues: {
       visitorId: '', 
@@ -45,7 +48,7 @@ export function QuickEntryCard() {
       setCreatedVisitId(visit.id);
       setStep(2);
     } catch (error) {
-      console.error('Failed to create visit', error);
+      toast.error(apiMessage(error, 'Could not create the visit. Try again.'));
     }
   };
 
@@ -53,10 +56,20 @@ export function QuickEntryCard() {
     if (!createdVisitId) return;
     try {
       await checkIn({ visitId: createdVisitId });
-      alert('Check-in successful!');
-      window.location.reload();
+      toast.success(
+        selectedVisitor
+          ? `${selectedVisitor.fullName} is checked in`
+          : 'Visitor checked in',
+      );
+      // `useCheckIn` already invalidates the visit and dashboard queries, so the
+      // desk updates on its own. Reloading the page here threw away the session
+      // and made reception wait through a full boot with the visitor standing
+      // there. Reset back to an empty form instead, ready for the next one.
+      reset();
+      setCreatedVisitId(null);
+      setStep(1);
     } catch (error) {
-      console.error('Failed to check in', error);
+      toast.error(apiMessage(error, 'Could not check the visitor in. Try again.'));
     }
   };
 

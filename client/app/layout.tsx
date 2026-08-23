@@ -5,6 +5,7 @@ import { QueryProvider } from '@/components/providers/QueryProvider'
 import { AuthProvider } from '@/context/AuthContext'
 import { SocketProvider } from '@/components/providers/SocketProvider'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { Toaster } from '@/components/providers/Toaster'
 
 export const metadata: Metadata = {
   title: 'RUCHI PerformX',
@@ -44,6 +45,7 @@ export default function RootLayout({
                 <div className="screen-only min-h-screen flex flex-col w-full">
                   {children}
                 </div>
+                <Toaster />
               </SocketProvider>
             </AuthProvider>
           </QueryProvider>

@@ -10,7 +10,6 @@ import { Input } from '@/components/ui/input';
 import { remainingDays } from '@/api/leave';
 import { useApplyLeave, useHolidays, useLeaveBalance, useLeaveTypes } from '@/hooks/useLeave';
 import { ApplyLeaveFormData, applyLeaveSchema, computeLeaveDays, formatLeaveDate } from '@/lib/leaveValidation';
-import { prepareAttachmentFiles } from '@/lib/attachmentUpload';
 
 /** The API returns every submission failure at once, so it can be an array. */
 function errorMessages(error: unknown): string[] {
@@ -24,7 +23,7 @@ const yearOf = (value: string) => Number(value.slice(0, 4)) || new Date().getFul
 
 export function ApplyLeaveForm() {
   const router = useRouter();
-  const [attachments, setAttachments] = useState<File[]>([]);
+  const [attachmentUrl, setAttachmentUrl] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
 
   const { data: types = [] } = useLeaveTypes();
@@ -54,12 +53,12 @@ export function ApplyLeaveForm() {
       computeLeaveDays(
         startDate,
         endDate,
-        [...startYearHolidays, ...endYearHolidays].filter((holiday) => !holiday.is_optional),
+        [...startYearHolidays, ...endYearHolidays].filter((holiday) => !holiday.isOptional),
       ),
     [startDate, endDate, startYearHolidays, endYearHolidays],
   );
 
-  const needsProof = Boolean(selectedType?.requires_proof) && attachments.length === 0;
+  const needsProof = Boolean(selectedType?.requires_proof) && attachmentUrl.trim() === '';
   const overBalance =
     Boolean(selectedType && selectedType.is_paid && breakdown && remaining !== null && breakdown.workingDays > remaining);
   const noWorkingDays = Boolean(breakdown && breakdown.workingDays < 0.5);
@@ -70,7 +69,7 @@ export function ApplyLeaveForm() {
       await applyMutation.mutateAsync({
         ...values,
         reason: values.reason.trim(),
-        attachments: attachments.length ? await prepareAttachmentFiles(attachments) : undefined,
+        attachment_url: attachmentUrl.trim() || undefined,
       });
       router.push('/leave');
     } catch (error) {
@@ -195,22 +194,22 @@ export function ApplyLeaveForm() {
       </div>
 
       <div className="mt-4">
-        <label className="block text-sm font-medium text-slate-700">
-          Attachment {selectedType?.requires_proof ? '' : '(optional)'}
+        <label htmlFor="attachment-url" className="block text-sm font-medium text-slate-700">
+          Supporting document link {selectedType?.requires_proof ? '' : '(optional)'}
         </label>
         <Input
-          type="file"
-          multiple
+          id="attachment-url"
+          type="url"
+          inputMode="url"
+          maxLength={500}
+          placeholder="https://..."
           className="mt-1"
-          onChange={(event) => setAttachments(Array.from(event.target.files ?? []))}
+          value={attachmentUrl}
+          onChange={(event) => setAttachmentUrl(event.target.value)}
         />
-        {attachments.length ? (
-          <div className="mt-2 space-y-1 text-xs text-slate-600">
-            {attachments.map((file) => (
-              <div key={`${file.name}-${file.size}`}>{file.name}</div>
-            ))}
-          </div>
-        ) : null}
+        <p className="mt-1 text-xs text-slate-500">
+          Paste a link to the document. Leave stores the link, not the file.
+        </p>
         {needsProof ? (
           <p className="mt-1 text-xs text-rose-600">{selectedType?.name} needs a supporting document.</p>
         ) : null}

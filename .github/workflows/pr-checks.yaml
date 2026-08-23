@@ -84,17 +84,10 @@ jobs:
         with:
           bun-version: latest
       - run: bun install --frozen-lockfile
-      - name: Typecheck, allowing the known baseline
-        run: |
-          # 41 pre-existing errors on main, see docs/src/p1_known_gaps.md.
-          # This gate is "no new ones", not "zero".
-          count=$(npx tsc --noEmit -p tsconfig.json 2>&1 | grep -c 'error TS' || true)
-          echo "client type errors: $count (baseline 41)"
-          if [ "$count" -gt 41 ]; then
-            npx tsc --noEmit -p tsconfig.json 2>&1 | grep 'error TS' || true
-            echo "FAIL: $count errors, up from the 41 on main."
-            exit 1
-          fi
+      - name: Typecheck
+        # The baseline was 41 and is now zero, so this is a plain gate again.
+        # A counted baseline only holds while somebody keeps lowering it.
+        run: npx tsc --noEmit -p tsconfig.json
 
   hygiene:
     name: Hygiene
