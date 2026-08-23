@@ -12,7 +12,7 @@ import {
 } from '@/hooks/useVendors';
 import { VendorAccessGate } from '@/components/vendors/VendorAccessGate';
 import { ACCESS_LEVELS, formatDate, label } from '@/components/vendors/VendorChips';
-import { useUserOptions } from '@/components/vendors/pickers';
+import { useUserOptions } from '@/components/pickers';
 
 const selectClass =
   'h-8 rounded-lg border border-input bg-white px-3 text-sm text-slate-700 outline-none';

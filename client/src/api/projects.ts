@@ -199,8 +199,18 @@ export interface CreateProjectPayload {
   co_lead_id?: string;
 }
 
-export interface UpdateProjectPayload extends Partial<CreateProjectPayload> {
+/**
+ * `UpdateProjectDto` is wider than creation: it carries the lifecycle status,
+ * the R&D classification, and leadership. `co_lead_id: null` is how a co-lead
+ * is removed, which is why it is nullable here and absent from creation.
+ */
+export interface UpdateProjectPayload extends Partial<Omit<CreateProjectPayload, 'co_lead_id'>> {
   status?: ProjectStatus;
+  lead_id?: string;
+  co_lead_id?: string | null;
+  department_id?: string | null;
+  is_rnd?: boolean;
+  rnd_category?: string | null;
 }
 
 export interface ChecklistItemPayload {

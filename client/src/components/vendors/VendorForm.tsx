@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { CreateVendorPayload, Vendor } from '@/api/vendors';
 import { useVendorCategories } from '@/hooks/useVendors';
-import { useDepartmentOptions, useUserOptions } from './pickers';
+import { useDepartmentOptions, useUserOptions } from '@/components/pickers';
 
 /**
  * Section 1 fields, one for one with the `vendors` columns the create DTO

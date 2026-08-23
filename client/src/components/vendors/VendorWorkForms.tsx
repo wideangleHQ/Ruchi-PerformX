@@ -1,7 +1,7 @@
 'use client';
 
 import { VendorWorkDialog, WorkField } from './VendorWorkDialog';
-import { useUserOptions } from './pickers';
+import { useUserOptions } from '@/components/pickers';
 import {
   assignmentSchema, clean, contractSchema, deliverableSchema, documentSchema, reviewSchema,
 } from '@/lib/vendorValidation';

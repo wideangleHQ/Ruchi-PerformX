@@ -158,6 +158,10 @@ export const useCreateProject = () =>
 export const useUpdateProject = (projectId: string) =>
   useProjectMutation((payload: UpdateProjectPayload) => projectsApi.updateProject(projectId, payload));
 
+/** Soft delete. The Lead or the MD only; the service refuses everybody else. */
+export const useDeleteProject = (projectId: string) =>
+  useProjectMutation<void, void>(() => projectsApi.deleteProject(projectId));
+
 export const useAddProjectMember = (projectId: string) =>
   useProjectMutation((payload: { user_id: string; role: ProjectMemberRole }) =>
     projectsApi.addMember(projectId, payload),

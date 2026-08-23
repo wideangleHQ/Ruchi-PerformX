@@ -25,7 +25,7 @@ import { KpisPanel } from '@/components/projects/KpisPanel';
 import { MessagesPanel } from '@/components/projects/MessagesPanel';
 import { OutcomesPanel } from '@/components/projects/OutcomesPanel';
 import { ActivityPanel } from '@/components/projects/ActivityPanel';
-import { ArrowLeft, FileCheck } from 'lucide-react';
+import { ArrowLeft, FileCheck, Pencil } from 'lucide-react';
 
 const panels = [
   { key: 'overview', label: 'Overview' },
@@ -139,6 +139,15 @@ export default function ProjectDetailPage() {
                 </option>
               ))}
             </select>
+          )}
+          {canManage && (
+            <Link
+              href={`/projects/${projectId}/edit`}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            >
+              <Pencil size={16} />
+              Edit
+            </Link>
           )}
           <Link
             href={`/projects/${projectId}/closure`}
