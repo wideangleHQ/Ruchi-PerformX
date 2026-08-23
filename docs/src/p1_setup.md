@@ -54,6 +54,7 @@ failing later.
 | `ASSISTANT_MODEL` | no | Defaults to `laguna-s-2.1-free`, which is free. See the benchmark in `assistant.config.ts` before changing it |
 | `OPENCODE_BASE_URL` | no | Defaults to `https://opencode.ai/zen/v1`. For a self-hosted OpenAI-compatible gateway |
 | `PORT` | no | Defaults to `4000` |
+| `CORS_ORIGINS` | no | Comma-separated browser origins allowed to call the API. Defaults to `http://localhost:4001,https://app.ruchiperformx.in`. Setting it **replaces** the default, so include every origin you still need |
 | `INTERNAL_API_KEY` | yes | Shared secret CareerX sends as `x-internal-api-key` |
 | `RESEND_API_KEY` | yes | Outbound email |
 | `RESEND_FROM_EMAIL` | yes | Verified sender address |
@@ -68,6 +69,13 @@ failing later.
 The two Supabase key names are a leftover from a rename that was never
 finished. Setting both to the service role key is the safe move until the
 duplicate is cleaned up.
+
+`CORS_ORIGINS` is the one to reach for when a deployed client loads but every
+request fails and the API logs nothing. A browser rejects a disallowed origin at
+the preflight, so the request never arrives: there is no server-side trace, and
+the screen just fails. Add the client's origin here rather than editing
+`main.ts`. It is not in `server_env_required` because the default covers local
+development and the production domain, so leaving it unset cannot fail quietly.
 
 Four of these secrets kill the process at startup rather than at first use:
 `JWT_SECRET` is checked in the module body of `auth.module.ts`,
