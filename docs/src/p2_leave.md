@@ -263,6 +263,12 @@ Holidays:
 | PATCH | `/holidays/:id` | HR (any), HOD (own department only), ADMIN |
 | DELETE | `/holidays/:id` | HR (any), HOD (own department only), ADMIN |
 
+`PATCH` moves a holiday between the common and department-wise tiers through
+`departmentId`, where `null` means company-wide. The calendar screen renders it
+as a select on each holiday a caller may manage, listing only the tiers they may
+move it to: a HOD sees their own departments and no company-wide option, because
+the API refuses that. See [Holidays](p1_api_reference.md#holidays) for the rule.
+
 A single `/approve` and `/reject` endpoint, not separate `manager-approve`
 and `hr-approve` ones. Both roles run the same transition against the same
 `PENDING` status, so a role branch inside one handler is simpler than two

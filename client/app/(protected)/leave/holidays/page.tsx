@@ -11,6 +11,7 @@ import {
   useDeleteHoliday,
   useHolidays,
   useUpcomingHolidays,
+  useUpdateHoliday,
 } from '@/hooks/useHolidays';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -50,6 +51,7 @@ export default function HolidaysPage() {
   const { data: upcoming = [] } = useUpcomingHolidays(1);
   const createHoliday = useCreateHoliday();
   const deleteHoliday = useDeleteHoliday();
+  const updateHoliday = useUpdateHoliday();
 
   // HR and ADMIN maintain both tiers. A HOD maintains their own departments
   // only, which the API enforces regardless of what this screen renders.
@@ -77,11 +79,24 @@ export default function HolidaysPage() {
     [departments, ownDepartmentIds, setsCommon],
   );
 
-  const canDelete = (holiday: Holiday) =>
+  const canManage = (holiday: Holiday) =>
     setsCommon ||
     (isHod &&
       holiday.departmentId !== null &&
       ownDepartmentIds.includes(holiday.departmentId));
+
+  // The tiers a holiday can be moved to. A HOD sees only their own departments
+  // and no company-wide option, because the API refuses both.
+  const tierOptions = useMemo(
+    () => [
+      ...(setsCommon ? [{ value: COMMON, label: 'Everyone (company-wide)' }] : []),
+      ...writableDepartments.map((department) => ({
+        value: department.id,
+        label: department.name,
+      })),
+    ],
+    [setsCommon, writableDepartments],
+  );
 
   const commonHolidays = holidays.filter((holiday) => holiday.tier === COMMON);
   const departmentHolidays = holidays.filter(
@@ -243,9 +258,11 @@ export default function HolidaysPage() {
         subtitle="Apply to everyone in the company."
         holidays={commonHolidays}
         isLoading={isLoading}
-        canDelete={canDelete}
+        canManage={canManage}
         onDelete={(id) => deleteHoliday.mutate(id)}
-        busy={deleteHoliday.isPending}
+        onMove={(id, departmentId) => updateHoliday.mutate({ id, data: { departmentId } })}
+        tierOptions={tierOptions}
+        busy={deleteHoliday.isPending || updateHoliday.isPending}
       />
 
       <HolidaySection
@@ -253,9 +270,11 @@ export default function HolidaysPage() {
         subtitle="Apply only to the department they are set for."
         holidays={departmentHolidays}
         isLoading={isLoading}
-        canDelete={canDelete}
+        canManage={canManage}
         onDelete={(id) => deleteHoliday.mutate(id)}
-        busy={deleteHoliday.isPending}
+        onMove={(id, departmentId) => updateHoliday.mutate({ id, data: { departmentId } })}
+        tierOptions={tierOptions}
+        busy={deleteHoliday.isPending || updateHoliday.isPending}
       />
     </div>
   );
@@ -266,16 +285,20 @@ function HolidaySection({
   subtitle,
   holidays,
   isLoading,
-  canDelete,
+  canManage,
   onDelete,
+  onMove,
+  tierOptions,
   busy,
 }: {
   title: string;
   subtitle: string;
   holidays: Holiday[];
   isLoading: boolean;
-  canDelete: (holiday: Holiday) => boolean;
+  canManage: (holiday: Holiday) => boolean;
   onDelete: (id: string) => void;
+  onMove: (id: string, departmentId: string | null) => void;
+  tierOptions: { value: string; label: string }[];
   busy: boolean;
 }) {
   return (
@@ -304,18 +327,40 @@ function HolidaySection({
                   {holiday.isOptional ? <Badge variant="secondary">Optional</Badge> : null}
                 </div>
               </div>
-              {canDelete(holiday) ? (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  disabled={busy}
-                  aria-label={`Delete ${holiday.name}`}
-                  onClick={() => {
-                    if (window.confirm(`Delete "${holiday.name}"?`)) onDelete(holiday.id);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4 text-red-600" />
-                </Button>
+              {canManage(holiday) ? (
+                <div className="flex shrink-0 items-center gap-1">
+                  {tierOptions.length > 1 ? (
+                    <select
+                      value={holiday.departmentId ?? COMMON}
+                      disabled={busy}
+                      aria-label={`Move ${holiday.name}`}
+                      onChange={(event) =>
+                        onMove(
+                          holiday.id,
+                          event.target.value === COMMON ? null : event.target.value,
+                        )
+                      }
+                      className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs text-gray-600"
+                    >
+                      {tierOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={busy}
+                    aria-label={`Delete ${holiday.name}`}
+                    onClick={() => {
+                      if (window.confirm(`Delete "${holiday.name}"?`)) onDelete(holiday.id);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 text-red-600" />
+                  </Button>
+                </div>
               ) : null}
             </div>
           ))}

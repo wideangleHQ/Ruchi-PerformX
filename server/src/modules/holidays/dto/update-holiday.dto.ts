@@ -1,12 +1,8 @@
 // src/modules/holidays/dto/update-holiday.dto.ts
 
-import { IsBoolean, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, MaxLength } from 'class-validator';
 import { Transform } from 'class-transformer';
 
-// No `departmentId`. Moving a holiday between the common and department-wise
-// tiers changes who it applies to and which unique index guards it, so it is a
-// delete plus a create rather than an edit. `forbidNonWhitelisted` turns an
-// attempt into a 400 that says so.
 export class UpdateHolidayDto {
   @IsOptional()
   @IsString()
@@ -22,4 +18,16 @@ export class UpdateHolidayDto {
   @IsOptional()
   @IsBoolean()
   isOptional?: boolean;
+
+  // Moves the holiday between tiers. A UUID sets the department-wise tier, an
+  // explicit null returns it to the common tier, and omitting it leaves the
+  // tier alone. `@IsOptional()` skips null as well as undefined, which is what
+  // makes the null case expressible.
+  //
+  // The service checks the caller against both the old tier and the new one,
+  // so a HOD cannot move a holiday out of their department or up to
+  // company-wide.
+  @IsOptional()
+  @IsUUID()
+  departmentId?: string | null;
 }

@@ -163,14 +163,20 @@ export class HolidaysService {
   }
 
   /**
-   * Edit a holiday's name, date, or optional flag. The tier does not move; see
-   * `UpdateHolidayDto`.
+   * Edit a holiday's name, date, optional flag, or tier.
+   *
+   * Moving between tiers changes who the holiday applies to, so the caller is
+   * checked against the tier it is leaving as well as the one it is joining.
+   * That is what stops a HOD moving a departmental holiday to company-wide, or
+   * handing one to a department that is not theirs.
    *
    * @param id - holiday id
-   * @param dto - the fields to change, all optional
-   * @param user - the caller, checked against the row's existing tier
+   * @param dto - the fields to change, all optional. `departmentId: null`
+   *   returns the holiday to the common tier; omitting it leaves the tier alone
+   * @param user - the caller, checked against both tiers
    * @throws NotFoundException when no such holiday exists
-   * @throws ForbiddenException when the row is outside the caller's departments
+   * @throws ForbiddenException when either tier is outside the caller's
+   *   authority
    * @throws ConflictException when the edit collides with an existing holiday
    */
   async update(
@@ -185,7 +191,16 @@ export class HolidaysService {
     if (!existing) {
       throw new NotFoundException('Holiday not found');
     }
+
+    const movesTier = dto.departmentId !== undefined;
+    const nextDepartmentId = movesTier
+      ? (dto.departmentId ?? null)
+      : existing.department_id;
+
     await this.assertCanWrite(user, existing.department_id);
+    if (movesTier && nextDepartmentId !== existing.department_id) {
+      await this.assertCanWrite(user, nextDepartmentId);
+    }
 
     const holidayDate = dto.date ? this.parseDate(dto.date) : undefined;
 
@@ -200,6 +215,7 @@ export class HolidaysService {
           ...(holidayDate
             ? { holiday_date: holidayDate, year: holidayDate.getUTCFullYear() }
             : {}),
+          ...(movesTier ? { department_id: nextDepartmentId } : {}),
         },
         select: SELECT,
       });
@@ -210,7 +226,7 @@ export class HolidaysService {
         error,
         dto.name ?? existing.name,
         dto.date ?? holidayDateKey(existing.holiday_date),
-        existing.department_id,
+        nextDepartmentId,
       );
     }
   }
@@ -269,6 +285,10 @@ export class HolidaysService {
     departmentId: string | null,
   ): Promise<void> {
     if (user.role === role_enum.HR || user.role === role_enum.ADMIN) {
+      // A HOD's department is proven by the scope check below. HR and ADMIN
+      // pass any id, so an unknown one has to be caught here or it reaches
+      // Postgres as a foreign key violation and surfaces as a 500.
+      if (departmentId !== null) await this.assertDepartmentExists(departmentId);
       return;
     }
 
@@ -284,6 +304,17 @@ export class HolidaysService {
       throw new ForbiddenException(
         'You can only manage holidays for your own department',
       );
+    }
+  }
+
+  /** @throws NotFoundException when the department is missing or deactivated. */
+  private async assertDepartmentExists(departmentId: string): Promise<void> {
+    const department = await this.prisma.departments.findFirst({
+      where: { id: departmentId, is_active: true },
+      select: { id: true },
+    });
+    if (!department) {
+      throw new NotFoundException('Department not found');
     }
   }
 
