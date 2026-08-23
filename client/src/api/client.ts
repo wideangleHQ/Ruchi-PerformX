@@ -1,6 +1,27 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+/**
+ * The API mounts everything under the `api/v1` global prefix set in `main.ts`,
+ * and every call in `src/api` is written relative to it, so the base URL has to
+ * carry it.
+ *
+ * Setting `NEXT_PUBLIC_API_URL` to the bare host is an easy mistake, because
+ * that is exactly what `NEXT_PUBLIC_SOCKET_URL` wants, and the two variables
+ * otherwise look identical. It turns every request in the product into a 404
+ * with no other symptom: the host answers, so it is not CORS and not a network
+ * error, and login simply fails. Append the prefix when it is missing rather
+ * than let one character of configuration take the whole app down.
+ *
+ * Accepts `https://host`, `https://host/`, `https://host/api/v1` and
+ * `https://host/api/v1/`, and leaves a future `/api/v2` alone.
+ */
+const RAW_API_URL = (
+  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'
+).replace(/\/+$/, '');
+
+const API_URL = /\/api\/v\d+$/.test(RAW_API_URL)
+  ? RAW_API_URL
+  : `${RAW_API_URL}/api/v1`;
 
 
 const axiosClient: AxiosInstance = axios.create({

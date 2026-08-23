@@ -27,35 +27,52 @@ at `api.ruchiperformx.in`, and the database and object storage are on Supabase.
 
 ## How the client gets deployed
 
-Nothing deploys on push, and nothing in this repository deploys production.
-
-Vercel's own git integration is off, because `client/vercel.json` sets
-`deploymentEnabled: false`. That leaves `.github/workflows/ci.yaml` as the only
-automated path, and it builds previews only:
+`.github/workflows/ci.yaml` deploys production on every push to `main`, and on
+demand:
 
 ```
-schedule   30 18 * * *   18:30 UTC, midnight IST, every day
-dispatch   Actions -> Vercel Preview Deployment -> Run workflow
+push       branches: [main]
+dispatch   Actions -> Vercel Production Deployment -> Run workflow
 ```
 
-So there is always a preview URL showing roughly yesterday's `main`, and anyone
-who needs a fresher one can press the button.
+It runs `vercel pull --environment=production`, `vercel build --prod`, then
+`vercel deploy --prebuilt --prod`. Vercel's own git integration stays off
+(`client/vercel.json` keeps `deploymentEnabled: false`), so this workflow is the
+single deploy path and a merge cannot deploy twice.
 
-**Production is deployed by hand from Vercel**, by someone who decides the code
-is ready. There is no `--prod` anywhere in the workflow and adding one is a
-decision, not a tidy-up. The reasoning is in the
-[decision log](decisions.md).
+This replaced a preview-only arrangement on 2026-08-24. See the
+[decision log](decisions.md) for what changed and why.
 
-Three things follow.
+Four things follow.
 
-The preview URL is up to a day behind `main` unless somebody dispatches it, so
-it is not a check on a commit you just pushed.
+**A merge into `main` is a release.** There is no staging step between the two
+any more.
 
-GitHub disables scheduled workflows after sixty days without a push to the
-repository, and it does so quietly. A long quiet period stops the daily preview
-and nothing announces it.
+**There are no preview deployments at all.** The integration is off and the old
+preview cron is gone, so a change cannot be checked on a real URL before it is
+the production URL. Branch previews come back by removing `deploymentEnabled`
+from `client/vercel.json`; do that before the deploy path grows a second person.
 
-The API is not deployed by this workflow and never has been.
+**A Vercel rollback reverts the client only.** The API and its schema are on
+Railway. A merge carrying a Prisma migration is a decision to run it, and
+rolling the client back does not roll the schema back.
+
+**The API is not deployed by this workflow and never has been.**
+
+### `NEXT_PUBLIC_*` is compiled in, not read at runtime
+
+Next.js inlines these at build time, so changing one in the Vercel dashboard
+does nothing until a new build runs. Two of them are easy to confuse, and the
+difference is one path segment:
+
+| Variable | Value | Note |
+| --- | --- | --- |
+| `NEXT_PUBLIC_API_URL` | `https://api.ruchiperformx.in/api/v1` | **with** the prefix |
+| `NEXT_PUBLIC_SOCKET_URL` | `https://api.ruchiperformx.in` | **without** it |
+
+Getting the first one wrong used to 404 every request in the product while the
+host answered normally, so it looked like neither CORS nor an outage. `client.ts`
+now appends the prefix when it is missing, so a bare host works either way.
 
 ## Request path
 

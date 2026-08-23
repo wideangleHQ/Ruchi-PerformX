@@ -1464,3 +1464,57 @@ the performance panel.
 **Also.** The empty state on the deadlines screen now says where deadlines come
 from. There is no deadline entity to create, and "Nothing scheduled for this
 vendor" read as a missing feature rather than an empty union of four tables.
+
+---
+
+## 2026-08-24 Production deploys on push to main, superseding the hand-deploy rule
+
+**Decision.** Supersedes *2026-08-16 Deploys are scheduled, and production is
+deployed by hand*. `ci.yaml` now triggers on push to `main` and runs
+`vercel pull --environment=production`, `vercel build --prod` and
+`vercel deploy --prebuilt --prod`. Vercel's git integration stays off, so the
+workflow remains the single deploy path.
+**Why.** The 2026-08-16 reasoning was Phase 2 specific: seventeen merges in a
+month, and no appetite for half-finished modules reaching a hundred employees
+one merge at a time. Phase 2 is merged. What remained was the cost that entry
+named and accepted, and it had started to bite: the deployed site trailed `main`
+by up to a day, "what is live" was answerable only in the Vercel dashboard, and
+a promote-by-hand step that did not work, because Vercel refuses to promote a
+prebuilt deployment built for a non-production environment.
+**Instead of.** Re-enabling the git integration and deleting the workflow, which
+was the other candidate and is the smaller moving part. Rejected for now because
+it would have deployed twice per merge until the workflow went, and removing a
+CI file is a separate decision from changing what it does.
+**Costs.** Three, and the second is the one to watch.
+
+A merge is a release, with nothing between the two.
+
+There are now no preview deployments of any kind: the integration is off and the
+preview cron is gone, so no change can be seen on a real URL before that URL is
+production. Restoring branch previews is one line in `client/vercel.json`.
+
+A Vercel rollback reverts the client only. A merge carrying a migration is a
+decision to run it against production, and rolling the client back does not roll
+the schema back.
+
+---
+
+## 2026-08-24 The API base URL tolerates a missing `/api/v1`
+
+**Decision.** `client.ts` appends the `api/v1` prefix to
+`NEXT_PUBLIC_API_URL` when it is absent, rather than trusting it.
+**Why.** The API mounts every route under that global prefix and every call in
+`src/api` is written relative to it, so the base must carry it. Setting the
+variable to the bare host is a one-character mistake with no good failure mode:
+the host answers, so it is not CORS, not DNS and not an outage, every request in
+the product 404s, and login just stops working. It is also the exact value
+`NEXT_PUBLIC_SOCKET_URL` wants, and the two sit next to each other in the Vercel
+dashboard marked Sensitive, so neither can be read back to compare. It took a
+path-by-path probe against production to find.
+**Instead of.** Documenting the correct value and leaving the code strict.
+Rejected: the documentation already said it, and being right in a table does not
+help at 1am when the symptom is a 404 on a host that is plainly up.
+**Costs.** The client now silently accepts a base URL that is not quite right,
+which hides a misconfiguration instead of failing loudly. Acceptable here
+because there is exactly one correct answer to append and no ambiguity about
+it. A future `/api/v2` is left alone by the check.
