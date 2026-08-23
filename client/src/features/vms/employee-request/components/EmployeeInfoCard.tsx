@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { EmployeeInfo } from '../types/employee-request.types';
-import { User, Briefcase, MapPin, Building } from 'lucide-react';
+import { User, Briefcase, Building, IdCard } from 'lucide-react';
 
 export const EmployeeInfoCard = memo(function EmployeeInfoCard({ employee }: { employee: EmployeeInfo }) {
   return (
@@ -24,19 +24,17 @@ export const EmployeeInfoCard = memo(function EmployeeInfoCard({ employee }: { e
         <div className="flex items-start gap-2">
           <Briefcase className="w-4 h-4 text-gray-400 mt-0.5" />
           <div>
-            <p className="text-xs text-gray-500">Designation</p>
-            <p className="font-medium text-sm text-gray-900">{employee.designation}</p>
+            <p className="text-xs text-gray-500">Role</p>
+            <p className="font-medium text-sm text-gray-900">{employee.role}</p>
           </div>
         </div>
-        {employee.location && (
-          <div className="flex items-start gap-2">
-            <MapPin className="w-4 h-4 text-gray-400 mt-0.5" />
-            <div>
-              <p className="text-xs text-gray-500">Location</p>
-              <p className="font-medium text-sm text-gray-900">{employee.location}</p>
-            </div>
+        <div className="flex items-start gap-2">
+          <IdCard className="w-4 h-4 text-gray-400 mt-0.5" />
+          <div>
+            <p className="text-xs text-gray-500">Username</p>
+            <p className="font-medium text-sm text-gray-900">{employee.employeeId}</p>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

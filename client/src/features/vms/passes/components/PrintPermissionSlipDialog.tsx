@@ -11,14 +11,17 @@ import { PermissionSlipDocument } from './PermissionSlipDocument';
 import { PrintPortal } from './PrintPortal';
 import { Printer } from 'lucide-react';
 
+type PaperSize = 'a5' | 'a4' | 'thermal';
+
 interface PrintPermissionSlipDialogProps {
   slip: PassResponse | null;
   onClose: () => void;
 }
 
 export function PrintPermissionSlipDialog({ slip, onClose }: PrintPermissionSlipDialogProps) {
-  const [paperSize, setPaperSize] = useState('a5');
-  const [copies, setCopies] = useState(1);
+  // Copy count is not settable from script. The browser's own print dialog
+  // owns it, so there is no control for it here.
+  const [paperSize, setPaperSize] = useState<PaperSize>('a5');
 
   if (!slip) return null;
 
@@ -48,26 +51,15 @@ export function PrintPermissionSlipDialog({ slip, onClose }: PrintPermissionSlip
               <div className="flex gap-4 mt-4 pb-4 border-b text-sm">
                 <div>
                   <span className="font-semibold text-gray-700">Paper Size: </span>
-                  <select 
-                    value={paperSize} 
-                    onChange={(e) => setPaperSize(e.target.value)}
+                  <select
+                    value={paperSize}
+                    onChange={(e) => setPaperSize(e.target.value as PaperSize)}
                     className="border rounded px-2 py-1 bg-white"
                   >
                     <option value="a5">A5 (148mm × 210mm)</option>
                     <option value="a4">A4 (210mm × 297mm)</option>
                     <option value="thermal">80mm Thermal</option>
                   </select>
-                </div>
-                <div>
-                  <span className="font-semibold text-gray-700">Copies: </span>
-                  <input 
-                    type="number" 
-                    value={copies}
-                    onChange={(e) => setCopies(Math.max(1, Math.min(5, parseInt(e.target.value) || 1)))}
-                    min={1}
-                    max={5} 
-                    className="border rounded px-2 py-1 w-16 bg-white" 
-                  />
                 </div>
               </div>
             </DialogHeader>
@@ -80,8 +72,8 @@ export function PrintPermissionSlipDialog({ slip, onClose }: PrintPermissionSlip
         </DialogContent>
       </Dialog>
 
-      <PrintPortal paperSize={paperSize as 'a5' | 'a4' | 'thermal'}>
-        <PermissionSlipDocument slip={slip} paperSize={paperSize as 'a5' | 'a4' | 'thermal'} />
+      <PrintPortal paperSize={paperSize}>
+        <PermissionSlipDocument slip={slip} paperSize={paperSize} />
       </PrintPortal>
     </>
   );

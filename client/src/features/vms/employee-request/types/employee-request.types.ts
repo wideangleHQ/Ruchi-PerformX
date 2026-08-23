@@ -1,9 +1,12 @@
+/**
+ * What PerformX actually knows about the signed-in employee. There is no
+ * designation or seat location on `users`, so the card does not claim one.
+ */
 export interface EmployeeInfo {
   employeeId: string;
   fullName: string;
   department: string;
-  designation: string;
-  location?: string;
+  role: string;
 }
 
 export interface VisitorRequestPayload {
