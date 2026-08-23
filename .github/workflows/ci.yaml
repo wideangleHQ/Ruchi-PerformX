@@ -46,9 +46,15 @@ jobs:
             --prod \
             --token="$VERCEL_TOKEN"
 
+      # `--archive=tgz` uploads one tarball instead of one request per file.
+      # A Next.js build is thousands of small static chunks, and the free plan
+      # caps uploads at 5000 a day, so a handful of deploys in one afternoon
+      # exhausts the quota and every deploy then fails for 24 hours with
+      # `api-upload-free`. Vercel's own error message recommends this flag.
       - name: Deploy Production
         run: |
           vercel deploy \
             --prebuilt \
             --prod \
+            --archive=tgz \
             --token="$VERCEL_TOKEN"
