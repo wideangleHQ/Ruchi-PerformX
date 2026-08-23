@@ -1464,3 +1464,40 @@ the performance panel.
 **Also.** The empty state on the deadlines screen now says where deadlines come
 from. There is no deadline entity to create, and "Nothing scheduled for this
 vendor" read as a missing feature rather than an empty union of four tables.
+
+---
+
+## 2026-08-24 Vercel deploys on merge again, superseding the hand-deploy rule
+
+**Decision.** Supersedes *2026-08-16 Deploys are scheduled, and production is
+deployed by hand*. `client/vercel.json` no longer sets
+`git.deploymentEnabled: false`, so Vercel's own integration deploys `main` to
+production and every branch to a preview. `.github/workflows/ci.yaml` stays for
+now, redundant, so the daily preview does not vanish from under anyone using
+it; deleting it is a follow-up.
+**Why.** The 2026-08-16 reasoning was Phase 2 specific: seventeen merges into
+`main` in a month, and no appetite for half-finished modules reaching a hundred
+employees one merge at a time. Phase 2 is merged. What is left is the cost that
+decision named and accepted, and it now bites daily: the deployed site trails
+`main` by up to a day, "what is live" is answered only in the Vercel dashboard,
+and GitHub disables a scheduled workflow after sixty days without a push, so the
+one automated path stops silently.
+
+The workflow had also stopped doing what it claimed, which is the other half of
+why the hand-deploy path had to go. The project's `NEXT_PUBLIC_*` variables are
+marked Sensitive, so `vercel pull` does not return them, and `vercel build` +
+`vercel deploy --prebuilt` on a runner compiled the `http://localhost:4000`
+fallback from `api/client.ts` into the bundle. Vercel also refuses to promote a
+prebuilt non-production deployment, so the documented "promote it by hand" path
+did not work either. Building on Vercel, where the values exist, removes the
+whole class. The cron previews still carry the defect until the workflow goes.
+**Instead of.** Keeping the workflow and passing the variables to it explicitly
+as Actions secrets, which duplicates the Vercel project's configuration into a
+second place that then drifts. Also rejected: a `--prod` dispatch target, for
+the reason the original entry rejected it, one wrong click.
+**Costs.** The protection the original decision bought is gone: a merge is a
+release. Two things that follow. A Vercel rollback reverts the client only, so
+a merge carrying a Prisma migration is a decision to run it against production,
+and rolling the client back does not roll the schema back. And `main` should
+now be treated as deployable at all times, which is a working agreement this
+repository has not needed until today.

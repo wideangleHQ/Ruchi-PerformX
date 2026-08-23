@@ -27,24 +27,34 @@ at `api.ruchiperformx.in`, and the database and object storage are on Supabase.
 
 ## How the client gets deployed
 
-Nothing deploys on push, and nothing in this repository deploys production.
+Vercel's git integration owns it. A merge into `main` builds and goes to
+production; every other branch and pull request gets a preview URL.
+`client/vercel.json` no longer sets `deploymentEnabled: false`.
 
-Vercel's own git integration is off, because `client/vercel.json` sets
-`deploymentEnabled: false`. That leaves `.github/workflows/ci.yaml` as the only
-automated path, and it builds previews only:
+This reverses the Phase 2 arrangement, where the integration was disabled and a
+scheduled workflow built previews with the Vercel CLI. That existed because
+Phase 2 landed as seventeen merges and half-finished modules should not reach a
+hundred employees one merge at a time. Phase 2 is merged, so the reason is
+spent. The [decision log](decisions.md) carries both entries.
 
-```
-schedule   30 18 * * *   18:30 UTC, midnight IST, every day
-dispatch   Actions -> Vercel Preview Deployment -> Run workflow
-```
+Three things worth knowing.
 
-So there is always a preview URL showing roughly yesterday's `main`, and anyone
-who needs a fresher one can press the button.
+**`.github/workflows/ci.yaml` is still here and is now redundant.** It builds a
+preview on a daily cron with the Vercel CLI, which the integration already does
+per branch. It is kept for now rather than deleted, so the daily preview does
+not disappear from under anyone still using it.
 
-**Production is deployed by hand from Vercel**, by someone who decides the code
-is ready. There is no `--prod` anywhere in the workflow and adding one is a
-decision, not a tidy-up. The reasoning is in the
-[decision log](decisions.md).
+**That workflow's previews are suspect.** It runs `vercel build` then
+`vercel deploy --prebuilt`, and the project's `NEXT_PUBLIC_*` variables are
+marked Sensitive, so `vercel pull` does not return them. A build with those
+values missing does not fail; `api/client.ts` falls back to
+`http://localhost:4000` and that gets compiled into the bundle. Check the
+network tab on a cron preview before trusting it. Builds from the integration
+run on Vercel, where the values exist, and cannot hit this.
+
+**A rollback does not undo a migration.** Vercel can revert the client in one
+click; the API and its schema are on Railway and are not covered by it. A merge
+carrying a migration is a decision to run it.
 
 Three things follow.
 
