@@ -3,6 +3,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import {
+  CreateAssignmentPayload,
+  CreateContractPayload,
+  CreateDeliverablePayload,
+  CreateDocumentPayload,
+  CreateReviewPayload,
   CreateVendorPayload,
   UpdateVendorPayload,
   VendorAccessLevel,
@@ -126,9 +131,16 @@ export interface VendorAccess {
   level: VendorAccessLevel | null;
   /** Any level at all, which is what opening the module requires. */
   canRead: boolean;
-  /** VENDOR_MANAGER and above: create, edit, assignments, contracts, documents. */
+  /**
+   * VENDOR_MANAGER and above. Every create and edit in the module: vendors,
+   * assignments, contracts, documents, deliverables and reviews.
+   */
   canWrite: boolean;
-  /** VENDOR_ADMIN: reviews and document deletion. */
+  /**
+   * VENDOR_ADMIN. Document deletion only, which is the one write above manager
+   * in `VendorWorkService`. Reviews are manager, despite what this comment used
+   * to say.
+   */
   canAdmin: boolean;
   /** MD and EA only: granting and revoking access. */
   canManageAccess: boolean;
@@ -193,3 +205,49 @@ export const useRevokeVendorAccess = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['vendor-access'] }),
   });
 };
+
+/**
+ * Every vendor write invalidates the whole `vendors` key rather than guessing
+ * which panel is showing the row. The profile tabs all read from the same
+ * vendor, so a narrower key would just be a way to miss one.
+ */
+function useVendorWorkMutation<TVariables>(
+  mutationFn: (variables: TVariables) => Promise<unknown>,
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['vendors'] }),
+  });
+}
+
+export const useCreateAssignment = () =>
+  useVendorWorkMutation((payload: CreateAssignmentPayload) =>
+    vendorsApi.createAssignment(payload),
+  );
+
+export const useRemoveAssignment = () =>
+  useVendorWorkMutation((id: string) => vendorsApi.removeAssignment(id));
+
+export const useCreateContract = () =>
+  useVendorWorkMutation((payload: CreateContractPayload) => vendorsApi.createContract(payload));
+
+export const useCreateDocument = () =>
+  useVendorWorkMutation((payload: CreateDocumentPayload) => vendorsApi.createDocument(payload));
+
+export const useRemoveDocument = () =>
+  useVendorWorkMutation((id: string) => vendorsApi.removeDocument(id));
+
+export const useCreateDeliverable = () =>
+  useVendorWorkMutation((payload: CreateDeliverablePayload) =>
+    vendorsApi.createDeliverable(payload),
+  );
+
+export const useUpdateDeliverable = () =>
+  useVendorWorkMutation(
+    ({ id, payload }: { id: string; payload: Partial<CreateDeliverablePayload> }) =>
+      vendorsApi.updateDeliverable(id, payload),
+  );
+
+export const useCreateReview = () =>
+  useVendorWorkMutation((payload: CreateReviewPayload) => vendorsApi.createReview(payload));

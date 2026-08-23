@@ -1190,3 +1190,38 @@ obvious gap.
 **Costs.** Somebody still has to sit down and enter five types before leave
 works. The screen makes that ten minutes instead of a curl session, but it does
 not remove the step.
+
+## 2026-08-22 One dialog for the five vendor work forms
+
+**Decision.** `VendorWorkDialog` takes a field spec and renders it;
+`VendorWorkForms` supplies five specs, one per work entity. There is no
+per-entity dialog component.
+
+**Why.** The five forms differ only in their fields. The shell, the
+validate-then-submit, the error placement and the busy state are identical. Five
+components would be five copies of the same seventy lines, and the fifth would
+drift from the first the week somebody fixed a bug in one of them.
+
+**Instead of.** Five components, which is the obvious shape and reads more
+directly at each call site. Rejected on the handbook's own rule: reuse before
+you write, and no abstraction with one caller. This one has five.
+
+**Costs.** The field spec is a small language, and small languages grow. It
+covers text, date, number, url, textarea and select, and nothing else. A form
+that needs something it cannot express should get its own component rather than
+push a branch into the spec, and that is written above the type so the next
+person reads it before adding a `kind`.
+
+## 2026-08-22 Vendor write buttons are hidden, not disabled
+
+**Decision.** Without `VENDOR_MANAGER` the Add buttons do not render. They are
+not shown greyed out.
+
+**Why.** A disabled button invites the question of how to enable it, and the
+answer is an access grant that somebody else has to make. Hiding it leaves the
+read-only tabs looking deliberate, which they are: `VENDOR_VIEWER` is a real
+level with a real purpose.
+
+**Costs.** A manager who has lost access sees the tabs quietly change shape
+rather than being told why. The vendor access screen is where that is visible,
+and the API is still the real gate either way.

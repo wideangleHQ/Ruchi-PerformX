@@ -17,6 +17,44 @@ assumes the person holding a valid JWT is an employee. Read
 [Auth and roles](p1_auth_and_roles.md#how-authorization-is-enforced) before
 you write the first endpoint.
 
+## The write forms
+
+All five work entities shipped read-only: the endpoints existed and the forms
+did not. They are now on the vendor profile tabs, behind an Add button that
+renders only for `VENDOR_MANAGER` and above.
+
+| Tab | Creates | Level |
+| --- | --- | --- |
+| Assignments | `POST /vendor-assignments` | VENDOR_MANAGER |
+| Deliverables | `POST /vendor-deliverables` | VENDOR_MANAGER |
+| Documents | `POST /vendor-documents` | VENDOR_MANAGER |
+| Contracts | `POST /vendor-contracts` | VENDOR_MANAGER |
+| Reviews | `POST /vendor-reviews` | VENDOR_MANAGER |
+
+Document deletion is the only write above manager, at `VENDOR_ADMIN`. There is
+no delete button on these tabs, so nothing here needs it.
+
+One dialog drives all five. They differ only in their fields, so
+`VendorWorkDialog` takes a field spec and `VendorWorkForms` supplies five of
+them. Five bespoke dialogs would be five copies of the same shell, and the fifth
+would drift from the first the week somebody fixed a bug in one.
+
+Two things the forms say on screen, because the API behaviour is otherwise
+surprising:
+
+- **Recording a document does not upload it.** `POST /vendor-documents` takes a
+  URL and a storage path rather than multipart, so the file goes in the bucket
+  first and the form records where it is.
+- **Creating an assignment grants portal access.** The row is what lets that
+  vendor's login see the item named, and it fires `VENDOR_TASK_ASSIGNED`. It is
+  an access change as much as a record, so the form says so before you submit.
+
+The forms refuse a few things the API accepts, each one a case where the row
+would read as wrong rather than fail: a contract ending before it starts, a
+renewal after the end date, a document expiring before it was issued, and a
+non-service assignment with no item behind it.
+
+
 ## Decisions already made
 
 **Vendor Management access and external portal login are different
