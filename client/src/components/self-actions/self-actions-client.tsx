@@ -115,19 +115,18 @@ export function SelfActionsClient() {
     enabled: canUseDepartmentLookup,
   });
 
-  const { data: usersPage } = useQuery({
+  const { data: users = [] } = useQuery({
     queryKey: ['self-actions', 'creators'],
     queryFn: async () => {
       try {
-        return await usersApi.getUsers({ page: 1, limit: 200 });
+        return await usersApi.getUsers({ active: true });
       } catch {
-        return { data: [], total: 0 };
+        return [];
       }
     },
     enabled: canUseCreatorLookup,
   });
 
-  const users = usersPage?.data ?? [];
   const actions = data?.data ?? [];
   const total = data?.total ?? 0;
   const page = data?.page ?? filters.page ?? 1;

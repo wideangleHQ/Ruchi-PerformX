@@ -81,9 +81,8 @@ export interface AssetUser {
 
 export const assetsApi = {
   /**
-   * GET /users, typed as what the route actually returns. `usersApi.getUsers`
-   * declares a paginated envelope the API has never sent, and the handover
-   * picker needs the plain list.
+   * GET /users, narrowed to the four fields the handover picker renders.
+   * `usersApi.getUsers` returns the same list as full `User` rows.
    */
   getDirectory: async (): Promise<AssetUser[]> => {
     const response = await axiosClient.get<AssetUser[]>('/users', { params: { active: 'true' } });

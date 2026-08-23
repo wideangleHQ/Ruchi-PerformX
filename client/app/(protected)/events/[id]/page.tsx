@@ -24,7 +24,7 @@ export default function EventDetailPage() {
   const { user } = useAuth();
 
   const { data: event, isLoading } = useEvent(id);
-  const { data: users } = useUsers({ limit: 200 });
+  const { data: users = [] } = useUsers({ active: true });
   const updateEvent = useUpdateEvent(id);
   const addCoordinator = useAddCoordinator(id);
   const removeCoordinator = useRemoveCoordinator(id);
@@ -48,7 +48,7 @@ export default function EventDetailPage() {
   const isMd = user?.role === 'MD';
   const canManage =
     isMd || isCreator || event.coordinators.some((coordinator) => coordinator.user_id === user?.id);
-  const unassigned = (users?.data ?? []).filter(
+  const unassigned = users.filter(
     (person) => !event.coordinators.some((coordinator) => coordinator.user_id === person.id),
   );
 

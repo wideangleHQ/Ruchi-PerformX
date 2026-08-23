@@ -29,8 +29,7 @@ export function CreateEventDialog({ open, onClose, onSubmit, isPending, error }:
   const [budget, setBudget] = useState('');
   const [coordinatorIds, setCoordinatorIds] = useState<string[]>([]);
 
-  const { data: users } = useUsers({ limit: 200 });
-  const people = users?.data ?? [];
+  const { data: people = [] } = useUsers({ active: true });
 
   useEffect(() => {
     if (open) {

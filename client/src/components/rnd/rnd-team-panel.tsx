@@ -27,17 +27,17 @@ export function RndTeamPanel() {
   const [selected, setSelected] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const { data: usersPage } = useQuery({
+  const { data: users = [] } = useQuery({
     queryKey: ['rnd', 'candidates'],
-    queryFn: () => usersApi.getUsers({ page: 1, limit: 200 }),
+    queryFn: () => usersApi.getUsers({ active: true }),
   });
 
   const candidates = useMemo(() => {
     const onTeam = new Set(team.map((member) => member.user_id));
-    return (usersPage?.data ?? [])
+    return users
       .filter((user) => !onTeam.has(user.id))
       .sort((a, b) => a.fullName.localeCompare(b.fullName));
-  }, [usersPage, team]);
+  }, [users, team]);
 
   const add = async () => {
     if (!selected) return;

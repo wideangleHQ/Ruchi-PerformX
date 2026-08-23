@@ -162,7 +162,6 @@ export class UsersService {
       orderBy: { created_at: 'desc' },
     });
 
-    console.log("Users from Prisma:", users);
     return users.map((user) => this.toUserResponse(user));
   }
 
