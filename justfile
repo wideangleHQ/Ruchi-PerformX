@@ -142,6 +142,10 @@ db-models:
 seed-holidays:
     cd server && npx tsx prisma/seed-holidays.ts
 
+# The five leave types, with a --dry-run that prints them without writing.
+seed-leave-types *ARGS:
+    cd server && npx tsx prisma/seed-leave-types.ts {{ARGS}}
+
 # What has been applied, and what has not. Reads production, changes nothing.
 migrate-status:
     cd server && npx prisma migrate status

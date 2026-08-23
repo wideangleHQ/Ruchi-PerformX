@@ -522,6 +522,12 @@ identical row through.
 
 `just seed-holidays` loads the fixed-date national holidays as common holidays
 for the current and next year. It is safe to rerun.
+
+`just seed-leave-types` does the same for the five leave types, and
+`--dry-run` prints them without writing. Both skip rows that already exist, so
+neither overwrites anything HR has entered. See
+[The seeded types](p2_leave.md#the-seeded-types) for the numbers and why two of
+them are zero.
 ## Polls
 
 | Method | Path | Roles |
