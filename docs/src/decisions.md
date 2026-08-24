@@ -1544,3 +1544,34 @@ token. The namespace boundary is the thing worth enforcing.
 `/vms/` carrying a VMS token now gets a 401 rather than quietly working. Both are
 the point. `jwt-auth.guard.spec.ts` covers all four combinations of token and
 namespace, and the escalation case fails if the fallback returns.
+
+## 2026-08-23 Self-registration lands pending, and cannot ask for every role
+
+**Decision.** `AuthService.register` writes `is_active: false` and
+`pending_approval: true`. `RegisterDto.role` is an `@IsIn` over
+`SELF_REGISTERABLE_ROLES`, which is the seven roles the signup form offers and
+excludes ADMIN and VENDOR.
+
+**Why.** `POST /auth/register` is `@Public()`, wrote `is_active: true`, never
+set `pending_approval`, and validated the role with `@IsEnum(role_enum)`. So a
+stranger could create a live MD account and log straight in, and
+`/register-success` told them they were awaiting an approval that did not exist.
+
+Nothing else needed building. `login` already refuses a pending or inactive
+account, and `approve` already sets `is_active: true` and clears the flag. The
+flags were simply never written. `GET /users/pending` was unreachable for a
+second reason: it was declared below `@Get(':id')`, so Nest read "pending" as a
+user id. `GET /users/password-reset-requests` was shadowed the same way. Both
+moved above it.
+
+**Instead of.** Writing to `registration_requests`, which is what
+`p1_auth_and_roles.md` claimed happened and what the table exists for. Rejected
+because no server code references that table, so it would mean building a second
+approval path beside the one already implemented and tested against `users`. The
+table is now dead weight; deleting it is a migration nobody needs this month.
+
+**Costs.** Registration now depends on somebody approving it, and no screen
+called the approval endpoints when this landed. Failing closed is right, but a
+queue nobody can see is a queue nobody empties, so the screen goes in with it.
+A pending non-EMPLOYEE has `department_id: null` and therefore does not appear
+in a HOD's departmental queue; MD, EA and PA see the whole list.

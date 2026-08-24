@@ -69,6 +69,22 @@ export class UsersController {
     return this.usersService.findByDepartment(departmentId);
   }
 
+  // Both literal routes below sit above `@Get(':id')` because Nest matches in
+  // declaration order. Underneath it they were shadowed: "pending" and
+  // "password-reset-requests" were read as user ids and 404'd, which is why the
+  // approval queue looked unbuilt rather than unreachable.
+  @Get('pending')
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA)
+  findPending(@CurrentUser() user: JwtPayload) {
+    return this.usersService.findPending(user);
+  }
+
+  @Get('password-reset-requests')
+  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA)
+  findPasswordResetRequests(@CurrentUser() user: JwtPayload) {
+    return this.usersService.findPasswordResetRequests(user);
+  }
+
   @Get(':id')
   @Roles(role_enum.MD, role_enum.HOD, role_enum.ADMIN, role_enum.EA, role_enum.PA, role_enum.PURCHASE_HEAD)
   findOne(@Param('id') id: string) {
@@ -95,12 +111,6 @@ export class UsersController {
 
   // ─── APPROVAL WORKFLOW ────────────────────────────────────────────────────────
 
-  @Get('pending')
-  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA)
-  findPending(@CurrentUser() user: JwtPayload) {
-    return this.usersService.findPending(user);
-  }
-
   @Patch(':id/approve')
   @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA)
   approve(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
@@ -114,12 +124,6 @@ export class UsersController {
   }
 
   // ─── PASSWORD RESET WORKFLOW ──────────────────────────────────────────────────
-
-  @Get('password-reset-requests')
-  @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA)
-  findPasswordResetRequests(@CurrentUser() user: JwtPayload) {
-    return this.usersService.findPasswordResetRequests(user);
-  }
 
   @Patch(':id/reset-password')
   @Roles(role_enum.MD, role_enum.HOD, role_enum.EA, role_enum.PA, role_enum.ADMIN)

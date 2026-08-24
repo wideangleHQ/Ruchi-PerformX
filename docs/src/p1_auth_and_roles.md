@@ -29,9 +29,30 @@ Login is rejected if the account is inactive, soft-deleted, or still
 
 ## Signup and approval
 
-Self-signup does not create a user. `POST /api/v1/auth/register` writes a row to
-`registration_requests` with the password already hashed, a requested role, and
-a department.
+`POST /api/v1/auth/register` creates the user row directly, as
+`is_active: false` and `pending_approval: true`, so the account exists but
+cannot log in until somebody approves it.
+
+This chapter used to say signup wrote to `registration_requests` and created no
+user. That was the intent and never the code: `register` created a live user
+with `is_active: true` and never set `pending_approval`, and the role came
+straight off the request body with `@IsEnum(role_enum)` behind it. So anybody
+who could reach the signup page could create an active MD account and log in,
+while `/register-success` told them they were awaiting approval. The description
+being wrong is most of why it lasted. `registration_requests` is still
+referenced by no server code.
+
+Two gates now. `RegisterDto` accepts only the roles the signup form offers,
+`SELF_REGISTERABLE_ROLES`, which excludes ADMIN and VENDOR: ADMIN administers
+the system and VENDOR belongs to the external portal that `just vendor-roles`
+keeps out of the main API. And the request lands pending regardless, so a role
+that passes the whitelist still needs a human.
+
+Approval is `PATCH /users/:id/approve`, which sets `is_active: true` and clears
+the flag; `/reject` leaves it inactive. `GET /users/pending` lists the queue,
+scoped to a HOD's own departments. All three were unreachable until recently:
+`@Get('pending')` was declared below `@Get(':id')`, so Nest read "pending" as a
+user id and 404'd. `self-registration.spec.ts` covers both gates.
 
 Before the form is submitted the client checks whether a given slot is already
 taken, using a set of public endpoints:

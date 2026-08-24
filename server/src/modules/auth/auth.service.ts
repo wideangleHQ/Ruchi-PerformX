@@ -214,7 +214,12 @@ export class AuthService {
             role: dto.role,
             password_hash: passwordHash,
             department_id: dto.role === role_enum.EMPLOYEE ? departmentIds[0] ?? null : null,
-            is_active: true,
+            // Pending, not live. `login` already refuses both of these states;
+            // register simply never set them, so the gate never tripped and a
+            // stranger could sign up as MD and log straight in. Approval is
+            // PATCH /users/:id/approve.
+            is_active: false,
+            pending_approval: true,
           },
         });
 
