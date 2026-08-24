@@ -104,6 +104,10 @@ the way round the only password requirement the product has.
 It is also the only password path that does not touch email, so while
 `RESEND_FROM_EMAIL` points at an unverifiable domain it is the one that works.
 
+The form is on **My Profile**, under Security, at `/profile#security`. It is
+there rather than on Settings because Settings is not in the sidebar and cannot
+be reached without typing the URL; Settings links across to it.
+
 The two reset flows:
 
 **Self-service, OTP by email.** Three calls:

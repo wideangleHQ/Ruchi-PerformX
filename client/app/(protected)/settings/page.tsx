@@ -1,6 +1,6 @@
 'use client';
 
-import { ChangePasswordForm } from '@/components/settings/ChangePasswordForm';
+import Link from 'next/link';
 
 export default function SettingsPage() {
   return (
@@ -17,10 +17,12 @@ export default function SettingsPage() {
         <div className="rounded-lg bg-white p-6 shadow">
           <h2 className="text-lg font-semibold text-gray-900">Security</h2>
           <p className="mt-2 text-gray-600">
-            Change your password. This is the one password path that does not depend on
-            email.
+            Change your password from{' '}
+            <Link href="/profile#security" className="font-medium text-green-700 underline">
+              My Profile
+            </Link>
+            . It lives there because that screen is in the sidebar and this one is not.
           </p>
-          <ChangePasswordForm />
         </div>
 
         <div className="rounded-lg bg-white p-6 shadow">

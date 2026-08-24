@@ -1,5 +1,7 @@
 'use client';
 
+import { ChangePasswordForm } from '@/components/settings/ChangePasswordForm';
+
 import type { ChangeEvent, FormEvent, ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -310,6 +312,19 @@ export default function ProfilePage() {
                 </button>
               </div>
             </form>
+          </section>
+
+          {/*
+            Changing a password lives here rather than on Settings, because
+            Settings is not in the sidebar and this screen is. It is also the
+            only password path that works while the reset OTP cannot be sent.
+          */}
+          <section id="security" className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-xl font-bold text-slate-900">Security</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Change your password. You will need your current one.
+            </p>
+            <ChangePasswordForm />
           </section>
         </div>
       ) : null}
