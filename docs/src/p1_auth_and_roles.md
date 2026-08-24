@@ -263,6 +263,13 @@ is the access record id and whose `accessType` is `RECEPTION` or the employee
 variant. The payload maps `RECEPTION` to `role: ADMIN` and everything else to
 `role: EMPLOYEE`, purely so that `RolesGuard` has something to check.
 
+A VMS token is accepted **only** under `/vms/`, and only when it carries
+`scope: 'vms'`. The guard used to fall back to the VMS secret on every other
+path, which meant a reception kiosk reached the whole API as `role: ADMIN`. That
+fallback existed for one route, the audit controller, which was registered as
+`/audit` rather than `/vms/audit`. Both were fixed together;
+`jwt-auth.guard.spec.ts` fails if the fallback returns.
+
 `JwtAuthGuard` contains a defensive check on this path: it rejects VMS tokens
 whose `sub` is not a UUID. That guards against a batch of older tokens that put
 the numeric access code in `sub`. If you see

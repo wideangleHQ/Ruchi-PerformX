@@ -240,6 +240,9 @@ schema-only leftovers from a descoped feature. See
 [Visitor management](p1_vms.md#visitors-and-photos). Adding to them implies a
 capability that does not exist.
 
-Do not fix the `/audit` route prefix in this phase unless you are also updating
-the VMS client in the same release. It should be `/vms/audit`, it is not, and
-changing it breaks the reception audit screen.
+The `/audit` route prefix is fixed. It is `/vms/audit`, and the VMS client
+moved in the same commit, which is what the warning here used to ask for. The
+prefix mattered for more than tidiness: it was the only VMS route outside the
+namespace, and the token fallback that existed to serve it let a reception kiosk
+authenticate against the whole API. See
+[Auth and roles](p1_auth_and_roles.md#vms-access-codes).

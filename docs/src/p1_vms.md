@@ -211,15 +211,15 @@ Dashboard and reports:
 | GET | `/vms/reports/visitor-history/:visitorId` |
 | GET | `/vms/reports/export` |
 
-Audit, ADMIN only, and note the path is `/audit` rather than `/vms/audit`:
+Audit, ADMIN only:
 
 | Method | Path |
 | --- | --- |
-| GET | `/audit` |
-| GET | `/audit/:id` |
-| GET | `/audit/visitor/:visitorId` |
-| GET | `/audit/visit/:visitId` |
-| GET | `/audit/employee/:employeeId` |
+| GET | `/vms/audit` |
+| GET | `/vms/audit/:id` |
+| GET | `/vms/audit/visitor/:visitorId` |
+| GET | `/vms/audit/visit/:visitId` |
+| GET | `/vms/audit/employee/:employeeId` |
 
 The missing `vms/` prefix on the audit controller is a bug in the sense that it
 breaks the naming pattern, but changing it breaks the client. Fix both together

@@ -12,7 +12,7 @@ import { ApiResponse } from '../../common/interfaces/api-response.interface';
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN')
-@Controller('audit')
+@Controller('vms/audit')
 export class AuditController {
   constructor(
     @Inject(IAuditServiceToken)

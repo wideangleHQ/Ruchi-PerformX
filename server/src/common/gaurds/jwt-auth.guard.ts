@@ -49,15 +49,10 @@ export class JwtAuthGuard {
           throw new UnauthorizedException('Session expired. Please sign in again.');
         }
       } else {
-        try {
-          payload = this.jwtService.verify(token);
-        } catch {
-          payload = vmsJwtService.verify<VmsJwtPayload>(token);
-          // Also validate UUID on the fallback VMS path
-          if (payload?.sub && !UUID_REGEX.test(payload.sub)) {
-            throw new UnauthorizedException('Session expired. Please sign in again.');
-          }
-        }
+        // No VMS fallback. A kiosk token carries a real `role`, and reception
+        // kiosks are minted as ADMIN, so accepting one here handed the whole
+        // API to anybody at the front desk. Every VMS route is under /vms/.
+        payload = this.jwtService.verify(token);
       }
 
       request.user = payload;

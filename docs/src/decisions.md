@@ -1518,3 +1518,29 @@ help at 1am when the symptom is a 404 on a host that is plainly up.
 which hides a misconfiguration instead of failing loudly. Acceptable here
 because there is exactly one correct answer to append and no ambiguity about
 it. A future `/api/v2` is left alone by the check.
+
+## 2026-08-23 A VMS token is accepted only under /vms/
+
+**Decision.** `JwtAuthGuard` no longer falls back to the VMS secret outside the
+VMS namespace. The audit controller moves from `/audit` to `/vms/audit` and the
+VMS client moves with it, in the same commit.
+
+**Why.** The fallback let any VMS token authenticate against the whole API, and
+`access.service.ts` mints a reception kiosk as `role: ADMIN`. So anyone at the
+front desk held an admin token for every PerformX endpoint. It was recorded as a
+known gap rather than a finding because fixing it was thought to need a separate
+VMS client release.
+
+That was not true: the VMS client lives in this repository, and `/audit` was the
+only route it called outside `/vms/`. Every other VMS URL already carried the
+prefix, so one rename removed the entire reason the fallback existed.
+
+**Instead of.** Keeping the fallback and checking `scope: 'vms'` inside it. That
+still leaves a kiosk token valid against the main API, just with one more
+condition attached, and the condition is set by the same service that mints the
+token. The namespace boundary is the thing worth enforcing.
+
+**Costs.** Any client still calling `/audit` gets a 404, and any request outside
+`/vms/` carrying a VMS token now gets a 401 rather than quietly working. Both are
+the point. `jwt-auth.guard.spec.ts` covers all four combinations of token and
+namespace, and the escalation case fails if the fallback returns.
