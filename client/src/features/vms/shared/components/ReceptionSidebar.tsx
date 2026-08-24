@@ -28,7 +28,7 @@ export function ReceptionSidebar() {
     { label: 'Check-Out', href: '/vms/reception/check-out', icon: LogOut },
     { label: 'Visitors', href: '/vms/reception/visitors', icon: Users },
     { label: 'Visits', href: '/vms/reception/visits', icon: ClipboardList },
-    { label: 'Visitor Requests', href: '/vms/reception/requests', icon: CalendarDays, hidden: true },
+    { label: 'Visitor Requests', href: '/vms/reception/requests', icon: CalendarDays },
     { label: 'Appointments', href: '/vms/reception/appointments', icon: CalendarDays },
     { label: 'Passes', href: '/vms/reception/passes', icon: Badge },
     { label: 'Reports', href: '/vms/reception/reports', icon: FileBarChart, hidden: true },

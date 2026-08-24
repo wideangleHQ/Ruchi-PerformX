@@ -145,6 +145,7 @@ export class VisitorRequestService implements VisitorRequestServiceContract {
   async rejectRequest(
     id: string,
     actorId: string,
+    reason?: string,
     tx?: VisitorRequestDbClient,
   ): Promise<VisitorRequestResponseDto> {
     return this.runInTransaction(tx, async (client) => {
@@ -153,7 +154,10 @@ export class VisitorRequestService implements VisitorRequestServiceContract {
         status: request_status_enum.REJECTED,
         reviewed_by_id: actorId,
         reviewed_at: new Date(),
-        rejection_reason: 'Rejected by reviewer',
+        // The screen has always collected a reason and never had anywhere to
+        // send it. A rejection with no reason sends the requester to ask in
+        // person, which is the thing this queue exists to avoid.
+        rejection_reason: reason?.trim() || 'Rejected by reviewer',
       }, client);
 
       return this.toResponse(updated);

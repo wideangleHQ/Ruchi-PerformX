@@ -83,6 +83,7 @@ export interface VisitorRequestServiceContract {
   rejectRequest(
     id: string,
     actorId: string,
+    reason?: string,
     tx?: VisitorRequestDbClient,
   ): Promise<VisitorRequestResponseDto>;
 

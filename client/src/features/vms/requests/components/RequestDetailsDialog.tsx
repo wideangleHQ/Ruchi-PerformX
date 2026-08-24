@@ -1,5 +1,10 @@
+import { useState } from 'react';
 import { VisitorRequestResponse, VisitorRequestStatus } from '../types/request.types';
-import { useUpdateRequest } from '../hooks/useUpdateRequest';
+import {
+  useApproveRequest,
+  useCreateVisitFromRequest,
+  useRejectRequest,
+} from '../hooks/useUpdateRequest';
 import {
   Dialog,
   DialogContent,
@@ -13,27 +18,55 @@ interface RequestDetailsDialogProps {
   onClose: () => void;
 }
 
+/** The API message if there is one, rather than a console line nobody sees. */
+function readError(error: unknown, fallback: string): string {
+  const message = (error as { response?: { data?: { message?: string | string[] } } })
+    ?.response?.data?.message;
+  if (Array.isArray(message)) return message.join(', ');
+  return message ?? fallback;
+}
+
 export function RequestDetailsDialog({ request, onClose }: RequestDetailsDialogProps) {
-  const { mutateAsync: updateRequest, isPending } = useUpdateRequest();
+  const approve = useApproveRequest();
+  const reject = useRejectRequest();
+  const createVisit = useCreateVisitFromRequest();
+  const [error, setError] = useState<string | null>(null);
+
+  const isPending = approve.isPending || reject.isPending || createVisit.isPending;
 
   const handleApprove = async () => {
     if (!request) return;
+    setError(null);
     try {
-      await updateRequest({ id: request.id, payload: { status: VisitorRequestStatus.APPROVED } });
+      await approve.mutateAsync(request.id);
       onClose();
     } catch (e) {
-      console.error('Failed to approve request');
+      setError(readError(e, 'Could not approve this request.'));
     }
   };
 
   const handleReject = async () => {
     if (!request) return;
+    setError(null);
     const reason = window.prompt('Please enter a rejection reason (optional):') || undefined;
     try {
-      await updateRequest({ id: request.id, payload: { status: VisitorRequestStatus.REJECTED, rejectionReason: reason } });
+      await reject.mutateAsync({ id: request.id, reason });
       onClose();
     } catch (e) {
-      console.error('Failed to reject request');
+      setError(readError(e, 'Could not reject this request.'));
+    }
+  };
+
+  // An approved request is not a visit until this runs, and nothing called it,
+  // so an approval used to be where the flow stopped.
+  const handleCreateVisit = async () => {
+    if (!request) return;
+    setError(null);
+    try {
+      await createVisit.mutateAsync(request.id);
+      onClose();
+    } catch (e) {
+      setError(readError(e, 'Could not create a visit from this request.'));
     }
   };
 
@@ -90,6 +123,12 @@ export function RequestDetailsDialog({ request, onClose }: RequestDetailsDialogP
           )}
         </div>
 
+        {error && (
+          <div role="alert" className="mt-4 rounded-md border border-red-200 bg-red-50 p-3">
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
+        )}
+
         <div className="flex justify-end gap-3 pt-6 border-t mt-4">
           <button 
             type="button" 
@@ -118,6 +157,17 @@ export function RequestDetailsDialog({ request, onClose }: RequestDetailsDialogP
                 Approve
               </button>
             </>
+          )}
+
+          {request.status === VisitorRequestStatus.APPROVED && (
+            <button
+              type="button"
+              onClick={handleCreateVisit}
+              disabled={isPending}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 font-medium disabled:opacity-50 transition-colors"
+            >
+              Create Visit
+            </button>
           )}
         </div>
       </DialogContent>

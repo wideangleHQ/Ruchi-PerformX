@@ -66,6 +66,28 @@ that put the access code itself in `sub`.
 
 ## The visit flow
 
+Reception drives the first three steps from `/vms/reception/requests`. That
+screen used to PATCH `{ status }` at `/vms/requests/:id`, whose DTO is a partial
+of the create DTO and declares no `status`, so `forbidNonWhitelisted` turned
+every approve and reject into a 400 that the dialog logged to the console and
+swallowed. It calls the three endpoints below now, shows the error when one
+fails, and offers Create Visit on an approved request, which nothing called
+before. The rejection reason the dialog has always collected now reaches the
+server rather than being replaced by a fixed string.
+
+The nav entry was `hidden: true`, so none of it was reachable anyway. Reports,
+Audit and Settings are still hidden, and stay hidden until their own faults are
+fixed: `GET /vms/reports` has no bare handler, audit double-wraps its envelope,
+and `/vms/settings` has no controller at all.
+
+**The employee side still cannot submit.** `POST /vms/requests` requires
+`hostEmployeeId` and `expectedArrival`; the form sends `company`,
+`preferredDate` and `preferredTime` and omits both required fields. It needs a
+host picker rather than a rename, because an employee kiosk token's `sub` is an
+access record id and not a user id, so the caller cannot be defaulted to the
+host. `GET /vms/visits/employees` is the list to pick from.
+
+
 ```
 Employee raises a request           POST /vms/requests
         |

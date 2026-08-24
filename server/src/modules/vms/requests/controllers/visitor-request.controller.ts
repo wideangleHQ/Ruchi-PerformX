@@ -9,6 +9,7 @@ import { JwtPayload } from '../../../../common/types/jwt-payload.type';
 import { CreateVisitorRequestDto } from '../dto/create-visitor-request.dto';
 import { SearchVisitorRequestDto } from '../dto/search-visitor-request.dto';
 import { UpdateVisitorRequestDto } from '../dto/update-visitor-request.dto';
+import { RejectVisitorRequestDto } from '../dto/reject-visitor-request.dto';
 import { VisitorRequestResponseDto } from '../dto/visitor-request-response.dto';
 import { VisitorRequestService } from '../services/visitor-request.service';
 import { PaginatedResponse } from '../../common/interfaces/paginated-response.interface';
@@ -112,8 +113,12 @@ export class VisitorRequestController {
   @ApiOperation({ summary: 'Reject visitor request' })
   @ApiOkResponse({ type: VisitorRequestResponseDto })
   @ApiParam({ name: 'id', format: 'uuid' })
-  reject(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload): Promise<ApiResponse<VisitorRequestResponseDto>> {
-    return this.wrap('Visitor request rejected', this.visitorRequestService.rejectRequest(id, user.sub, undefined));
+  reject(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RejectVisitorRequestDto,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<ApiResponse<VisitorRequestResponseDto>> {
+    return this.wrap('Visitor request rejected', this.visitorRequestService.rejectRequest(id, user.sub, dto.reason));
   }
 
   @Post(':id/create-visit')
