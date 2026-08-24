@@ -54,3 +54,17 @@ export const resetPasswordSchema = z.object({
 
 export type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
 
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Enter your current password'),
+  newPassword: z.string().min(8, 'Password must be at least 8 characters'),
+  confirmPassword: z.string().min(1, 'Password confirmation is required'),
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
+}).refine((data) => data.newPassword !== data.currentPassword, {
+  message: 'The new password has to be different',
+  path: ['newPassword'],
+});
+
+export type ChangePasswordFormData = z.infer<typeof changePasswordSchema>;
+

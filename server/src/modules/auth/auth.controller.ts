@@ -15,6 +15,7 @@ import { RegisterDto } from './dto/register.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { VerifyResetOtpDto } from './dto/verify-reset-otp.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
@@ -111,9 +112,9 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   changePassword(
     @CurrentUser() user: JwtPayload,
-    @Body('newPassword') newPassword: string,
+    @Body() dto: ChangePasswordDto,
   ) {
-    return this.authService.changePassword(user.sub, newPassword);
+    return this.authService.changePassword(user.sub, dto);
   }
 
   @Post('logout')

@@ -1575,3 +1575,36 @@ called the approval endpoints when this landed. Failing closed is right, but a
 queue nobody can see is a queue nobody empties, so the screen goes in with it.
 A pending non-EMPLOYEE has `department_id: null` and therefore does not appear
 in a HOD's departmental queue; MD, EA and PA see the whole list.
+
+## 2026-08-23 Changing a password requires the current one
+
+**Decision.** `POST /auth/change-password` takes `currentPassword` alongside
+`newPassword`, verifies it with bcrypt before writing, and enforces the same
+eight-character minimum as registration. Settings renders the form.
+
+**Why.** The route took only `newPassword`. Anyone holding a live session could
+set a new password without knowing the old one, which turns a borrowed laptop or
+a lifted token into a full account takeover with the owner locked out. It also
+had no DTO at all, `@Body('newPassword')`, so no length rule applied and this
+was the way round the only password requirement in the product.
+
+The form matters separately. Self-service reset depends on an OTP email, and
+`RESEND_FROM_EMAIL` is on a domain Resend cannot verify, so no reset mail is
+sent. The endpoint was implemented on day one and never called; Settings said
+"Coming soon". Wiring it up is the only way to set a password that works today.
+
+**Instead of.** Requiring a fresh login rather than the current password.
+Rejected as more code for the same guarantee, and it would need a re-auth screen
+that nothing else in the product has.
+
+**Costs.** Anyone who has genuinely forgotten their password cannot use this
+path, which is what the reset flows are for. While email is down, that leaves
+the approver-driven reset: `PATCH /users/:id/reset-password` hands over a
+temporary password and needs no mail.
+
+Two related lies on the reset path went with it. `/forgot-password` routed to
+its success page from the `catch` as well as the `try`, so a failed send read as
+a sent mail; it now shows the error and points at an approver. And it routed to
+a page saying "contact your HOD for approval", an approval step that does not
+exist on this flow; it now goes to the OTP entry screen, which is the actual
+next step.

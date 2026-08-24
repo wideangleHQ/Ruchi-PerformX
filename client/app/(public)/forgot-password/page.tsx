@@ -12,19 +12,34 @@ import { Input } from '@/components/ui/input';
 export default function ForgotPasswordPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const form = useForm<ForgotPasswordFormData>({
     resolver: zodResolver(forgotPasswordSchema),
     defaultValues: { email: '' },
   });
 
+  // The next step is entering the emailed code, not a success page. The old
+  // flow routed to one from the `catch` as well as the `try`, so a failed send
+  // read as a sent mail and the user waited for an email that never came.
+  //
+  // Not revealing whether an address exists is handled on the server, which
+  // answers the same way either way, so there is nothing to hide here.
   const onSubmit = async (data: ForgotPasswordFormData) => {
+    setError(null);
+    setIsLoading(true);
     try {
-      setIsLoading(true);
       await authApi.forgotPassword({ email: data.email });
-      router.push('/forgot-password-success');
-    } catch {
-      router.push('/forgot-password-success');
+      router.push(`/verify-otp?email=${encodeURIComponent(data.email)}&type=reset`);
+    } catch (err: unknown) {
+      const message = (err as { response?: { data?: { message?: string | string[] } } })
+        ?.response?.data?.message;
+      setError(
+        Array.isArray(message)
+          ? message.join(', ')
+          : (message ??
+              'Could not send the reset code. Ask your HOD, EA, PA or the MD to reset your password instead.'),
+      );
     } finally {
       setIsLoading(false);
     }
@@ -39,6 +54,12 @@ export default function ForgotPasswordPage() {
         </div>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          {error && (
+            <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-4">
+              <p className="text-sm text-red-800">{error}</p>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700">Email</label>
             <Input

@@ -13,6 +13,7 @@ import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { VerifyResetOtpDto } from './dto/verify-reset-otp.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { role_enum } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from '../users/dto/create-user.dto';
@@ -451,8 +452,26 @@ async resetPassword(dto: ResetPasswordDto) {
 }
   // ─── CHANGE PASSWORD ─────────────────────────────────────────────────────────
 
-  async changePassword(userId: string, newPassword: string) {
-    const passwordHash = await bcrypt.hash(newPassword, this.BCRYPT_ROUNDS);
+  /**
+   * Changes the caller's own password.
+   *
+   * @throws UnauthorizedException when `currentPassword` does not match. That
+   *   check is the whole point: without it a live session was enough to take
+   *   the account over, no old password needed.
+   */
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    const user = await this.prisma.users.findUnique({
+      where: { id: userId },
+      select: { password_hash: true },
+    });
+    if (!user) throw new UnauthorizedException('Invalid credentials');
+
+    const matches = await bcrypt.compare(dto.currentPassword, user.password_hash);
+    if (!matches) {
+      throw new UnauthorizedException('Your current password is not correct');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, this.BCRYPT_ROUNDS);
 
     await this.prisma.users.update({
       where: { id: userId },

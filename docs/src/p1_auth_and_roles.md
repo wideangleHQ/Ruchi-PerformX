@@ -81,7 +81,19 @@ department controller must have at least one.
 
 ## Password reset
 
-Two different flows exist, and the client uses both.
+Three flows exist.
+
+**Changing your own password.** `POST /auth/change-password`, from Settings. It
+takes `currentPassword` and `newPassword` and verifies the first with bcrypt
+before writing. That check is the point: the route used to take only
+`newPassword`, so a live session was enough to take an account over without
+knowing the old password, and there was no length rule either, which made this
+the way round the only password requirement the product has.
+
+It is also the only password path that does not touch email, so while
+`RESEND_FROM_EMAIL` points at an unverifiable domain it is the one that works.
+
+The two reset flows:
 
 **Self-service, OTP by email.** Three calls:
 

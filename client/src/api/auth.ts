@@ -50,6 +50,18 @@ export const authApi = {
     return response.data;
   },
 
+  /**
+   * POST /auth/change-password. The one password path that does not depend on
+   * email, which is why Settings uses it rather than the OTP flow.
+   */
+  changePassword: async (data: {
+    currentPassword: string;
+    newPassword: string;
+  }): Promise<MessageResponse> => {
+    const response = await axiosClient.post<MessageResponse>('/auth/change-password', data);
+    return response.data;
+  },
+
   /** POST /auth/logout */
   logout: async (): Promise<void> => {
     await axiosClient.post('/auth/logout');
