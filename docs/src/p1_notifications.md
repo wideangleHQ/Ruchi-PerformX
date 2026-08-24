@@ -165,6 +165,13 @@ Phase 2 adds vendor accounts, since vendors are external users.
 `RESEND_FROM_EMAIL`. It is used for the OTP password reset flow and for a
 handful of task events.
 
+`RESEND_FROM_EMAIL` has to be on a domain verified at resend.com/domains.
+Resend refuses to send from anything else, one error per email, so a free-mail
+address there fails every notification and both OTPs while the application looks
+healthy. It is checked at boot and logged as an ERROR naming the domain, because
+one loud line at startup gets read and a per-send error does not. Production ran
+on a gmail.com sender for weeks without anybody noticing.
+
 There are no HTML templates in PerformX. CareerX has ten of them under
 `src/modules/email/templates/` and they are a good pattern to copy when Phase 2
 needs leave approval and project deadline emails.

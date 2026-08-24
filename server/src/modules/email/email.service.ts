@@ -26,6 +26,32 @@ export function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
+/**
+ * Domains Resend will never let you send from, because you cannot prove you own
+ * them. A from-address here fails every send with "the domain is not verified",
+ * one error per email, which is how every notification and both OTPs failed for
+ * weeks without anybody noticing.
+ *
+ * ponytail: a hardcoded set of the common free providers, not a DNS lookup. It
+ * catches the mistake people actually make. Widen it if somebody finds a sixth.
+ */
+const UNVERIFIABLE_SENDER_DOMAINS = new Set([
+  'gmail.com',
+  'yahoo.com',
+  'outlook.com',
+  'hotmail.com',
+  'icloud.com',
+]);
+
+/**
+ * The domain of a from-address. Resend accepts both `a@b.com` and
+ * `Ruchi <a@b.com>`, and a plain split on `@` reads the second as `b.com>`,
+ * which would quietly stop the check below from ever firing.
+ */
+export function senderDomain(fromEmail: string): string {
+  return fromEmail.split('@').pop()?.replace(/>.*$/, '').trim().toLowerCase() ?? '';
+}
+
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
@@ -48,6 +74,17 @@ export class EmailService {
     this.logger.log(
       `EmailService initialized. From Email: ${this.fromEmail}`,
     );
+
+    const domain = senderDomain(this.fromEmail);
+    if (UNVERIFIABLE_SENDER_DOMAINS.has(domain)) {
+      // Loud at boot rather than one error per send. Not a throw: email is not
+      // worth refusing to start over, the way ASSET_ENCRYPTION_KEY is.
+      this.logger.error(
+        `RESEND_FROM_EMAIL is on ${domain}, which Resend cannot verify. ` +
+          'Every email will fail, including both password reset OTPs. ' +
+          'Set it to an address on a domain verified at resend.com/domains.',
+      );
+    }
   }
 
   /**

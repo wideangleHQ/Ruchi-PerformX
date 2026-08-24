@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { escapeHtml } from './email.service';
+import { escapeHtml, senderDomain } from './email.service';
 
 // Notification bodies carry free text one employee wrote and another reads,
 // inside a mail sent from RUCHI's own address. An injected anchor there is a
@@ -31,5 +31,25 @@ describe('escapeHtml', () => {
     expect(escapeHtml('Approved, 3 days, back on Monday')).toBe(
       'Approved, 3 days, back on Monday',
     );
+  });
+});
+
+// A from-address on a domain Resend cannot verify fails every send, so the boot
+// check that catches it has to read the domain out of both accepted forms.
+// `Ruchi <a@gmail.com>` read naively gives `gmail.com>`, which matches nothing
+// and turns the check off without saying so.
+describe('senderDomain', () => {
+  it('reads a plain address', () => {
+    expect(senderDomain('noreply@ruchiperformx.in')).toBe('ruchiperformx.in');
+  });
+
+  it('reads a display-name address', () => {
+    expect(senderDomain('RUCHI PerformX <noreply@ruchiperformx.in>')).toBe(
+      'ruchiperformx.in',
+    );
+  });
+
+  it('lowercases, so the domain set needs only one casing', () => {
+    expect(senderDomain('Ops <Ops@GMail.com>')).toBe('gmail.com');
   });
 });

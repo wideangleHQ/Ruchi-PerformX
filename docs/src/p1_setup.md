@@ -57,7 +57,7 @@ failing later.
 | `CORS_ORIGINS` | no | Comma-separated browser origins allowed to call the API. Defaults to `http://localhost:4001,https://app.ruchiperformx.in`. Setting it **replaces** the default, so include every origin you still need |
 | `INTERNAL_API_KEY` | yes | Shared secret CareerX sends as `x-internal-api-key` |
 | `RESEND_API_KEY` | yes | Outbound email |
-| `RESEND_FROM_EMAIL` | yes | Verified sender address |
+| `RESEND_FROM_EMAIL` | yes | Sender address, on a domain verified at resend.com/domains. A free-mail domain such as gmail.com can never be verified and fails every send; the boot log says so. |
 | `SUPABASE_URL` | yes | Storage |
 | `SUPABASE_SERVICE_ROLE_KEY` | yes | Storage, server side only |
 | `SUPABASE_SERVICE_KEY` | see note | Older name still read in some files; set both to the same value |
