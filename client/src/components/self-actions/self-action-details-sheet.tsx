@@ -40,13 +40,16 @@ export function SelfActionDetailsSheet({ action, open, onClose }: Props) {
         <div className="flex-1 overflow-y-auto p-5 text-sm">
           <div className="space-y-5">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Title</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Work</p>
             <p className="mt-1 font-semibold text-slate-900">{action.title}</p>
           </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Description</p>
-            <p className="mt-1 whitespace-pre-wrap text-slate-700">{action.description}</p>
-          </div>
+          {/* Entries written before the two fields merged still have one. */}
+          {action.description?.trim() ? (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Description</p>
+              <p className="mt-1 whitespace-pre-wrap text-slate-700">{action.description}</p>
+            </div>
+          ) : null}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Priority</p>

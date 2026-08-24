@@ -58,8 +58,6 @@ export interface SelfActionFilters {
   priority?: SelfActionPriority;
   departmentId?: string;
   createdById?: string;
-  dateFrom?: string;
-  dateTo?: string;
   page?: number;
   limit?: number;
 }
@@ -85,16 +83,21 @@ export const selfActionsApi = {
     return response.data;
   },
 
+  /**
+   * `title` is the single field the form collects. `description` is optional
+   * because the two merged; the column stays so entries written before the
+   * merge keep theirs, and the server defaults a new one to an empty string.
+   */
   createSelfAction: async (data: {
     title: string;
-    description: string;
+    description?: string;
     priority?: SelfActionPriority;
     attachments?: File[];
     department_ids?: string[];
   }): Promise<SelfAction> => {
     const formData = new FormData();
     formData.append('title', data.title);
-    formData.append('description', data.description);
+    if (data.description) formData.append('description', data.description);
     if (data.priority) formData.append('priority', data.priority);
     if (data.department_ids?.length) {
       data.department_ids.forEach((id) => formData.append('department_ids[]', id));

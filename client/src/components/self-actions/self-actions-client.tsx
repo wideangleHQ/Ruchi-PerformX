@@ -38,8 +38,6 @@ function parseFilters(searchParams: SearchParamsLike): SelfActionFilters {
     priority: (searchParams.get('priority') as SelfActionFilters['priority']) || undefined,
     departmentId: searchParams.get('departmentId') || undefined,
     createdById: searchParams.get('createdById') || undefined,
-    dateFrom: searchParams.get('dateFrom') || undefined,
-    dateTo: searchParams.get('dateTo') || undefined,
     page: Number(searchParams.get('page') || 1),
     limit: Number(searchParams.get('limit') || DEFAULT_LIMIT),
   };
@@ -65,8 +63,6 @@ function setQueryParams(
     ['priority', normalized.priority],
     ['departmentId', normalized.departmentId],
     ['createdById', normalized.createdById],
-    ['dateFrom', normalized.dateFrom],
-    ['dateTo', normalized.dateTo],
   ];
 
   entries.forEach(([key, value]) => {
@@ -89,7 +85,10 @@ export function SelfActionsClient() {
 
   const { user } = useAuth();
   const canUseDepartmentLookup = !!user && (user.role === 'MD' || user.role === 'HOD' || user.role === 'EA' || user.role === 'PA' || user.role === 'PURCHASE_HEAD' || user.role === 'DEPARTMENT_CONTROLLER' || user.role === 'ADMIN');
-  const canUseCreatorLookup = !!user && user.role === 'ADMIN' && activeTab === 'all';
+  // Anyone who can see other people's self-actions can filter to one person.
+  // It only narrows: the service scopes by department and forces ownership for
+  // EMPLOYEE regardless of what createdById says, so this grants no reach.
+  const canUseCreatorLookup = canUseDepartmentLookup && activeTab === 'all';
 
   const queryFilters = useMemo<SelfActionFilters>(
     () =>
@@ -181,7 +180,6 @@ export function SelfActionsClient() {
 
   const handleCreate = async (values: {
     title: string;
-    description: string;
     priority: SelfActionPriority;
     attachments: File[];
     department_ids?: string[];

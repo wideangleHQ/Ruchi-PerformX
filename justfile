@@ -146,6 +146,11 @@ seed-holidays:
 seed-leave-types *ARGS:
     cd server && npx tsx prisma/seed-leave-types.ts {{ARGS}}
 
+# Let a locked-out user back in. They change it from Settings afterwards.
+# Needed while RESEND_FROM_EMAIL cannot send, so no reset OTP goes out.
+set-password USERNAME PASSWORD:
+    cd server && npx tsx prisma/set-password.ts {{USERNAME}} {{PASSWORD}}
+
 # What has been applied, and what has not. Reads production, changes nothing.
 migrate-status:
     cd server && npx prisma migrate status

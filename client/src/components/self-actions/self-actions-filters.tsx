@@ -90,34 +90,26 @@ export function SelfActionsFilters({
           </select>
         ) : null}
 
+        {/*
+          By name, not by date. The date range was two unlabelled inputs that
+          nobody used to find anything; the question people actually ask of this
+          list is whose work it is.
+        */}
         {showCreatorField ? (
-          <>
-            <select
-              value={values.createdById ?? ''}
-              onChange={(event) => setValues((current) => ({ ...current, createdById: event.target.value }))}
-              className="h-8 rounded-lg border border-input bg-white px-3 text-sm text-slate-700 outline-none"
-            >
-              <option value="">All Creators</option>
-              {users.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.fullName}
-                </option>
-              ))}
-            </select>
-          </>
+          <select
+            aria-label="Name"
+            value={values.createdById ?? ''}
+            onChange={(event) => setValues((current) => ({ ...current, createdById: event.target.value }))}
+            className="h-8 rounded-lg border border-input bg-white px-3 text-sm text-slate-700 outline-none"
+          >
+            <option value="">All Names</option>
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.fullName}
+              </option>
+            ))}
+          </select>
         ) : null}
-
-        <Input
-          type="date"
-          value={values.dateFrom ?? ''}
-          onChange={(event) => setValues((current) => ({ ...current, dateFrom: event.target.value }))}
-        />
-
-        <Input
-          type="date"
-          value={values.dateTo ?? ''}
-          onChange={(event) => setValues((current) => ({ ...current, dateTo: event.target.value }))}
-        />
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">

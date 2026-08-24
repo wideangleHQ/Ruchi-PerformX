@@ -121,7 +121,7 @@ export class SelfActionsService {
         const created = await tx.self_actions.create({
           data: {
             title: dto.title,
-            description: dto.description,
+            description: dto.description ?? '',
             priority: dto.priority ?? 'MEDIUM',
             status: 'OPEN',
             created_by_id: user.sub,

@@ -1608,3 +1608,42 @@ a sent mail; it now shows the error and points at an approver. And it routed to
 a page saying "contact your HOD for approval", an approval step that does not
 exist on this flow; it now goes to the OTP entry screen, which is the actual
 next step.
+
+## 2026-08-24 A self-action is one field
+
+**Decision.** The form collects a single field, Work, which writes `title`.
+`description` stays as an optional column that the service defaults to an empty
+string, and the detail sheet and edit dialog render it only when it holds
+something.
+
+**Why.** Nobody wrote two useful sentences about the same piece of work, and the
+second box was the one that got a shrug. Asking for a title and a description of
+the same fifteen-word entry is a form fighting its users.
+
+**Instead of.** A migration that concatenates `description` into `title` and
+drops the column. That is the honest one-field version, and it rewrites 7,408
+live rows to save a nullable column. Rejected: the cost is irreversible and the
+benefit is tidiness.
+
+Also rejected: writing the single field to both columns, which duplicates every
+value and leaves the older entries looking inconsistent beside the new ones.
+
+**Costs.** Two shapes of row now exist, and code that reads a self-action has to
+tolerate an empty description. Search reads both columns, which is what keeps
+the older entries findable by words that only ever appeared in the description.
+
+## 2026-08-24 Self-actions filter by name, not by date
+
+**Decision.** The date range comes off the filter bar. The name filter,
+`createdById`, is shown to anyone who can already see other people's entries.
+
+**Why.** The dates were two unlabelled inputs. The question people ask of this
+list is whose work it is, and the filter that answered it was ADMIN-only on one
+tab, so almost nobody could reach it.
+
+Widening it grants no reach. `list` resolves the department scope separately and
+forces `created_by_id = self` for EMPLOYEE regardless of what `createdById`
+says, so the picker only narrows what the caller could already see.
+
+**Costs.** `dateFrom` and `dateTo` stay on the server DTO with nothing sending
+them. Deleting them is a separate change and they cost nothing sitting there.

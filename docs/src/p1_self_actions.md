@@ -60,6 +60,32 @@ the projects module needs a third comment thread anyway. See
 and old and new values. Unlike `task_status_logs`, it is not limited to status
 changes, so edits to the title or description also land here.
 
+## One field, not two
+
+The form collects a single field, labelled **Work**. It writes `title`.
+
+`description` is still a column and still NOT NULL: `CreateSelfActionDto` makes
+it optional and the service defaults it to an empty string. Nothing was
+migrated, so the 7,408 entries written before the merge keep their descriptions,
+and both the detail sheet and the edit dialog render that box only when it holds
+something. A new entry never shows it.
+
+Search still reads both columns, which is what keeps the older entries findable
+by words that only ever appeared in the description.
+
+## Filtering
+
+By name, not by date. The date range was two unlabelled inputs, and the question
+people actually ask of this list is whose work it is.
+
+The name filter is `createdById`, and it is shown to anyone who can already see
+other people's entries rather than to ADMIN alone, which is who could reach it
+before. It only narrows: `list` resolves the department scope separately and
+forces `created_by_id = self` for EMPLOYEE regardless of what `createdById`
+says, so the picker grants no reach that the caller did not already have.
+
+`dateFrom` and `dateTo` remain on the server DTO. Nothing sends them.
+
 ## Endpoints
 
 Every endpoint below is open to EMPLOYEE, HOD, MD, EA, PA, and
@@ -71,7 +97,7 @@ not.
 | POST | `/self-actions` | create |
 | GET | `/self-actions` | list, scoped by department |
 | GET | `/self-actions/:id` | detail |
-| PATCH | `/self-actions/:id` | edit title, description, priority |
+| PATCH | `/self-actions/:id` | edit the work text, priority, and a legacy description |
 | PATCH | `/self-actions/:id/status` | change status |
 | DELETE | `/self-actions/:id` | soft delete via `deleted_at` |
 | GET | `/self-actions/:id/comments` | thread |

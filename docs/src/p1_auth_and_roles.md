@@ -54,6 +54,17 @@ scoped to a HOD's own departments. All three were unreachable until recently:
 `@Get('pending')` was declared below `@Get(':id')`, so Nest read "pending" as a
 user id and 404'd. `self-registration.spec.ts` covers both gates.
 
+While `RESEND_FROM_EMAIL` cannot send, `just set-password <username> <password>`
+is how somebody locked out gets back in: it sets a known password so they can
+sign in and change it themselves from Settings. It enforces the same eight
+characters as every other password path, so it is not a way round the rule.
+`PATCH /users/:id/admin-reset-password` does the same over HTTP and still has no
+screen.
+
+Deleting the account instead is the expensive way to solve a forgotten password:
+`self_actions.created_by_id` is `onDelete: Cascade`, so it takes their entire
+history with it.
+
 The queue is at `/approvals`, in the sidebar for MD, HOD, EA and PA. It shows
 the requested role, because that is what the applicant asked for rather than
 anything they proved.

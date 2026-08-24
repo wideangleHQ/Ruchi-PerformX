@@ -13,7 +13,7 @@ import { useAuth } from '@/context/AuthContext';
 type Props = {
   open: boolean;
   onClose: () => void;
-  onSubmit: (values: { title: string; description: string; priority: SelfActionPriority; attachments: File[]; department_ids?: string[] }) => Promise<void>;
+  onSubmit: (values: { title: string; priority: SelfActionPriority; attachments: File[]; department_ids?: string[] }) => Promise<void>;
   isPending?: boolean;
   error?: string | null;
 };
@@ -21,7 +21,6 @@ type Props = {
 export function CreateSelfActionDialog({ open, onClose, onSubmit, isPending, error }: Props) {
   const { user } = useAuth();
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<SelfActionPriority>('MEDIUM');
   const [attachments, setAttachments] = useState<File[]>([]);
   const [departmentIds, setDepartmentIds] = useState<string[]>([]);
@@ -37,7 +36,6 @@ export function CreateSelfActionDialog({ open, onClose, onSubmit, isPending, err
   useEffect(() => {
     if (open) {
       setTitle('');
-      setDescription('');
       setPriority('MEDIUM');
       setAttachments([]);
       setDepartmentIds(user?.departmentIds?.length ? user.departmentIds : user?.departmentId ? [user.departmentId] : []);
@@ -63,24 +61,28 @@ export function CreateSelfActionDialog({ open, onClose, onSubmit, isPending, err
           className="space-y-4 p-5"
           onSubmit={async (event) => {
             event.preventDefault();
-            await onSubmit({ title, description, priority, attachments: await prepareAttachmentFiles(attachments), department_ids: departmentIds });
+            await onSubmit({ title, priority, attachments: await prepareAttachmentFiles(attachments), department_ids: departmentIds });
           }}
         >
           {error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
 
+          {/*
+            One field, not a title and a description. Nobody wrote two useful
+            sentences about the same piece of work, and the second box was the
+            one people left blank-ish. The column stays and older entries still
+            show what they put in it.
+          */}
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Title *</label>
-            <Input value={title} onChange={(event) => setTitle(event.target.value)} required />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Description *</label>
-            <textarea
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
+            <label htmlFor="self-action-work" className="mb-1 block text-sm font-medium text-slate-700">
+              Work *
+            </label>
+            <Input
+              id="self-action-work"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="What did you do?"
+              maxLength={255}
               required
-              rows={5}
-              className="w-full rounded-lg border border-input bg-white px-3 py-2 text-sm outline-none"
             />
           </div>
 

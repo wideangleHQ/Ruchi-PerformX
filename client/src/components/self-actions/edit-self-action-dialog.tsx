@@ -53,20 +53,37 @@ export function EditSelfActionDialog({ open, action, onClose, onSubmit, isPendin
           {error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Title *</label>
-            <Input value={title} onChange={(event) => setTitle(event.target.value)} required />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Description *</label>
-            <textarea
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
+            <label htmlFor="self-action-edit-work" className="mb-1 block text-sm font-medium text-slate-700">
+              Work *
+            </label>
+            <Input
+              id="self-action-edit-work"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              maxLength={255}
               required
-              rows={5}
-              className="w-full rounded-lg border border-input bg-white px-3 py-2 text-sm outline-none"
             />
           </div>
+
+          {/*
+            Only for entries written before the two fields merged. New ones have
+            nothing here, so the box does not appear and nobody is asked to fill
+            a field that no longer exists on the form.
+          */}
+          {description.trim() ? (
+            <div>
+              <label htmlFor="self-action-edit-description" className="mb-1 block text-sm font-medium text-slate-700">
+                Description
+              </label>
+              <textarea
+                id="self-action-edit-description"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                rows={5}
+                className="w-full rounded-lg border border-input bg-white px-3 py-2 text-sm outline-none"
+              />
+            </div>
+          ) : null}
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Priority *</label>
