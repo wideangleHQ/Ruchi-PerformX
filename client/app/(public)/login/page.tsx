@@ -161,7 +161,17 @@ export default function LoginPage() {
             </div>
 
             {/* Form */}
+            {/*
+              `method="post"` matters even though this form is submitted with
+              JavaScript. A form with no method defaults to GET, so a submit
+              that lands before React hydrates is handled natively by the
+              browser: it navigates to the current URL with every field as a
+              query parameter. On this form that puts the username and password
+              into the address bar, browser history, the Referer header and the
+              edge access log. POST keeps them in a request body instead.
+            */}
             <form
+              method="post"
               onSubmit={form.handleSubmit(onSubmit)}
               className="space-y-5"
             >
