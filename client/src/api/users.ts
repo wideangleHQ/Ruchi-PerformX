@@ -8,6 +8,21 @@ export interface Department {
   isActive: boolean;
 }
 
+/**
+ * What `PATCH /users/:id` accepts, which is not `Partial<User>`. A `User` is
+ * the response shape and carries `id`, `username`, `email`, `status` and two
+ * department display strings that the DTO rejects outright, so sending one back
+ * is a 400 under `forbidNonWhitelisted`.
+ */
+export interface UpdateUserPayload {
+  fullName?: string;
+  role?: Role;
+  departmentId?: string | null;
+  departmentIds?: string[];
+  isActive?: boolean;
+  canAccessCareerHR?: boolean;
+}
+
 export const usersApi = {
   /**
    * The whole directory as a bare array. `GET /users` is not paginated and
@@ -24,8 +39,8 @@ export const usersApi = {
     return response.data;
   },
 
-  updateUser: async (id: string, data: Partial<User>): Promise<User> => {
-    const response = await axiosClient.put<User>(`/users/${id}`, data);
+  updateUser: async (id: string, data: UpdateUserPayload): Promise<User> => {
+    const response = await axiosClient.patch<User>(`/users/${id}`, data);
     return response.data;
   },
 
@@ -39,6 +54,26 @@ export const usersApi = {
     role?: Role;
   }): Promise<User[]> => {
     const response = await axiosClient.get<User[]>('/users/assignable', { params });
+    return response.data;
+  },
+
+  /**
+   * The approval queue. Registration lands as `pending_approval`, so a new
+   * account cannot log in until one of these two calls resolves it. Scoped to a
+   * HOD's own departments server side; MD, EA and PA see everything.
+   */
+  getPendingUsers: async (): Promise<User[]> => {
+    const response = await axiosClient.get<User[]>('/users/pending');
+    return response.data;
+  },
+
+  approveUser: async (id: string): Promise<{ message: string }> => {
+    const response = await axiosClient.patch<{ message: string }>(`/users/${id}/approve`);
+    return response.data;
+  },
+
+  rejectUser: async (id: string): Promise<{ message: string }> => {
+    const response = await axiosClient.patch<{ message: string }>(`/users/${id}/reject`);
     return response.data;
   },
 

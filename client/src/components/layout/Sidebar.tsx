@@ -26,6 +26,7 @@ import {
   KeyRound,
   Building2,
   CalendarHeart,
+  ShieldCheck,
 } from 'lucide-react';
 import { launchCareerX } from '@/api/career';
 import { useToast } from '@/hooks/useToast';
@@ -72,6 +73,14 @@ const navItems: NavItem[] = [
     showWhen: 'vendorAccess',
   },
   { href: '/events', label: 'Events', icon: <CalendarHeart size={20} /> },
+  {
+    href: '/approvals',
+    label: 'Approvals',
+    icon: <ShieldCheck size={20} />,
+    // A sign-up cannot log in until one of these four resolves it, so the
+    // queue needs to be visible to them or nobody empties it.
+    roles: ['MD', 'HOD', 'EA', 'PA'],
+  },
   { href: '/notifications', label: 'Notifications', icon: <Bell size={20} /> },
   // Scoring, HOD Scores and Analytics are hidden until the employee score model
   // is settled. The employee score is unbounded points, not a percentage, and

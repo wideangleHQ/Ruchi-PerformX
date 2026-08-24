@@ -54,6 +54,10 @@ scoped to a HOD's own departments. All three were unreachable until recently:
 `@Get('pending')` was declared below `@Get(':id')`, so Nest read "pending" as a
 user id and 404'd. `self-registration.spec.ts` covers both gates.
 
+The queue is at `/approvals`, in the sidebar for MD, HOD, EA and PA. It shows
+the requested role, because that is what the applicant asked for rather than
+anything they proved.
+
 Before the form is submitted the client checks whether a given slot is already
 taken, using a set of public endpoints:
 
