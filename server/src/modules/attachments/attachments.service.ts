@@ -2,10 +2,16 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { role_enum, Prisma } from '@prisma/client';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import {
+  supabaseBucketFromEnv,
+  supabaseKeyFromEnv,
+  supabaseUrlFromEnv,
+} from '../../common/helpers/supabase-env.helper';
 import { PDFDocument } from 'pdf-lib';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -51,8 +57,9 @@ const DOCUMENT_EXTENSIONS = new Set(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv',
 
 @Injectable()
 export class AttachmentsService {
+  private readonly logger = new Logger(AttachmentsService.name);
   private readonly supabase: SupabaseClient;
-  private readonly bucket = process.env.SUPABASE_BUCKET || 'performx-files';
+  private readonly bucket = supabaseBucketFromEnv('SUPABASE_BUCKET', 'performx-files');
   private readonly maxImageSize = 10 * 1024 * 1024;
   private readonly maxDocumentSize = 25 * 1024 * 1024;
 
@@ -60,11 +67,24 @@ export class AttachmentsService {
     private readonly prisma: PrismaService,
     private readonly departmentScopeService: DepartmentScopeService,
   ) {
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+    const supabaseUrl = supabaseUrlFromEnv();
+    const supabaseKey = supabaseKeyFromEnv();
 
     if (!supabaseUrl || !supabaseKey) {
       throw new Error('Supabase environment variables are missing');
+    }
+
+    const raw = (process.env.SUPABASE_URL ?? '').trim().replace(/^["']|["']$/g, '');
+    if (raw.replace(/\/+$/, '') !== supabaseUrl) {
+      // Loud at boot rather than one 400 per upload, the way the sender domain
+      // check is. Not a throw: the value is usable once trimmed, and this is
+      // how it has been set on Railway for months.
+      this.logger.warn(
+        `SUPABASE_URL is set to ${raw}, which carries an API path. ` +
+          `Using ${supabaseUrl}. That path routes storage calls to PostgREST, ` +
+          'which answers PGRST125 "Invalid path specified in request URL". ' +
+          'Set it to the bare project URL.',
+      );
     }
 
     this.supabase = createClient(supabaseUrl, supabaseKey);
@@ -309,19 +329,6 @@ export class AttachmentsService {
       return [];
     }
 
-    // DEBUG: remove after diagnosing
-    console.log('UPLOAD DEBUG target=', target);
-    console.log(
-      'UPLOAD DEBUG files=',
-      files.map((f) => ({
-        originalname: f.originalname,
-        mimetype: f.mimetype,
-        size: f.size,
-        hasBuffer: !!f.buffer,
-        bufferLen: f.buffer?.length,
-      })),
-    );
-
     const createdIds: string[] = [];
     const uploadedPaths: string[] = [];
 
@@ -365,8 +372,6 @@ export class AttachmentsService {
 
       return results;
     } catch (error) {
-      // DEBUG: remove after diagnosing
-      console.log('UPLOAD DEBUG caught error=', error);
       if (createdIds.length) {
         await this.prisma.task_attachments.deleteMany({ where: { id: { in: createdIds } } });
       }

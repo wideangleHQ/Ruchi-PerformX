@@ -58,7 +58,7 @@ failing later.
 | `INTERNAL_API_KEY` | yes | Shared secret CareerX sends as `x-internal-api-key` |
 | `RESEND_API_KEY` | yes | Outbound email |
 | `RESEND_FROM_EMAIL` | yes | Sender address, on a domain verified at resend.com/domains. A free-mail domain such as gmail.com can never be verified and fails every send; the boot log says so. |
-| `SUPABASE_URL` | yes | Storage |
+| `SUPABASE_URL` | yes | Storage. The **bare** project URL, no API path |
 | `SUPABASE_SERVICE_ROLE_KEY` | yes | Storage, server side only |
 | `SUPABASE_SERVICE_KEY` | see note | Older name still read in some files; set both to the same value |
 | `SUPABASE_BUCKET` | yes | Task and self action attachments |
@@ -69,6 +69,18 @@ failing later.
 The two Supabase key names are a leftover from a rename that was never
 finished. Setting both to the service role key is the safe move until the
 duplicate is cleaned up.
+
+`SUPABASE_URL` takes `https://<ref>.supabase.co` and nothing after it. Railway
+has held it as `.../rest/v1/` since before this was written, which is the value
+the PostgREST docs give and is wrong for everything else. The storage client
+appends its own `/storage/v1/object/...`, the gateway routes the result on the
+`/rest/v1/` it sees first, and PostgREST answers PGRST125, "Invalid path
+specified in request URL". That is a 400 on every upload, on a message naming
+neither storage nor the variable.
+
+`supabase-env.helper.ts` strips any service path now, so a wrong value no longer
+breaks uploads, and `AttachmentsService` warns at boot when it has to. Set it
+correctly anyway; the helper is a net, not the rule.
 
 `CORS_ORIGINS` is the one to reach for when a deployed client loads but every
 request fails and the API logs nothing. A browser rejects a disallowed origin at

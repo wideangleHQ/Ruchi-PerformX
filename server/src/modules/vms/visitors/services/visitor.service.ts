@@ -3,6 +3,11 @@ import { Inject, Injectable, BadRequestException, NotFoundException } from '@nes
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import {
+  supabaseBucketFromEnv,
+  supabaseKeyFromEnv,
+  supabaseUrlFromEnv,
+} from '../../../../common/helpers/supabase-env.helper';
 import { randomUUID } from 'crypto';
 import {
   VISITOR_SELECT,
@@ -32,24 +37,14 @@ export class VisitorService implements VisitorServiceContract {
     @Inject(VISITOR_DOMAIN_SERVICE)
     private readonly visitorDomainService: VisitorDomainService,
   ) {
-    const sanitize = (val: string | undefined): string => (val || '').trim().replace(/^["']|["']$/g, '');
-
-    // Railway has SUPABASE_URL="https://...supabase.co/rest/v1/" which breaks the storage API.
-    // We must strip /rest/v1 and any trailing slashes.
-    let rawUrl = sanitize(process.env.SUPABASE_URL) || 'https://example.supabase.co';
-    rawUrl = rawUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
-    
-    const supabaseUrl = rawUrl;
-    const supabaseKey = sanitize(process.env.SUPABASE_SERVICE_ROLE_KEY) || sanitize(process.env.SUPABASE_SERVICE_KEY) || 'fake-key';
-    this.bucket = sanitize(process.env.SUPABASE_VMS_BUCKET) || 'vms-files';
+    // This constructor is where the /rest/v1 workaround used to live, alone.
+    // It is shared now, because AttachmentsService needed the same thing and
+    // did not have it.
+    const supabaseUrl = supabaseUrlFromEnv() || 'https://example.supabase.co';
+    const supabaseKey = supabaseKeyFromEnv() || 'fake-key';
+    this.bucket = supabaseBucketFromEnv('SUPABASE_VMS_BUCKET', 'vms-files');
 
     this.supabase = createClient(supabaseUrl, supabaseKey);
-
-    console.log('[VMS] Supabase initialized:', {
-      url: supabaseUrl.substring(0, 30) + '...',
-      bucket: this.bucket,
-      hasKey: supabaseKey.length > 10,
-    });
   }
 
   async uploadPhoto(visitorId: string, file: Express.Multer.File, actorId: string): Promise<any> {

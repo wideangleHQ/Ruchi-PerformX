@@ -1676,3 +1676,34 @@ query including the creator's own HOD.
 **Costs.** Any future flow that wants to create an employee first and assign the
 department second now has to be one statement or one transaction. Nothing does
 that today: both writers set the column in the same insert.
+
+## 2026-08-25 One reading of the Supabase environment
+
+**Decision.** `supabase-env.helper.ts` is the only place that reads
+`SUPABASE_URL`, the key names and the bucket names. It strips any
+`/rest/v1`-style service path, trims, and unquotes. `AttachmentsService` and
+`VisitorService` both use it, and the former warns at boot when the value it was
+given had a path on it.
+
+**Why.** Railway holds `SUPABASE_URL` as `https://<ref>.supabase.co/rest/v1/`.
+The storage client appends `/storage/v1/object/...` to that, the gateway routes
+the whole path on the `/rest/v1/` it sees first, and PostgREST answers PGRST125,
+"Invalid path specified in request URL".
+
+`VisitorService` stripped the path in its own constructor and `AttachmentsService`
+did not, so visitor photos uploaded and every task, request and self-action
+attachment returned a 400. `task_attachments` took eleven rows in its life and
+none after 2026-07-11. The message names neither storage nor the variable, which
+is most of why it survived.
+
+**Instead of.** Only fixing the Railway variable, which fixes today and not the
+next deploy, the next environment, or the next person who copies the value out
+of the PostgREST docs. The variable should still be corrected; the helper is a
+net under it.
+
+Also rejected: copying the regex from `VisitorService` into `AttachmentsService`.
+Two copies is how the first one ended up load-bearing and unnoticed.
+
+**Costs.** A self-hosted deployment whose Supabase genuinely lives under a
+`/rest/v1` path could not be expressed. No such deployment exists, and a path
+that is not a service prefix is left alone.
