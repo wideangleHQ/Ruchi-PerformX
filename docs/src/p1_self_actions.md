@@ -84,6 +84,18 @@ before. It only narrows: `list` resolves the department scope separately and
 forces `created_by_id = self` for EMPLOYEE regardless of what `createdById`
 says, so the picker grants no reach that the caller did not already have.
 
+`search` reads three columns: `title`, `description`, and the creator's
+`full_name`. The name is in there because it is the second thing people type
+into this box, after a word from the work itself, and because the picker beside
+it only helps someone who already knows the exact name to pick.
+
+It grants no reach either, for the same reason and by the same mechanism. The
+three-way match is one `OR` inside the clause list that `list` `AND`s together,
+so it sits beside the department scope and the EMPLOYEE ownership filter rather
+than above them. An employee searching a colleague's name gets their own
+entries or nothing. `self-action-search.spec.ts` reads the `where` that reaches
+Prisma and fails if that stops being true.
+
 `dateFrom` and `dateTo` remain on the server DTO. Nothing sends them.
 
 ## Endpoints

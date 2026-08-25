@@ -206,10 +206,17 @@ export class SelfActionsService {
     if (filter.status) clauses.push({ status: filter.status });
     if (filter.priority) clauses.push({ priority: filter.priority });
     if (filter.search) {
+      // The creator's name is in here because it is the second thing people
+      // type into a search box on this screen, after a word from the work
+      // itself. It grants no reach: this OR is one clause among several ANDed
+      // together, so it narrows the department scope and the EMPLOYEE
+      // ownership filter above rather than reaching past them. Someone who can
+      // only see their own entries searching a colleague's name gets nothing.
       clauses.push({
         OR: [
           { title: { contains: filter.search, mode: 'insensitive' } },
           { description: { contains: filter.search, mode: 'insensitive' } },
+          { users: { full_name: { contains: filter.search, mode: 'insensitive' } } },
         ],
       });
     }

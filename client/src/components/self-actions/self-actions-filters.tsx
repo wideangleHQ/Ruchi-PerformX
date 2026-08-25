@@ -46,7 +46,7 @@ export function SelfActionsFilters({
           <Input
             value={values.search ?? ''}
             onChange={(event) => setValues((current) => ({ ...current, search: event.target.value }))}
-            placeholder="Search title or description"
+            placeholder="Search work, description or person"
             className="pl-9"
           />
         </div>

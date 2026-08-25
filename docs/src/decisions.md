@@ -1707,3 +1707,25 @@ Two copies is how the first one ended up load-bearing and unnoticed.
 **Costs.** A self-hosted deployment whose Supabase genuinely lives under a
 `/rest/v1` path could not be expressed. No such deployment exists, and a path
 that is not a service prefix is left alone.
+
+## 2026-08-25 Self-action search matches the creator's name
+
+**Decision.** `search` matches `title`, `description` and the creator's
+`full_name`. The placeholder says so.
+
+**Why.** The box said "title or description" and people typed names into it
+anyway, then got nothing. The `createdById` picker added the day before only
+helps someone who already knows the exact name to pick out of a list.
+
+The match grants no reach. It is one `OR` among clauses that `findAll` `AND`s
+together, beside the department scope and the `created_by_id = self` that
+EMPLOYEE always carries, so it narrows what the caller could already see. An
+employee searching a colleague gets their own entries or nothing.
+
+**Instead of.** A separate name box, which is the picker that already exists.
+Also rejected: matching `username` as well, which is not what anybody types and
+would make the box match strings nobody can see on the screen.
+
+**Costs.** The search now joins `users` on every keystroke that reaches the
+server. At 7,718 rows over one indexed foreign key that is not worth a second
+query, but it is the first thing to look at if this list gets slow.
