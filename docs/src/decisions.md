@@ -1647,3 +1647,32 @@ says, so the picker only narrows what the caller could already see.
 
 **Costs.** `dateFrom` and `dateTo` stay on the server DTO with nothing sending
 them. Deleting them is a separate change and they cost nothing sitting there.
+
+## 2026-08-25 An employee's department is enforced in the database
+
+**Decision.** `users.department_id` is required for role EMPLOYEE, as a CHECK
+constraint, and `UsersService` refuses the same edits with a 400 before Postgres
+has to.
+
+**Why.** An EMPLOYEE's whole department scope is that one column, so null means
+they cannot file a self action and their own HOD cannot see them. A live account
+reached that state between its last self action on 2026-08-24 and the next
+morning, and nothing recorded how: `audit_logs` holds no rows for the users
+entity and `users.updated_at` is `@default(now())` with no `@updatedAt`.
+
+Two service paths could produce it silently. `departmentId: null` passes
+`@IsOptional`, which skips validation for null as well as undefined, and
+resolves into a Prisma `disconnect`. And a user moved off HOD or an assistant
+role has already had the column nulled by the branch that clears it, so arriving
+at EMPLOYEE without an explicit department leaves it null.
+
+**Instead of.** Guarding only in the service, which leaves Studio and psql able
+to reproduce it, and this arrived through a route nobody can identify. Also
+rejected: letting a self action be created with no department rows, which is
+worse than the error, because `buildSelfActionDepartmentFilter` matches on
+`some`, so a row with no join rows is invisible to every department-scoped
+query including the creator's own HOD.
+
+**Costs.** Any future flow that wants to create an employee first and assign the
+department second now has to be one statement or one transaction. Nothing does
+that today: both writers set the column in the same insert.

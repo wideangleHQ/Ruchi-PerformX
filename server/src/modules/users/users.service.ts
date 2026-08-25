@@ -148,6 +148,10 @@ export class UsersService {
         }
       }
     }
+
+    if (role === role_enum.EMPLOYEE && !departmentId) {
+      throw new BadRequestException('Employee must be assigned exactly one department');
+    }
   }
 
   async findAll(activeOnly?: boolean) {
@@ -288,6 +292,15 @@ export class UsersService {
     return user;
   }
 
+  /**
+   * Apply an admin edit to one user: name, role, department, active flag and
+   * CareerX access, plus the junction rows the new role needs.
+   *
+   * Throws NotFoundException when the user or a named department is gone,
+   * ConflictException for the single-MD and one-HOD-per-department rules, and
+   * BadRequestException when the edit would leave an EMPLOYEE with no
+   * department. Assumes the caller is ADMIN; the controller enforces that.
+   */
   async update(id: string, dto: UpdateUserDto) {
     const existing = await this.ensureExists(id);
     const departmentId =
@@ -301,6 +314,20 @@ export class UsersService {
     const resolvedDeptId = (role === role_enum.HOD || ASSISTANT_ROLES.includes(role) || role === role_enum.PURCHASE_HEAD)
       ? null
       : dto.departmentId !== undefined ? departmentId : undefined;
+
+    // department_id is the whole of an employee's scope: null means they cannot
+    // file a self action and their own HOD cannot see them. Two callers used to
+    // arrive here and clear it without saying so. `departmentId: null` passes
+    // @IsOptional, which validates only against undefined, and resolves to null
+    // below into a disconnect. And a user moved off HOD or an assistant role has
+    // already had the column nulled by the branch above, so becoming an EMPLOYEE
+    // without an explicit department leaves it that way.
+    if (role === role_enum.EMPLOYEE) {
+      const resulting = resolvedDeptId !== undefined ? resolvedDeptId : existing.department_id;
+      if (!resulting) {
+        throw new BadRequestException('Employee must be assigned exactly one department');
+      }
+    }
 
     const user = await this.prisma.users.update({
       where: { id },

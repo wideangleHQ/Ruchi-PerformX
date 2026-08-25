@@ -25,7 +25,10 @@ column names are referenced across a lot of raw SQL in the HOD score module.
 Fields worth knowing:
 
 - `role` is a `role_enum` with eight values, described in [Auth and roles](p1_auth_and_roles.md)
-- `department_id` is the single home department, nullable
+- `department_id` is the single home department. Nullable, but a CHECK
+  constraint named `users_employee_has_department` requires it for an
+  EMPLOYEE. The other roles keep their departments in the join tables below
+  and this column is deliberately null for them.
 - `pending_approval` gates a signed-up user who has not been approved yet
 - `must_change_password` forces a password change on next login
 - `can_access_career_hr` is the flag that lets this user into CareerX
