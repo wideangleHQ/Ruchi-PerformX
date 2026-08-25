@@ -195,7 +195,7 @@ export function AssistantPanel() {
       <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
         <div>
           <p className="text-sm font-medium text-slate-900">Assistant</p>
-          <p className="text-xs text-slate-500">Ask about leave, tasks, projects, vendors</p>
+          <p className="text-xs text-slate-500">Ask about tasks, projects, vendors</p>
         </div>
         <div className="flex items-center gap-1">
           {exchanges.length > 0 && (
@@ -223,11 +223,9 @@ export function AssistantPanel() {
           <div className="space-y-2 pt-6 text-center text-sm text-slate-500">
             <p>Ask a question in plain English.</p>
             <p className="text-xs">
-              &ldquo;How much leave do I have left?&rdquo;
-              <br />
               &ldquo;What is overdue?&rdquo;
               <br />
-              &ldquo;Who is off next week?&rdquo;
+              &ldquo;Which projects need review?&rdquo;
             </p>
           </div>
         )}
