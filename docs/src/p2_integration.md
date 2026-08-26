@@ -127,6 +127,15 @@ access, reads the PerformX token, and calls `launchCareerX` in
 `credentials: 'include'` so CareerX can set its own session cookies, then
 navigates the browser to `${CAREER_APP_URL}/dashboard?returnTo=<url>`.
 
+The two `NEXT_PUBLIC_CAREER_*` bases are inlined at build time, which is what
+broke the tab in production while local and preview kept working: they were
+marked Sensitive in the Vercel Production environment, `vercel pull` returned
+`[SENSITIVE]` for both, and the shipped bundle called
+`fetch("[SENSITIVE]/auth/exchange")`. A relative URL against
+`app.ruchiperformx.in` is a 404 HTML page, so the exchange never reached
+CareerX at all. `launchCareerX` now rejects a base that is not an `http(s)` URL
+and names the variable. See [Setup](p1_setup.md#client-environment).
+
 `returnTo` is the contract for the link back. It is a URL-encoded absolute
 PerformX URL, `/dashboard` by default, and CareerX's shell is what renders it.
 The exchange itself is unchanged; the token stays in the `Authorization` header

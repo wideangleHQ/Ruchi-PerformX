@@ -1729,3 +1729,29 @@ would make the box match strings nobody can see on the screen.
 **Costs.** The search now joins `users` on every keystroke that reaches the
 server. At 7,718 rows over one indexed foreign key that is not worth a second
 query, but it is the first thing to look at if this list gets slow.
+
+
+## 2026-08-26 The CareerX base URLs are validated at launch, not trusted
+
+**Decision.** `launchCareerX` throws when `NEXT_PUBLIC_CAREER_API_URL` or
+`NEXT_PUBLIC_CAREER_APP_URL` is not an `http(s)` URL, and the error names the
+variable.
+
+**Why.** Both were marked Sensitive in the Vercel Production environment, so
+`vercel pull` handed the build the literal `[SENSITIVE]` and it was inlined into
+the bundle. `fetch("[SENSITIVE]/auth/exchange")` resolves against
+`app.ruchiperformx.in`, returns the Next 404 page, and surfaces as the generic
+"CareerX authentication could not be completed" toast. Nothing reached CareerX,
+so no log on either side named the cause, and local and preview were unaffected
+because their builds got real values. The failure was invisible in exactly the
+environment nobody can attach a debugger to.
+
+**Instead of.** Adding the two to `client_env_required`, which only reads
+`client/.env.local` and would fail `just check-env` for everyone not working on
+the career tab, while still missing a Vercel-side value that exists but is
+unreadable. Also rejected: dropping the `localhost` fallbacks, which are what
+make the tab work in local development without configuration.
+
+**Costs.** The check is a shape check, not a reachability one: a well-formed URL
+pointing at the wrong host still fails at the fetch. The deploy-time
+verification for that is the `curl` in [Setup](p1_setup.md#client-environment).

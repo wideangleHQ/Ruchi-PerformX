@@ -143,6 +143,25 @@ Create `client/.env.local`:
 | `NEXT_PUBLIC_CAREER_API_URL` | CareerX API base, only needed if you are working on the career tab |
 | `NEXT_PUBLIC_CAREER_APP_URL` | CareerX frontend base, used for the SSO redirect |
 
+Both `NEXT_PUBLIC_*` values are inlined into the client bundle at build time,
+so on Vercel they have to be readable by the build. A variable marked
+**Sensitive** is not: `vercel pull` hands the build the literal string
+`[SENSITIVE]`, and that is what ends up in the shipped JavaScript. The career
+tab then posts to a relative `/auth/exchange`, gets the Next 404 page, and every
+user sees "CareerX authentication could not be completed" with nothing in any
+server log. Keep the two CareerX variables as ordinary Production variables, and
+check a deploy with:
+
+```bash
+curl -s https://app.ruchiperformx.in/career \
+  | grep -o '/_next/static/chunks/[^"]*' | sort -u \
+  | xargs -I{} curl -s https://app.ruchiperformx.in{} \
+  | grep -o 'fetch("[^"]*auth/exchange"'
+```
+
+`launchCareerX` now refuses anything that is not an `http(s)` URL and names the
+variable in the error, so the next occurrence says which one is unset.
+
 Port 4001 is not arbitrary. The server's CORS allowlist in `server/src/main.ts`
 is hardcoded to `http://localhost:4001` and `https://app.ruchiperformx.in`. If
 you run the client on any other port, every request fails CORS and the errors
