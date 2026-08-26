@@ -1,34 +1,34 @@
 {
-  "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/searchindex-8861f37f.js": {
-    "mtime": 1787678599.9486387,
-    "hash": "afb828668617c74dc3f3f1e1dd67dda3"
-  },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/elasticlunr-ef4e11c1.min.js": {
-    "mtime": 1787678599.9494789,
+    "mtime": 1787760346.694235,
     "hash": "bdc2dbed628a3bb7a62d58b999dd7123"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/searcher-09f2665d.js": {
-    "mtime": 1787678599.9494212,
-    "hash": "1954f204a25e664dfb7f7632c95730d9"
+    "mtime": 1787760346.694185,
+    "hash": "626e51ff928d79e24f08b15843ebafb4"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/highlight-abc7f01d.js": {
-    "mtime": 1787678599.948101,
+    "mtime": 1787760346.6926873,
     "hash": "a59ae1483df68e7fc5c3116462a4c15c"
   },
+  "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/searchindex-58a8905a.js": {
+    "mtime": 1787760346.6932924,
+    "hash": "e45bc894d3e4f137c2ef6d89063735ef"
+  },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/mark-09e88c2c.min.js": {
-    "mtime": 1787678599.9494505,
+    "mtime": 1787760346.6942117,
     "hash": "2ab50194c1473b8ab8589a3f63f204d8"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/clipboard-1626706a.min.js": {
-    "mtime": 1787678599.9481528,
+    "mtime": 1787760346.6927466,
     "hash": "f06c52bfddb458ad87349acf9fac06c5"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/book-c22b7243.js": {
-    "mtime": 1787678599.9458761,
+    "mtime": 1787760346.6887574,
     "hash": "8b5cfdd0194e90ca0eff4d8ffd61f355"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/toc-13fd3d2b.js": {
-    "mtime": 1787678599.9495049,
+    "mtime": 1787760346.6942582,
     "hash": "704a60bdd3b22de5600fff34959538b7"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/client/update-typo.js": {
@@ -1008,8 +1008,8 @@
     "hash": "15c1f4eba6643bee2ae4e80c4cb692cd"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/client/src/api/career.ts": {
-    "mtime": 1786900731.2928262,
-    "hash": "2d5a6ebc0477a1e987a91a83278d6771"
+    "mtime": 1787760303.7657795,
+    "hash": "cbe5a597c5130889005053a6d15562ee"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/client/src/api/assets.ts": {
     "mtime": 1787511573.5478446,
@@ -3132,16 +3132,16 @@
     "hash": "850dfeb1a11c26831ae21591c4e693b6"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/src/p2_integration.md": {
-    "mtime": 1787589769.771224,
-    "hash": "1170ac282c26b95790ef4c5f17f0dbb0"
+    "mtime": 1787760337.8212664,
+    "hash": "c3fc803cc2c1a6603bde807ed1b7d81e"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/src/p1_scoring.md": {
     "mtime": 1786900731.295919,
     "hash": "c58fd3b5a14f39d9a64b721a9ef664f0"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/src/decisions.md": {
-    "mtime": 1787678599.601425,
-    "hash": "c39107b58777ffb8fc12d01c74dad1f0"
+    "mtime": 1787760337.8221612,
+    "hash": "b05986f840142212bc08ba2d92cb9497"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/src/p1_architecture.md": {
     "mtime": 1787511887.0737395,
@@ -3156,8 +3156,8 @@
     "hash": "4dc61ea52bd46768a337f394473df058"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/src/p1_setup.md": {
-    "mtime": 1787678098.6396413,
-    "hash": "976dddcafc0a3fa279ff1bb49be7bdc4"
+    "mtime": 1787760321.2260504,
+    "hash": "bc6979031eb654f9743aef4f3331cfb9"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/src/p1_vms.md": {
     "mtime": 1787591309.5723352,
@@ -3232,131 +3232,131 @@
     "hash": "0e1e3c11fbdeaa90e1a712c218e3ea1a"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/p1_auth_and_roles.html": {
-    "mtime": 1787678599.951191,
-    "hash": "4f27c7bc48fe8ca12076ad5f6f6f2e86"
+    "mtime": 1787760346.698822,
+    "hash": "cc6fdc3d0f029a2f48e48acc27eede0f"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/p1_tasks.html": {
-    "mtime": 1787678599.9514503,
-    "hash": "aca696a00eb7ad9b74c6d516ff0dcf7c"
+    "mtime": 1787760346.699083,
+    "hash": "989e48211848de900d7bbef578a3e79d"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/print.html": {
-    "mtime": 1787678599.957876,
-    "hash": "db75e0fb48ae856e529cd7269436db47"
+    "mtime": 1787760346.708757,
+    "hash": "a4a45850e49a089238bf89ba481b18b7"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/p1_notifications.html": {
-    "mtime": 1787678599.9521244,
-    "hash": "92345d9b7324b86bca924df36f294810"
+    "mtime": 1787760346.699821,
+    "hash": "5212941767f0d86a027416239ff32215"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/p1_api_reference.html": {
-    "mtime": 1787678599.9531014,
-    "hash": "be247fe00a55ef1ae69965aeeea56d7d"
+    "mtime": 1787760346.7008266,
+    "hash": "caed007b6400b2f3dfe64a0f1ebe21ff"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/p2_projects.html": {
-    "mtime": 1787678599.9550247,
-    "hash": "cbeafa8d02089bb290e51f230ca7beb8"
+    "mtime": 1787760346.703005,
+    "hash": "f36d78571862f1ffd204f76f9605821c"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/p2_rnd_and_assets.html": {
-    "mtime": 1787678599.9552894,
-    "hash": "3ff821b57a950b00b4af8761efa1ccb3"
+    "mtime": 1787760346.703282,
+    "hash": "a2af6197989388968da6d705f72846b4"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/p1_requests_and_transfers.html": {
-    "mtime": 1787678599.9518902,
-    "hash": "0472bfd17a3e3bb256f5f518b10ad046"
+    "mtime": 1787760346.6995559,
+    "hash": "d632bcd516ab5b5ac2267023a09e0802"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/index.html": {
-    "mtime": 1787678599.9501288,
-    "hash": "e6ba7570010b1bf5b1bb4b292522cc70"
+    "mtime": 1787760346.697715,
+    "hash": "2449b09b5355b6060b2bce50cc89c13e"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/p1_architecture.html": {
-    "mtime": 1787678599.9506428,
-    "hash": "3c7a734e1796c809e2d77dd12df1a2ea"
+    "mtime": 1787760346.6982784,
+    "hash": "6011bee1d1dba1c5368d46a308cfc849"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/p2_plan.html": {
-    "mtime": 1787678599.9541132,
-    "hash": "45a4af09494bbbfbe789ad778f6a6e44"
+    "mtime": 1787760346.7018967,
+    "hash": "5ae72af2e65cfe440f8bb9e64b6c5402"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/p2_vendors.html": {
-    "mtime": 1787678599.9558704,
-    "hash": "4c79a48c67bf11e6c7481c9446995479"
+    "mtime": 1787760346.7038982,
+    "hash": "5b29c684d13639689f2938e84f4095c6"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/p1_overview.html": {
-    "mtime": 1787678599.9499714,
-    "hash": "e6ba7570010b1bf5b1bb4b292522cc70"
+    "mtime": 1787760346.6975188,
+    "hash": "2449b09b5355b6060b2bce50cc89c13e"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/p1_data_model.html": {
-    "mtime": 1787678599.950897,
-    "hash": "522f6c40050a6f038d268d4cce53a632"
+    "mtime": 1787760346.6985347,
+    "hash": "7fa9c999e3f9640ec72e06b80a4c3bab"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/p2_leave.html": {
-    "mtime": 1787678599.9547381,
-    "hash": "cf761cf24f3870f0ddd2b87fa5ea0720"
+    "mtime": 1787760346.7025685,
+    "hash": "8ccd076654a16970e766ad563f72faa8"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/p2_integration.html": {
-    "mtime": 1787678599.9563758,
-    "hash": "21cef3d8de37aefd1c508037ea3295fe"
+    "mtime": 1787760346.7044523,
+    "hash": "beb3bbe0431cfaf4f01299992db8cc60"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/p2_dashboard_social.html": {
-    "mtime": 1787678599.9555235,
-    "hash": "62df652afb0cc5748c77f24ce3cb2fd9"
+    "mtime": 1787760346.703539,
+    "hash": "171c9ad9a951186c3126bc0b64d8700d"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/404.html": {
-    "mtime": 1787678599.9576416,
-    "hash": "71f31809f480bf9a256d030ca0093961"
+    "mtime": 1787760346.7058973,
+    "hash": "9cd0b94d3486e14e7a6628457b8dec09"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/p1_scoring.html": {
-    "mtime": 1787678599.9523704,
-    "hash": "7f67deced759df5a8149585f44f3d8d2"
+    "mtime": 1787760346.700076,
+    "hash": "7f13132385da908dfa38e6d7043ba4b5"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/p2_notifications.html": {
-    "mtime": 1787678599.9561176,
-    "hash": "115dc11d33ba3a1ccf5c69e62cbe54bf"
+    "mtime": 1787760346.704185,
+    "hash": "9a1652b6353d2745b20ecd6dffd11183"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/decisions.html": {
-    "mtime": 1787678599.9574203,
-    "hash": "7a78e090d7fb12b36d480d7ccd6058a9"
+    "mtime": 1787760346.705615,
+    "hash": "40eaa0c29f5952ddf0f622cdd908e683"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/toc.html": {
-    "mtime": 1787678599.9496858,
+    "mtime": 1787760346.6944296,
     "hash": "9ba8790abde5a1b95b61bea73a14fe7f"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/p1_ux_audit.html": {
-    "mtime": 1787678599.9538646,
-    "hash": "3b011012e5c9f8c36fef506c1ff972f3"
+    "mtime": 1787760346.701629,
+    "hash": "ec63011dbe82e4e5f4d5f0256cc82bbf"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/p1_known_gaps.html": {
-    "mtime": 1787678599.9535987,
-    "hash": "1d004824867a9a9ebc65cab9693e9ce1"
+    "mtime": 1787760346.7013526,
+    "hash": "8e9d961682a6aa9b16068ff2ed1721b1"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/p1_vms.html": {
-    "mtime": 1787678599.9526248,
-    "hash": "407d3e1b9e6108ab7bb825cf6d6e6c6d"
+    "mtime": 1787760346.7003348,
+    "hash": "cd041f34b221f4c0e7b6cae516da2d0f"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/p1_self_actions.html": {
-    "mtime": 1787678599.9516706,
-    "hash": "52f813df4ee0fee35c323947503435ce"
+    "mtime": 1787760346.6993258,
+    "hash": "26821ad998d0962d41f218945f05e0ef"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/p1_setup.html": {
-    "mtime": 1787678599.9503906,
-    "hash": "b69bb6fa4111127d4bf4d9dda6a7dd6b"
+    "mtime": 1787760346.698023,
+    "hash": "e09d40de505f094a5df59178bcb9a39e"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/p2_assistant.html": {
-    "mtime": 1787678599.9566984,
-    "hash": "c48d10984d966ead3bbf5fb692bc0c08"
+    "mtime": 1787760346.704798,
+    "hash": "8df1f49a3a711c91d8816834d67aae88"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/p2_data_model.html": {
-    "mtime": 1787678599.9544413,
-    "hash": "4125cb529ca7de9459f76425a420c163"
+    "mtime": 1787760346.702225,
+    "hash": "9c37c0d2fcc9370f28414bc4689707af"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/p1_conventions.html": {
-    "mtime": 1787678599.9533467,
-    "hash": "5d08f1323ce5a98e4a62e652e1cadc72"
+    "mtime": 1787760346.7010894,
+    "hash": "1e99f384c09fb45989151a8ad57a11a2"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/fonts/OPEN-SANS-LICENSE.txt": {
-    "mtime": 1787678599.948263,
+    "mtime": 1787760346.6929092,
     "hash": "3b83ef96387f14655fc854ddc3c6bd57"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/fonts/SOURCE-CODE-PRO-LICENSE.txt": {
-    "mtime": 1787678599.9482894,
+    "mtime": 1787760346.692938,
     "hash": "9473ccaac27014a922dc77b776f02834"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/client/frontend-structure.txt": {
@@ -3368,11 +3368,11 @@
     "hash": "ab483f15434238324418516e2928fe6d"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/favicon-de23e50b.svg": {
-    "mtime": 1787678599.9480114,
+    "mtime": 1787760346.6925879,
     "hash": "2ab545f5294e510e3574d29bf08fc719"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/docs/book/favicon-8114d1fc.png": {
-    "mtime": 1787678599.9479685,
+    "mtime": 1787760346.6925368,
     "hash": "99aa04c6ee89063ee9fe65f6544e3d0b"
   },
   "/home/keir/wideangleHQ/Ruchi-PerformX/client/public/placeholder.jpg": {
