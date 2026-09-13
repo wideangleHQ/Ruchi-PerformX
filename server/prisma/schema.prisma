@@ -94,21 +94,21 @@ model incentives {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model notifications {
-  id         String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id    String                 @db.Uuid
-  task_id    String?                @db.Uuid
-  type       notification_type_enum
-  title      String                 @db.VarChar(255)
-  message    String
-  is_read    Boolean?               @default(false)
-  metadata   String?
-  entity_type  String?              @db.VarChar(50)
-  entity_id    String?              @db.Uuid
+  id           String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id      String                    @db.Uuid
+  task_id      String?                   @db.Uuid
+  type         notification_type_enum
+  title        String                    @db.VarChar(255)
+  message      String
+  is_read      Boolean?                  @default(false)
+  metadata     String?
+  entity_type  String?                   @db.VarChar(50)
+  entity_id    String?                   @db.Uuid
   channel      notification_channel_enum @default(IN_APP)
-  delivered_at DateTime?            @db.Timestamptz(6)
-  created_at DateTime?              @default(now()) @db.Timestamptz(6)
-  tasks      tasks?                 @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_notification_task")
-  users      users                  @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_notification_user")
+  delivered_at DateTime?                 @db.Timestamptz(6)
+  created_at   DateTime?                 @default(now()) @db.Timestamptz(6)
+  tasks        tasks?                    @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_notification_task")
+  users        users                     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_notification_user")
 
   @@index([is_read], map: "idx_notifications_read")
   @@index([user_id], map: "idx_notifications_user")
@@ -1447,4 +1447,184 @@ model assistant_exchanges {
   @@index([user_id, created_at])
   @@index([declined, created_at])
   @@index([conversation_id])
+}
+
+// ---- KPI and PS Score
+
+/// Where the outcome sits. INDIVIDUAL carries `owner_user_id`, DEPARTMENT
+/// carries `department_id`, PROJECT carries `project_id`. Exactly one, checked
+/// in the service because Prisma cannot express the alternative.
+enum kpi_scope_enum {
+  INDIVIDUAL
+  DEPARTMENT
+  PROJECT
+}
+
+/// How the outcome is measured. Every KPI uses exactly one.
+enum kpi_mode_enum {
+  QUANTITATIVE
+  BINARY
+  MILESTONE
+  RATING
+}
+
+/// Which way is good. A plain actual/target is wrong for a resolution time:
+/// five hours against a four hour target is 125% and worse, not better.
+enum kpi_direction_enum {
+  HIGHER_IS_BETTER
+  LOWER_IS_BETTER
+  EXACT_TARGET
+}
+
+/// The rule that turns achievement into a score. Achievement and score are two
+/// separate numbers; this is what separates them.
+enum kpi_scoring_method_enum {
+  DIRECT
+  THRESHOLD
+  RATING
+  MILESTONE
+}
+
+enum kpi_period_enum {
+  MONTHLY
+  QUARTERLY
+  ANNUAL
+}
+
+/// The lifecycle from the framework, in order, plus CANCELLED which can be
+/// reached from anywhere except LOCKED. Legal moves live in `kpi-lifecycle.ts`.
+enum kpi_status_enum {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  ACTIVE
+  IN_PROGRESS
+  PENDING_REVIEW
+  EVALUATED
+  FINALIZED
+  LOCKED
+  CANCELLED
+}
+
+/// One measurable outcome for a person, a department, or a project.
+///
+/// The unit is denormalised onto the row rather than pointing at a units table.
+/// The library is a constant in `kpi-units.ts`, and a department that needs
+/// something the library does not have types its own label. Either way the unit
+/// is frozen at creation, so a KPI cannot change from Rupees to Percentage
+/// halfway through a cycle even if the library is edited later.
+///
+/// ponytail: no relations, matching every other Phase 2 table. Ceiling: no
+/// database-level guarantee that `owner_user_id` points at a live user. Upgrade
+/// path is relations on every Phase 2 table at once, not this one alone.
+model kpis {
+  id                String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  scope             kpi_scope_enum
+  owner_user_id     String?                 @db.Uuid
+  department_id     String?                 @db.Uuid
+  project_id        String?                 @db.Uuid
+  name              String                  @db.VarChar(255)
+  description       String?
+  mode              kpi_mode_enum
+  /// Null for BINARY and MILESTONE, where the number has no unit of its own.
+  unit_label        String?                 @db.VarChar(60)
+  unit_symbol       String?                 @db.VarChar(12)
+  target_value      Decimal?                @db.Decimal(18, 4)
+  /// Optional starting point, so a KPI can measure improvement rather than
+  /// absolute level. Null means measure against zero.
+  baseline_value    Decimal?                @db.Decimal(18, 4)
+  direction         kpi_direction_enum?
+  scoring_method    kpi_scoring_method_enum
+  /// Threshold bands, rating rubric, and the overachievement cap. Shape and
+  /// validation are in `dto/scoring-config.dto.ts`.
+  scoring_config    Json?
+  /// Percent of the owner's PS Score. The set is normalised at scoring time, so
+  /// a set that does not total 100 still produces a defensible number.
+  weight            Decimal                 @db.Decimal(5, 2)
+  period            kpi_period_enum
+  period_start      DateTime                @db.Date
+  period_end        DateTime                @db.Date
+  evidence_required Boolean                 @default(false)
+  /// RATING always needs one. Other modes can ask for review where an HOD's
+  /// judgement adds something.
+  review_required   Boolean                 @default(false)
+  status            kpi_status_enum         @default(DRAFT)
+  created_by_id     String                  @db.Uuid
+  approved_by_id    String?                 @db.Uuid
+  approved_at       DateTime?               @db.Timestamptz(6)
+  cancelled_at      DateTime?               @db.Timestamptz(6)
+  cancel_reason     String?
+  locked_at         DateTime?               @db.Timestamptz(6)
+  created_at        DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime                @default(now()) @db.Timestamptz(6)
+
+  @@index([owner_user_id, period_start])
+  @@index([department_id, period_start])
+  @@index([project_id])
+  @@index([status])
+}
+
+/// A weighted stage of a MILESTONE KPI. Three of five stages complete is not
+/// 60%: it is whatever the three weigh.
+model kpi_milestones {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kpi_id          String    @db.Uuid
+  title           String    @db.VarChar(255)
+  weight          Decimal   @db.Decimal(5, 2)
+  sequence        Int
+  completed_at    DateTime? @db.Timestamptz(6)
+  completed_by_id String?   @db.Uuid
+  created_at      DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([kpi_id, sequence])
+}
+
+/// One person's share of a department or project KPI, in percent. Without a row
+/// here a shared KPI would credit every member with the whole outcome.
+model kpi_contributions {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kpi_id     String   @db.Uuid
+  user_id    String   @db.Uuid
+  share      Decimal  @db.Decimal(5, 2)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([kpi_id, user_id])
+  @@index([kpi_id])
+}
+
+/// An actual, appended. Nothing updates or deletes a row here: scoring reads
+/// the newest one and the rest stay as the history of how the number moved.
+model kpi_updates {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kpi_id        String   @db.Uuid
+  /// QUANTITATIVE only.
+  actual_value  Decimal? @db.Decimal(18, 4)
+  /// BINARY only.
+  binary_done   Boolean?
+  /// RATING only, 1 to `max_rating`. Entered by the reviewer, never the owner.
+  rating        Int?     @db.SmallInt
+  remarks       String?
+  evidence_url  String?  @db.VarChar(500)
+  entered_by_id String   @db.Uuid
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([kpi_id, created_at])
+}
+
+/// A target or weight change, kept so the original is never overwritten. The
+/// new values are written onto the KPI as well; this row is what makes the move
+/// explainable afterwards.
+model kpi_revisions {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kpi_id         String   @db.Uuid
+  old_target     Decimal? @db.Decimal(18, 4)
+  new_target     Decimal? @db.Decimal(18, 4)
+  old_weight     Decimal? @db.Decimal(5, 2)
+  new_weight     Decimal? @db.Decimal(5, 2)
+  effective_from DateTime @db.Date
+  reason         String
+  changed_by_id  String   @db.Uuid
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([kpi_id, created_at])
 }
