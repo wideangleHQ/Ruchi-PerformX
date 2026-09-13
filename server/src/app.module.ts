@@ -32,6 +32,7 @@ import { VendorPortalModule } from './modules/vendor-portal/vendor-portal.module
 import { EventsModule } from './modules/events/events.module';
 import { AssistantModule } from './modules/assistant/assistant.module';
 import { InternalModule } from './modules/internal/internal.module';
+import { KpiModule } from './modules/kpi/kpi.module';
 
 @Module({
   imports: [
@@ -69,6 +70,7 @@ import { InternalModule } from './modules/internal/internal.module';
     EventsModule,
     AssistantModule,
     InternalModule,
+    KpiModule,
   ],
   providers: [
     {
