@@ -16,7 +16,7 @@ export const KPI_STATUSES = ['ON_TRACK', 'AT_RISK', 'MISSED', 'MET'] as const;
  * `target` and `actual` are strings because a KPI is as often "under 3 days" or
  * "zero escalations" as it is a number.
  */
-export class CreateKpiDto {
+export class CreateProjectKpiDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)

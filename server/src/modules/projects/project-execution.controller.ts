@@ -22,8 +22,8 @@ import { UpdateChecklistItemDto } from './dto/checklist/update-checklist-item.dt
 import { CreateMilestoneDto } from './dto/milestone/create-milestone.dto';
 import { UpdateMilestoneDto } from './dto/milestone/update-milestone.dto';
 import { CreateSuccessCriterionDto } from './dto/criteria/create-success-criterion.dto';
-import { CreateKpiDto } from './dto/kpi/create-kpi.dto';
-import { UpdateKpiDto } from './dto/kpi/update-kpi.dto';
+import { CreateProjectKpiDto } from './dto/kpi/create-kpi.dto';
+import { UpdateProjectKpiDto } from './dto/kpi/update-kpi.dto';
 
 /**
  * Every internal role. Project visibility is company-wide, so the only thing
@@ -177,7 +177,7 @@ export class ProjectExecutionController {
   @Roles(...INTERNAL_ROLES)
   addKpi(
     @Param('id') id: string,
-    @Body() dto: CreateKpiDto,
+    @Body() dto: CreateProjectKpiDto,
     @CurrentUser() user: JwtPayload,
   ) {
     return this.service.addKpi(id, dto, user);
@@ -188,7 +188,7 @@ export class ProjectExecutionController {
   updateKpi(
     @Param('id') id: string,
     @Param('kpiId') kpiId: string,
-    @Body() dto: UpdateKpiDto,
+    @Body() dto: UpdateProjectKpiDto,
     @CurrentUser() user: JwtPayload,
   ) {
     return this.service.updateKpi(id, kpiId, dto, user);

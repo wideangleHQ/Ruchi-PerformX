@@ -18,8 +18,8 @@ import { toMemberTick } from './dto/checklist/member-tick-checklist.dto';
 import { CreateMilestoneDto } from './dto/milestone/create-milestone.dto';
 import { UpdateMilestoneDto } from './dto/milestone/update-milestone.dto';
 import { CreateSuccessCriterionDto } from './dto/criteria/create-success-criterion.dto';
-import { CreateKpiDto } from './dto/kpi/create-kpi.dto';
-import { UpdateKpiDto } from './dto/kpi/update-kpi.dto';
+import { CreateProjectKpiDto } from './dto/kpi/create-kpi.dto';
+import { UpdateProjectKpiDto } from './dto/kpi/update-kpi.dto';
 
 /** done / total / percent, computed, never stored. */
 export interface ProgressSummary {
@@ -561,7 +561,7 @@ export class ProjectExecutionService {
    * @throws ForbiddenException when the caller is not the Lead or Co-Lead.
    * @throws NotFoundException when the project does not exist or is deleted.
    */
-  async addKpi(projectId: string, dto: CreateKpiDto, user: JwtPayload) {
+  async addKpi(projectId: string, dto: CreateProjectKpiDto, user: JwtPayload) {
     await this.getProject(projectId);
     await this.projects.assertLeadOrCoLead(projectId, user.sub);
 
@@ -583,7 +583,7 @@ export class ProjectExecutionService {
   async updateKpi(
     projectId: string,
     kpiId: string,
-    dto: UpdateKpiDto,
+    dto: UpdateProjectKpiDto,
     user: JwtPayload,
   ) {
     await this.getProject(projectId);

@@ -8,7 +8,7 @@ import {
 import { KPI_STATUSES } from './create-kpi.dto';
 
 /** Body of `PATCH /projects/:id/kpis/:kpiId`. Lead and Co-Lead only. */
-export class UpdateKpiDto {
+export class UpdateProjectKpiDto {
   @IsOptional()
   @IsString()
   @IsNotEmpty()
