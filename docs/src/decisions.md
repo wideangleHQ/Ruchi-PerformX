@@ -1755,3 +1755,93 @@ make the tab work in local development without configuration.
 **Costs.** The check is a shape check, not a reachability one: a well-formed URL
 pointing at the wrong host still fails at the fetch. The deploy-time
 verification for that is the `curl` in [Setup](p1_setup.md#client-environment).
+
+
+## 2026-09-13 The PS Score is computed on read, with no stored score table
+
+**Decision.** `GET /kpis/ps-score` recomputes from the KPI rows, their
+milestones and their newest updates. There is no `ps_scores` table and no cron.
+
+**Why.** The history the framework asks for is already in the source: updates
+are append-only, a locked KPI preserves its target and actual permanently, and a
+revision keeps the value it replaced. A stored score would be a second copy of
+something derivable, and the employee score table next door already shows what
+that costs: `performance_scores` carries eight columns from a model that was
+never implemented, all sitting at zero. See [Scoring](p1_scoring.md).
+
+**Instead of.** A nightly job writing a row per person per cycle, the way
+`modules/scoring` does. Rejected because a KPI cycle is monthly, quarterly or
+annual per KPI rather than per person, so there is no single period to write a
+row for, and because nothing has asked for cross-cycle benchmarking yet — the
+framework lists it under future expansion.
+
+**Costs.** A PS Score for a month is only as stable as the KPIs behind it: a
+target revised in October changes what September reads, where a stored row would
+not. That is arguably the honest answer while a cycle is open and the wrong one
+after it closes, and the fix when somebody notices is to snapshot on the
+transition to LOCKED rather than to add a nightly job.
+
+## 2026-09-13 Weights are normalised over what counted, not validated to 100
+
+**Decision.** `psScore()` divides by the weight of the KPIs that produced a
+score, rather than assuming the set totals 100. The shortfall comes back as
+`declared_weight` for the UI to report.
+
+**Why.** Three of the framework's rules turn out to be the same rule. A
+cancelled KPI must have its weight redistributed rather than zeroed. A KPI with
+no actual yet must not be counted as a zero, because the business has not
+decided that policy. And a set whose weights do not total 100 needs to produce a
+defensible number, because that validation rule is itself an open decision.
+Normalising handles all three and leaves nothing to guess.
+
+**Instead of.** Refusing to approve a KPI set whose weights are not exactly 100,
+which is the rule the framework says somebody still has to decide, and which
+would block a legitimate half-configured set from ever being approved. Also
+rejected: scoring the missing weight as zero, which fails an employee for a KPI
+nobody asked them to update.
+
+**Costs.** A single KPI weighted 10% and scored 80 reads as a PS Score of 80,
+not 8. That is correct — it is the only measurement there is — but it looks
+generous next to a full set, so `counted_weight` is returned alongside and the
+UI says what the score was measured over.
+
+## 2026-09-13 The unit library is a constant, not a table
+
+**Decision.** `kpi-units.ts` holds the units. The chosen label and symbol are
+copied onto the KPI row, and a department needing something the library does not
+have types its own.
+
+**Why.** Units are read-only reference data that changes about once a year, and
+copying the label is what freezes it: a KPI running in rupees cannot become a
+KPI in percent because somebody edited a shared row. A table would have needed a
+seed script, a CRUD surface and a migration to add the word "batches".
+
+**Instead of.** A `kpi_units` table with a request-and-approve flow for custom
+units, which the framework describes. Rejected as scaffolding for a phase that
+has not started: nobody has asked for a custom unit yet, let alone for one
+shared across departments.
+
+**Costs.** A custom unit is private to its KPI, so two departments inventing the
+same one will not find each other's. The upgrade path is a table seeded from
+that array and read inside `searchUnits`, with nothing else changing, because
+every consumer already reads the label off the KPI row.
+
+## 2026-09-13 One status endpoint behind a transition table
+
+**Decision.** All ten KPI lifecycle states move through
+`PATCH /kpis/:id/status`, with the legal moves and the roles allowed to make
+them in `TRANSITIONS` in `kpi-lifecycle.ts`.
+
+**Why.** Ten states is what the framework names, and the states differ only in
+who may act. An endpoint per transition would have been eight routes, eight
+DTOs and eight service methods that all write one column.
+
+**Instead of.** `POST /kpis/:id/submit`, `/approve`, `/lock` and the rest, which
+reads better in a route list and is five times the code. Also rejected: no
+lifecycle at all, which would have meant an HOD approving the targets they set
+themselves.
+
+**Costs.** The client cannot see the table, so `NEXT_STATUSES` in
+`client/src/components/kpi/display.ts` mirrors it to decide which buttons to
+draw. A stale entry there is a missing button rather than a wrong outcome, since
+the server rejects an illegal move either way.

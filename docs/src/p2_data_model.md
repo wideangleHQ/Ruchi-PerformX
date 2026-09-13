@@ -815,6 +815,76 @@ model event_expenses {
 Event checklists reuse `project_checklist_items` with a nullable `event_id`, or
 skip checklists entirely for events. Do not build a second checklist table.
 
+### KPI and PS Score
+
+Built, migration `20260913164614_kpi_pms`. Six enums and five tables. See
+[KPIs and the PS Score](p2_kpi.md) for how they are used.
+
+There is no `kpi_units` table. The library is a constant in `kpi-units.ts` and
+the chosen label and symbol are copied onto the KPI row, so a running KPI does
+not move when the list is edited and a department can still type a unit of its
+own.
+
+```prisma
+model kpis {
+  id                String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  scope             kpi_scope_enum                              // INDIVIDUAL | DEPARTMENT | PROJECT
+  owner_user_id     String?                 @db.Uuid
+  department_id     String?                 @db.Uuid            // owning department, for scope filtering
+  project_id        String?                 @db.Uuid
+  name              String                  @db.VarChar(255)
+  description       String?
+  mode              kpi_mode_enum                               // QUANTITATIVE | BINARY | MILESTONE | RATING
+  unit_label        String?                 @db.VarChar(60)     // frozen at creation
+  unit_symbol       String?                 @db.VarChar(12)
+  target_value      Decimal?                @db.Decimal(18, 4)
+  baseline_value    Decimal?                @db.Decimal(18, 4)  // optional, measures improvement
+  direction         kpi_direction_enum?                         // HIGHER | LOWER | EXACT
+  scoring_method    kpi_scoring_method_enum                     // DIRECT | THRESHOLD | RATING | MILESTONE
+  scoring_config    Json?                                       // bands, rubric, cap
+  weight            Decimal                 @db.Decimal(5, 2)
+  period            kpi_period_enum                             // MONTHLY | QUARTERLY | ANNUAL
+  period_start      DateTime                @db.Date
+  period_end        DateTime                @db.Date
+  evidence_required Boolean                 @default(false)
+  review_required   Boolean                 @default(false)
+  status            kpi_status_enum         @default(DRAFT)
+  created_by_id     String                  @db.Uuid
+  approved_by_id    String?                 @db.Uuid
+  approved_at       DateTime?               @db.Timestamptz(6)
+  cancelled_at      DateTime?               @db.Timestamptz(6)
+  cancel_reason     String?
+  locked_at         DateTime?               @db.Timestamptz(6)
+  created_at        DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime                @default(now()) @db.Timestamptz(6)
+
+  @@index([owner_user_id, period_start])
+  @@index([department_id, period_start])
+  @@index([project_id])
+  @@index([status])
+}
+```
+
+`kpi_milestones` carries `title`, `weight`, `sequence`, and a nullable
+`completed_at` and `completed_by_id`. Achievement is completed weight, never a
+count of stages.
+
+`kpi_contributions` is `(kpi_id, user_id, share)` with a unique key on the
+first two. Without a row a shared KPI would credit every member with the whole
+outcome.
+
+`kpi_updates` is append-only: `actual_value`, `binary_done`, `rating`,
+`remarks`, `evidence_url`, `entered_by_id`. Nothing updates or deletes a row.
+Scoring reads the newest and the rest are the history of how the number moved.
+
+`kpi_revisions` holds `old_target`, `new_target`, `old_weight`, `new_weight`,
+`effective_from`, `reason` and `changed_by_id`. The new values are applied to
+the KPI as well; this row is what makes the change explainable a year later.
+
+The PS Score itself has no table. It is computed on read from the KPIs, their
+milestones and their newest updates. A locked KPI preserves its target and
+actual permanently, so the history the framework asks for is already there.
+
 ## Table count
 
 CSR is out. Projects and Vendors both grew substantially in this revision —

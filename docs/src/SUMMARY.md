@@ -25,6 +25,7 @@
 - [Schema changes](p2_data_model.md)
 - [Leave management](p2_leave.md)
 - [Projects](p2_projects.md)
+- [KPIs and the PS Score](p2_kpi.md)
 - [R&D and company assets](p2_rnd_and_assets.md)
 - [Home dashboard: birthdays, holidays, polls](p2_dashboard_social.md)
 - [Vendor management](p2_vendors.md)

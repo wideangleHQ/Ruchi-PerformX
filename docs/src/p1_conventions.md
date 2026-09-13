@@ -183,8 +183,8 @@ docs(p2): add projects module spec
 ```
 
 Scopes that make sense here: `auth`, `tasks`, `self-actions`, `requests`,
-`transfers`, `scoring`, `hod-score`, `notifications`, `vms`, `client`, `schema`,
-`docs`.
+`transfers`, `scoring`, `hod-score`, `kpi`, `notifications`, `vms`, `client`,
+`schema`, `docs`.
 
 ## Things this codebase does not have
 

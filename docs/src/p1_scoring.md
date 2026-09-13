@@ -7,6 +7,11 @@ before touching either.
 - `modules/scoring/` scores individual employees. Simple points arithmetic.
 - `modules/hod-score/` scores HODs. Six weighted components computed in SQL.
 
+Both are AT Scores: they measure execution. The outcome half of the performance
+model is the PS Score, which is a third engine in `modules/kpi/` and is
+documented in [KPIs and the PS Score](p2_kpi.md). The two are never averaged
+into one number, and no module imports across that line.
+
 # Employee scoring
 
 Files: `server/src/modules/scoring/scoring.service.ts` and `scoring.cron.ts`.

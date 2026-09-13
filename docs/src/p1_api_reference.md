@@ -482,6 +482,48 @@ and return the series oldest first. A month inside the window with no stored row
 comes back as `hasScore: false` and `points: null`, which is not the same as a
 stored zero. A user with no history at all returns an empty series.
 
+## KPIs and PS Score
+
+The outcome half of the performance model. Separate from the scores above and
+never averaged with them. See [KPIs and the PS Score](p2_kpi.md).
+
+`AUTHORS` below means MD, EA, PA, DEPARTMENT_CONTROLLER and HOD. Routes marked
+`internal` are open to every internal role, with the service deciding what comes
+back.
+
+| Method | Path | Roles |
+| --- | --- | --- |
+| GET | `/kpis/units` | internal |
+| GET | `/kpis/ps-score` | internal, own score only |
+| GET | `/kpis/ps-score/:userId` | AUTHORS, within department scope |
+| POST | `/kpis` | AUTHORS |
+| GET | `/kpis` | internal |
+| GET | `/kpis/:id` | internal, within department scope |
+| PATCH | `/kpis/:id` | AUTHORS, draft only |
+| PATCH | `/kpis/:id/status` | AUTHORS, narrowed per transition |
+| POST | `/kpis/:id/updates` | internal, owner or contributor |
+| POST | `/kpis/:id/milestones/:milestoneId/tick` | internal, owner or contributor |
+| PUT | `/kpis/:id/contributions` | AUTHORS |
+| POST | `/kpis/:id/revisions` | AUTHORS |
+
+`/kpis/units` and `/kpis/ps-score` are declared above `/kpis/:id` in the
+controller, or they would be shadowed by it.
+
+`PATCH /kpis/:id/status` is the only way a KPI changes state. `@Roles` lets any
+author reach it and `transitionRoles()` decides the rest, so an HOD can submit a
+KPI and cannot approve it. An illegal move is a 400, a move the caller's role
+may not make is a 403, and a cancellation without a reason is a 400.
+
+`POST /kpis/:id/updates` takes the actual, not a percentage: `actual_value` for
+a quantitative KPI, `binary_done` for a binary one, `rating` for a rating one,
+and a 400 for any of them sent against the wrong mode. A rating is refused from
+the KPI's own owner. Updates are appended; the newest is what scores.
+
+The two PS Score routes accept `month` and `year` and default to the current
+month. Every KPI whose cycle overlaps that month is in scope, so a monthly and
+an annual KPI can be carried at once. A cancelled KPI appears in the response
+marked not counted rather than being hidden.
+
 ## Holidays
 
 | Method | Path | Roles |
