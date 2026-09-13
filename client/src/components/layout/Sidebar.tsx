@@ -26,6 +26,7 @@ import {
   Building2,
   CalendarHeart,
   ShieldCheck,
+  Target,
 } from 'lucide-react';
 import { launchCareerX } from '@/api/career';
 import { useToast } from '@/hooks/useToast';
@@ -71,6 +72,10 @@ const navItems: NavItem[] = [
     showWhen: 'vendorAccess',
   },
   { href: '/events', label: 'Events', icon: <CalendarHeart size={20} /> },
+  // Everyone has a PS Score to read, including the employees who do not define
+  // KPIs, so this carries no role list. It sits above the commented-out Scoring
+  // items because it is the half of the performance model that is finished.
+  { href: '/kpis', label: 'KPIs', icon: <Target size={20} /> },
   {
     href: '/approvals',
     label: 'Approvals',
