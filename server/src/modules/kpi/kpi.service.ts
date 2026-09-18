@@ -214,13 +214,14 @@ export class KpiService {
   /**
    * Edit a KPI that is still a DRAFT.
    *
-   * Throws `ForbiddenException` for anyone but the author or the MD office, and
-   * `BadRequestException` once the KPI has left DRAFT. A target change after
-   * approval is a revision, not an edit, so that the original survives.
+   * Throws `ForbiddenException` for anyone but the author or an approver acting
+   * within their remit (see `isApproverFor`), and `BadRequestException` once
+   * the KPI has left DRAFT. A target change after approval is a revision, not
+   * an edit, so that the original survives.
    */
   async update(id: string, dto: UpdateKpiDto, user: JwtPayload) {
     const kpi = await this.loadKpi(id);
-    this.assertAuthor(kpi, user);
+    await this.assertAuthor(kpi, user);
     if (kpi.status !== 'DRAFT') {
       throw new BadRequestException(
         'Only a draft can be edited. Use a revision to change an approved target.',
@@ -283,7 +284,13 @@ export class KpiService {
         `A KPI cannot go from ${kpi.status} to ${dto.status}`,
       );
     }
-    if (!allowed.includes(user.role)) {
+    // Approver-gated moves get the department-scoped check; author moves
+    // (submitting a draft, an author's own cancel) do not.
+    const permitted =
+      allowed === KPI_APPROVER_ROLES
+        ? await this.isApproverFor(kpi, user)
+        : allowed.includes(user.role);
+    if (!permitted) {
       throw new ForbiddenException(`Your role cannot move a KPI to ${dto.status}`);
     }
     if (dto.status === 'CANCELLED' && !dto.reason) {
@@ -466,7 +473,7 @@ export class KpiService {
     user: JwtPayload,
   ) {
     const kpi = await this.loadKpi(id);
-    this.assertAuthor(kpi, user);
+    await this.assertAuthor(kpi, user);
     if (kpi.scope === 'INDIVIDUAL') {
       throw new BadRequestException(
         'An individual KPI is owned outright and has no shares to allocate',
@@ -504,7 +511,7 @@ export class KpiService {
     user: JwtPayload,
   ) {
     const kpi = await this.loadKpi(id);
-    this.assertAuthor(kpi, user);
+    await this.assertAuthor(kpi, user);
     if (kpi.status === 'LOCKED' || kpi.status === 'CANCELLED') {
       throw new BadRequestException(`A ${kpi.status} KPI cannot be revised`);
     }
@@ -882,11 +889,32 @@ export class KpiService {
     return owner.department_id;
   }
 
-  /** The author of a KPI, or the MD office, which can act on any of them. */
-  private assertAuthor(kpi: { created_by_id: string }, user: JwtPayload) {
+  /** The author of a KPI, or an approver acting within their remit: see
+   * `isApproverFor`. */
+  private async assertAuthor(
+    kpi: { created_by_id: string; department_id: string | null },
+    user: JwtPayload,
+  ) {
     if (kpi.created_by_id === user.sub) return;
-    if (KPI_APPROVER_ROLES.includes(user.role)) return;
+    if (await this.isApproverFor(kpi, user)) return;
     throw new ForbiddenException('Only the author can change this KPI');
+  }
+
+  /**
+   * Whether `user` may approve, finalize, lock, cancel, or edit this KPI as an
+   * approver rather than as its author.
+   *
+   * MD, EA and PA act on any KPI, matching their unrestricted department scope
+   * everywhere else. A HOD acts only within a department they head.
+   */
+  private async isApproverFor(
+    kpi: { department_id: string | null },
+    user: JwtPayload,
+  ): Promise<boolean> {
+    if (!KPI_APPROVER_ROLES.includes(user.role)) return false;
+    if (user.role !== role_enum.HOD) return true;
+    const scope = await this.departmentScope.resolveDepartmentScope(user);
+    return Boolean(kpi.department_id) && scope.departmentIds.includes(kpi.department_id!);
   }
 
   /** Whoever the KPI is measuring: its owner, or anybody holding a share of a

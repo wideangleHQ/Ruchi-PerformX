@@ -4,6 +4,13 @@ import { useState } from 'react';
 import { CheckCircle2, Circle, History, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { KpiStatus, RecordKpiUpdatePayload } from '@/api/kpi';
 import {
   useChangeKpiStatus,
@@ -351,26 +358,59 @@ export function KpiDetailSheet({ id, onClose }: { id: string; onClose: () => voi
         {kpi && NEXT_STATUSES[kpi.status].length > 0 ? (
           <div className="space-y-2 border-t border-slate-200 px-5 py-4">
             {pendingStatus === 'CANCELLED' ? (
-              <Input
-                placeholder="Why is this KPI being cancelled?"
-                value={cancelReason}
-                onChange={(event) => setCancelReason(event.target.value)}
-              />
-            ) : null}
-            <div className="flex flex-wrap gap-2">
-              {NEXT_STATUSES[kpi.status].map((status) => (
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Why is this KPI being cancelled?"
+                  value={cancelReason}
+                  onChange={(event) => setCancelReason(event.target.value)}
+                  autoFocus
+                />
                 <Button
-                  key={status}
                   type="button"
                   size="sm"
-                  variant={status === 'CANCELLED' ? 'outline' : 'default'}
-                  disabled={changeStatus.isPending}
-                  onClick={() => move(status)}
+                  variant="outline"
+                  disabled={!cancelReason.trim() || changeStatus.isPending}
+                  onClick={() => move('CANCELLED')}
                 >
-                  {statusLabel(status)}
+                  Confirm
                 </Button>
-              ))}
-            </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setPendingStatus(null);
+                    setCancelReason('');
+                  }}
+                >
+                  Back
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-600">Move to</span>
+                <div className="w-48">
+                  <Select
+                    value={null}
+                    onValueChange={(status) => {
+                      if (status) move(status as KpiStatus);
+                    }}
+                    disabled={changeStatus.isPending}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {NEXT_STATUSES[kpi.status].map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {statusLabel(status)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
           </div>
         ) : null}
       </aside>

@@ -1845,3 +1845,30 @@ themselves.
 `client/src/components/kpi/display.ts` mirrors it to decide which buttons to
 draw. A stale entry there is a missing button rather than a wrong outcome, since
 the server rejects an illegal move either way.
+
+## 2026-09-18 A HOD approves KPIs, but only in a department they head
+
+**Decision.** `role_enum.HOD` joins `KPI_APPROVER_ROLES`. MD, EA and PA keep
+approving across the company. A HOD's approval reach is checked separately, in
+`KpiService.isApproverFor`, against the department scope `hod_departments`
+already gives them: approve, finalize, lock, cancel, edit a draft, change
+contributions, or revise a target, all only on a KPI whose `department_id` is a
+department that HOD heads.
+
+**Why.** The client asked for it directly: HOD approves within their own
+department, EA and PA approve across every HOD. `KPI_APPROVER_ROLES` alone
+cannot express "this role, but only for that department" — it is one flat list
+checked with `.includes()` — so the department check lives in the service,
+the same place `assertCanRead` already checks department scope for read
+access.
+
+**Instead of.** Splitting `KPI_APPROVER_ROLES` into an unrestricted list and a
+department-scoped list, which would have meant two lists threaded through
+`transitionRoles`, `assertAuthor` and every caller, for a distinction that is
+really about one role. Also rejected: giving the HOD department check its own
+copy in each of `assertAuthor` and `changeStatus`, which is what
+`isApproverFor` exists to avoid.
+
+**Costs.** None known. This is a pure expansion: a HOD who previously could not
+approve, finalize, lock, cancel, or edit past DRAFT on any KPI now can, within
+their own department. Nothing that could approve before loses the ability to.

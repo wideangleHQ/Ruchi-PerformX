@@ -30,10 +30,14 @@ const SelectContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Popup>
 >(({ className, children, ...props }, ref) => (
   <SelectPrimitive.Portal>
-    <SelectPrimitive.Positioner>
+    {/* z-index has to live here: this is the positioned element (the Popup
+        below is position: static and cannot establish a stacking level), and
+        without it the popup paints behind any ancestor that opens its own
+        stacking context, such as a fixed z-40 sheet overlay. */}
+    <SelectPrimitive.Positioner className="z-50">
       <SelectPrimitive.Popup
         ref={ref}
-        className={cn("z-50 min-w-[8rem] rounded-lg border bg-background shadow-md", className)}
+        className={cn("min-w-[8rem] rounded-lg border bg-background shadow-md", className)}
         {...props}
       >
         <SelectPrimitive.List className="p-1">{children}</SelectPrimitive.List>

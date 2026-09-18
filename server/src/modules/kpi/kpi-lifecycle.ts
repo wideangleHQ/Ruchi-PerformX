@@ -23,13 +23,20 @@ export const KPI_AUTHOR_ROLES: role_enum[] = [
   role_enum.HOD,
 ];
 
-/** Roles that approve, finalize, lock, and cancel. The MD office plus the
- * controller: an HOD does not approve the targets they set themselves. */
+/**
+ * Roles that approve, finalize, lock, and cancel.
+ *
+ * MD, EA and PA approve without restriction, matching their unrestricted
+ * department scope everywhere else in PerformX. A HOD approves too, but only
+ * within a department they head — `KpiService` checks that department scope
+ * on every approver-gated move, since this list alone cannot express it.
+ */
 export const KPI_APPROVER_ROLES: role_enum[] = [
   role_enum.MD,
   role_enum.EA,
   role_enum.PA,
   role_enum.DEPARTMENT_CONTROLLER,
+  role_enum.HOD,
 ];
 
 const AUTHOR = KPI_AUTHOR_ROLES;

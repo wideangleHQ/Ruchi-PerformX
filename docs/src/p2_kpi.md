@@ -142,9 +142,16 @@ Two moves happen without the endpoint: entering the first actual, or ticking the
 first milestone, moves an `ACTIVE` KPI to `IN_PROGRESS`, because that is what In
 Progress means and nobody should have to remember to say so.
 
-An HOD creates and submits; the MD office and the Department Controller approve,
-finalize, lock and cancel. An HOD does not approve the target they set
-themselves.
+An HOD, EA, PA, the Department Controller and the MD office can all author and
+submit a KPI. The same set approves, finalizes, locks and cancels — `KPI_APPROVER_ROLES`
+in `kpi-lifecycle.ts` — but not with the same reach. MD, EA and PA approve
+across the company, matching their unrestricted department scope everywhere
+else in PerformX. A HOD approves too, but only within a department they head:
+`KpiService.isApproverFor` checks that department scope on every
+approver-gated move and on a draft edit, a contribution change, or a revision,
+since the role list alone cannot express "this HOD, that department." A HOD
+outside the KPI's department gets the same `ForbiddenException` an ordinary
+author would.
 
 ## Changing an approved target
 
