@@ -15,6 +15,7 @@ import {
   useProjectOutcomes,
   useProjectRoom,
   useProjectSuccessCriteria,
+  usePostProjectMessage,
   useUpdateProject,
 } from '@/hooks/useProjects';
 import { ProjectSummaryHeader } from '@/components/projects/ProjectSummaryHeader';
@@ -76,6 +77,7 @@ export default function ProjectDetailPage() {
   const { data: activity = [], isLoading: activityLoading } = useProjectActivity(projectId, panel === 'activity');
 
   const updateProject = useUpdateProject(projectId);
+  const postMessage = usePostProjectMessage(projectId);
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-12 text-gray-600">Loading project...</div>;
@@ -203,8 +205,9 @@ export default function ProjectDetailPage() {
 
       {panel === 'messages' && (
         <MessagesPanel
-          projectId={projectId}
           messages={messages}
+          onSend={(content) => postMessage.mutateAsync(content)}
+          isSending={postMessage.isPending}
           isLoading={messagesLoading}
           canParticipate={canParticipate}
         />

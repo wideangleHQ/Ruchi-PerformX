@@ -5,10 +5,12 @@ import { AlertTriangle, Plus, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
 import { CreateKpiPayload } from '@/api/kpi';
-import { useCreateKpi, useKpis, useMyPsScore } from '@/hooks/useKpi';
+import { useApproveKpi, useCreateKpi, useKpis, useMyPsScore } from '@/hooks/useKpi';
 import { KpiDetailSheet } from '@/components/kpi/kpi-detail-sheet';
 import { KpiFormDialog } from '@/components/kpi/kpi-form-dialog';
+import { KpiScoreTab } from '@/components/kpi/kpi-score-tab';
 import {
+  AUTHORITY_ROLES,
   MODE_LABELS,
   formatNumber,
   formatPercent,
@@ -18,7 +20,15 @@ import {
   statusTone,
 } from '@/components/kpi/display';
 
-const AUTHOR_ROLES = ['MD', 'EA', 'PA', 'DEPARTMENT_CONTROLLER', 'HOD'];
+type Tab = 'own' | 'others' | 'score';
+
+const TABS: [Tab, string][] = [
+  ['own', 'View your KPI'],
+  ['others', 'View others KPI'],
+  ['score', 'View score'],
+];
+
+const PAGE_SIZE = 20;
 
 function errorMessage(error: unknown) {
   const response = (error as { response?: { data?: { message?: string | string[] } } })
@@ -35,14 +45,29 @@ function errorMessage(error: unknown) {
  * score. An employee can complete every task on time and still miss the target
  * their role exists to hit, and one blended number would hide which of the two
  * is the problem.
+ *
+ * MD, EA, PA, HOD, and Department Controller get three tabs: their own KPIs,
+ * everyone else's they may see, and the PS Score search. Everyone else gets the
+ * list of KPIs they can see, with no tabs, because they have nobody else's to
+ * look at and no new score access.
  */
 export function KpiClient() {
   const { user } = useAuth();
-  const canAuthor = !!user && AUTHOR_ROLES.includes(user.role);
+  const isAuthority = !!user && AUTHORITY_ROLES.includes(user.role);
 
+  const [tab, setTab] = useState<Tab>('own');
+  const [page, setPage] = useState(1);
   const { data: psScore } = useMyPsScore();
-  const { data: kpis = [], isLoading } = useKpis({});
+  const { data: kpiPage, isLoading } = useKpis({
+    ...(isAuthority && tab !== 'score' && { view: tab }),
+    page,
+    limit: PAGE_SIZE,
+  });
+  const kpis = kpiPage?.items ?? [];
+  const pages = kpiPage ? Math.max(1, Math.ceil(kpiPage.total / kpiPage.limit)) : 1;
   const createKpi = useCreateKpi();
+  const approve = useApproveKpi();
+  const [listError, setListError] = useState<string | null>(null);
 
   const [formOpen, setFormOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -74,9 +99,9 @@ export function KpiClient() {
             Separate from the Action Tracker score, on purpose.
           </p>
         </div>
-        {canAuthor ? (
+        {user ? (
           <Button type="button" onClick={() => setFormOpen(true)}>
-            <Plus size={16} /> Define a KPI
+            <Plus size={16} /> {isAuthority ? 'Define or assign a KPI' : 'Define your KPI'}
           </Button>
         ) : null}
       </header>
@@ -136,7 +161,7 @@ export function KpiClient() {
                         <span className="text-slate-800">{line.name}</span>
                         {!line.counted ? (
                           <span className="ml-2 text-xs text-slate-400">
-                            {line.status === 'CANCELLED' ? 'cancelled' : 'not measured'}
+                            {line.status === 'DELETED' ? 'deleted' : 'not measured'}
                           </span>
                         ) : null}
                       </td>
@@ -176,58 +201,146 @@ export function KpiClient() {
         </section>
       ) : null}
 
-      <section className="rounded-2xl border border-slate-200 bg-white">
-        <div className="border-b border-slate-200 px-5 py-3">
-          <h2 className="text-sm font-semibold text-slate-900">All KPIs you can see</h2>
-        </div>
+      {isAuthority ? (
+        <nav className="flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1">
+          {TABS.map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => {
+                setTab(key);
+                setPage(1);
+              }}
+              className={`rounded-lg px-4 py-2 text-sm font-medium ${
+                tab === key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+      ) : null}
 
-        {isLoading ? (
-          <p className="p-5 text-sm text-slate-500">Loading KPIs...</p>
-        ) : kpis.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 p-10 text-center">
-            <Target size={28} className="text-slate-300" />
-            <p className="text-sm text-slate-500">
-              No KPIs yet. A HOD defines them and the MD office approves them.
-            </p>
+      {isAuthority && tab === 'score' ? (
+        <KpiScoreTab />
+      ) : (
+        <section className="rounded-2xl border border-slate-200 bg-white">
+          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+            <h2 className="text-sm font-semibold text-slate-900">
+              {!isAuthority
+                ? 'KPIs you can see'
+                : tab === 'own'
+                  ? 'Your KPIs'
+                  : 'Other people’s KPIs you can see'}
+            </h2>
+            {kpiPage ? (
+              <span className="text-xs text-slate-500">{kpiPage.total} in all</span>
+            ) : null}
           </div>
-        ) : (
-          <ul className="divide-y divide-slate-100">
-            {kpis.map((kpi) => (
-              <li key={kpi.id}>
-                <button
-                  type="button"
-                  onClick={() => setOpenKpiId(kpi.id)}
-                  className="flex w-full flex-wrap items-center gap-3 px-5 py-3 text-left hover:bg-slate-50"
-                >
-                  <span className="flex-1 text-sm font-medium text-slate-800">
-                    {kpi.name}
-                  </span>
-                  <span className="text-xs text-slate-500">
-                    {kpi.owner_user_id_user?.full_name ?? kpi.scope.toLowerCase()}
-                  </span>
-                  <span className="text-xs text-slate-500">{MODE_LABELS[kpi.mode]}</span>
-                  <span className="text-xs text-slate-500">
-                    {formatNumber(kpi.weight)}%
-                  </span>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs ${statusTone(kpi.status)}`}
-                  >
-                    {statusLabel(kpi.status)}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
 
-      <KpiFormDialog
-        open={formOpen}
-        onClose={() => setFormOpen(false)}
-        onSubmit={submit}
-        isPending={createKpi.isPending}
-        error={formError}
-      />
+          {listError ? (
+            <p className="mx-5 mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+              {listError}
+            </p>
+          ) : null}
+
+          {isLoading ? (
+            <p className="p-5 text-sm text-slate-500">Loading KPIs...</p>
+          ) : kpis.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 p-10 text-center">
+              <Target size={28} className="text-slate-300" />
+              <p className="text-sm text-slate-500">
+                No KPIs here yet. Define one with the button above.
+              </p>
+            </div>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {kpis.map((kpi) => (
+                <li key={kpi.id} className="flex items-center gap-2 pr-3 hover:bg-slate-50">
+                  <button
+                    type="button"
+                    onClick={() => setOpenKpiId(kpi.id)}
+                    className="flex flex-1 flex-wrap items-center gap-3 px-5 py-3 text-left"
+                  >
+                    <span className="flex-1 text-sm font-medium text-slate-800">
+                      {kpi.name}
+                    </span>
+                    <span className="text-xs text-slate-500">
+                      {kpi.owner_user_id_user?.full_name ?? kpi.scope.toLowerCase()}
+                    </span>
+                    <span className="text-xs text-slate-500">{MODE_LABELS[kpi.mode]}</span>
+                    <span className="text-xs text-slate-500">
+                      {formatNumber(kpi.weight)}%
+                    </span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs ${statusTone(kpi.status)}`}
+                    >
+                      {statusLabel(kpi.status)}
+                    </span>
+                  </button>
+                  {isAuthority &&
+                  kpi.status === 'PENDING_APPROVAL' &&
+                  kpi.owner_user_id !== user?.id ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={approve.isPending}
+                      onClick={async () => {
+                        setListError(null);
+                        try {
+                          await approve.mutateAsync(kpi.id);
+                        } catch (caught) {
+                          setListError(errorMessage(caught));
+                        }
+                      }}
+                    >
+                      Quick approve
+                    </Button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {pages > 1 ? (
+            <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-3 text-sm">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={page <= 1}
+                onClick={() => setPage(page - 1)}
+              >
+                Previous
+              </Button>
+              <span className="text-slate-500">
+                Page {page} of {pages}
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={page >= pages}
+                onClick={() => setPage(page + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          ) : null}
+        </section>
+      )}
+
+      {user ? (
+        <KpiFormDialog
+          open={formOpen}
+          onClose={() => setFormOpen(false)}
+          onSubmit={submit}
+          isPending={createKpi.isPending}
+          error={formError}
+          selfId={user.id}
+          canAssign={isAuthority}
+        />
+      ) : null}
 
       {openKpiId ? (
         <KpiDetailSheet id={openKpiId} onClose={() => setOpenKpiId(null)} />

@@ -15,17 +15,9 @@ export type KpiDirection = 'HIGHER_IS_BETTER' | 'LOWER_IS_BETTER' | 'EXACT_TARGE
 export type KpiScoringMethod = 'DIRECT' | 'THRESHOLD' | 'RATING' | 'MILESTONE';
 export type KpiPeriod = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
 
-export type KpiStatus =
-  | 'DRAFT'
-  | 'PENDING_APPROVAL'
-  | 'APPROVED'
-  | 'ACTIVE'
-  | 'IN_PROGRESS'
-  | 'PENDING_REVIEW'
-  | 'EVALUATED'
-  | 'FINALIZED'
-  | 'LOCKED'
-  | 'CANCELLED';
+/** The four statuses of the approved KPI specification. An authority's KPI is
+ * published on submit; an employee's waits for a quick approve. */
+export type KpiStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'PUBLISHED' | 'DELETED';
 
 /** Phase 2 tables carry plain FK columns, so the server resolves them with
  * `attachUsers` and returns a sibling `<column>_user` property. */
@@ -80,6 +72,8 @@ export interface Kpi {
   evidence_required: boolean;
   review_required: boolean;
   status: KpiStatus;
+  /** The ten-state status a row held before the four-status change, if any. */
+  legacy_status: string | null;
   created_by_id: string;
   approved_by_id: string | null;
   approved_at: string | null;
@@ -182,6 +176,9 @@ export interface PsScore {
 }
 
 export interface KpiFilters {
+  view?: 'own' | 'others';
+  page?: number;
+  limit?: number;
   scope?: KpiScope;
   status?: KpiStatus;
   owner_user_id?: string;
@@ -224,14 +221,84 @@ export interface CreateKpiPayload {
   review_required?: boolean;
   milestones?: KpiMilestonePayload[];
   contributions?: KpiContributionPayload[];
+  save_as_draft?: boolean;
+}
+
+export interface Page<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface KpiAllocation {
+  user_id: string;
+  permitted: number;
+  allocated: number;
+  remaining: number;
+  kpis: { id: string; name: string; weight: number; status: KpiStatus }[];
+}
+
+export interface KpiMessage {
+  id: string;
+  kpi_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  user_id_user?: KpiUser | null;
+}
+
+/** One `performance_scores` row as the View Score tab shows it. The numbers are
+ * read, never computed, on the client. */
+export interface ScoreRow {
+  id: string;
+  user: { id: string; full_name: string; username: string; email: string; role: string };
+  department: { id: string; name: string } | null;
+  month: number;
+  year: number;
+  final_score: number | null;
+  self_productivity_score: number | null;
+  assigned_task_score: number | null;
+  self_actions_completed: number | null;
+  self_actions_total: number | null;
+  assigned_tasks_completed: number | null;
+  assigned_tasks_total: number | null;
+  overdue_tasks_count: number | null;
+  is_finalized: boolean;
+}
+
+export interface ScorePage extends Page<ScoreRow> {
+  departments: { id: string; name: string }[];
+}
+
+export interface ScoreFilters {
+  q?: string;
+  department_id?: string;
+  user_id?: string;
+  month?: number;
+  year?: number;
+  page?: number;
+  limit?: number;
 }
 
 export type UpdateKpiPayload = Partial<
   Omit<
     CreateKpiPayload,
-    'scope' | 'mode' | 'owner_user_id' | 'department_id' | 'project_id' | 'scoring_method' | 'milestones' | 'contributions'
+    | 'scope'
+    | 'mode'
+    | 'owner_user_id'
+    | 'department_id'
+    | 'project_id'
+    | 'scoring_method'
+    | 'milestones'
+    | 'contributions'
+    | 'save_as_draft'
   >
 >;
+
+export interface CreateKpiMessagePayload {
+  content: string;
+}
 
 export interface ChangeKpiStatusPayload {
   status: KpiStatus;
@@ -279,9 +346,12 @@ export const kpiApi = {
     return response.data;
   },
 
-  getKpis: async (filters: KpiFilters): Promise<Kpi[]> => {
-    const response = await axiosClient.get<Kpi[]>('/kpis', {
+  getKpis: async (filters: KpiFilters): Promise<Page<Kpi>> => {
+    const response = await axiosClient.get<Page<Kpi>>('/kpis', {
       params: {
+        view: filters.view,
+        page: filters.page,
+        limit: filters.limit,
         scope: filters.scope,
         status: filters.status,
         owner_user_id: filters.owner_user_id,
@@ -296,6 +366,50 @@ export const kpiApi = {
 
   getKpi: async (id: string): Promise<KpiDetail> => {
     const response = await axiosClient.get<KpiDetail>(`/kpis/${id}`);
+    return response.data;
+  },
+
+  /** GET /kpis/allocation/:userId - taken and remaining weight in a period. */
+  getAllocation: async (
+    userId: string,
+    periodStart: string,
+    periodEnd: string,
+  ): Promise<KpiAllocation> => {
+    const response = await axiosClient.get<KpiAllocation>(`/kpis/allocation/${userId}`, {
+      params: { period_start: periodStart, period_end: periodEnd },
+    });
+    return response.data;
+  },
+
+  /** GET /kpis/scores - existing PS Score rows within the caller's scope. */
+  searchScores: async (filters: ScoreFilters): Promise<ScorePage> => {
+    const response = await axiosClient.get<ScorePage>('/kpis/scores', {
+      params: {
+        q: filters.q || undefined,
+        department_id: filters.department_id || undefined,
+        user_id: filters.user_id || undefined,
+        month: filters.month,
+        year: filters.year,
+        page: filters.page,
+        limit: filters.limit,
+      },
+    });
+    return response.data;
+  },
+
+  /** POST /kpis/:id/approve - quick approve, PENDING_APPROVAL to PUBLISHED. */
+  approveKpi: async (id: string): Promise<Kpi> => {
+    const response = await axiosClient.post<Kpi>(`/kpis/${id}/approve`);
+    return response.data;
+  },
+
+  getMessages: async (id: string): Promise<KpiMessage[]> => {
+    const response = await axiosClient.get<KpiMessage[]>(`/kpis/${id}/chat`);
+    return response.data;
+  },
+
+  postMessage: async (id: string, payload: CreateKpiMessagePayload): Promise<KpiMessage> => {
+    const response = await axiosClient.post<KpiMessage>(`/kpis/${id}/chat`, payload);
     return response.data;
   },
 

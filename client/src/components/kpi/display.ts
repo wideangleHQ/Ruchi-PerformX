@@ -9,14 +9,8 @@ import { KpiMode, KpiStatus } from '@/api/kpi';
 const TONES: Record<KpiStatus, string> = {
   DRAFT: 'bg-slate-100 text-slate-700',
   PENDING_APPROVAL: 'bg-amber-100 text-amber-800',
-  APPROVED: 'bg-sky-100 text-sky-800',
-  ACTIVE: 'bg-emerald-100 text-emerald-800',
-  IN_PROGRESS: 'bg-emerald-100 text-emerald-800',
-  PENDING_REVIEW: 'bg-violet-100 text-violet-800',
-  EVALUATED: 'bg-indigo-100 text-indigo-800',
-  FINALIZED: 'bg-blue-100 text-blue-800',
-  LOCKED: 'bg-slate-200 text-slate-800',
-  CANCELLED: 'bg-rose-100 text-rose-800',
+  PUBLISHED: 'bg-emerald-100 text-emerald-800',
+  DELETED: 'bg-rose-100 text-rose-800',
 };
 
 export function statusTone(status: KpiStatus): string {
@@ -68,21 +62,6 @@ export function scoreBand(score: number): { label: string; tone: string } {
   return { label: 'Improvement required', tone: 'text-rose-600' };
 }
 
-/**
- * The moves offered on the detail panel, mirroring the server's transition
- * table. The server decides what is legal and who may do it; this only decides
- * which buttons are worth drawing, so a stale entry here is a missing button
- * rather than a wrong outcome.
- */
-export const NEXT_STATUSES: Record<KpiStatus, KpiStatus[]> = {
-  DRAFT: ['PENDING_APPROVAL', 'CANCELLED'],
-  PENDING_APPROVAL: ['APPROVED', 'DRAFT', 'CANCELLED'],
-  APPROVED: ['ACTIVE', 'CANCELLED'],
-  ACTIVE: ['PENDING_REVIEW', 'CANCELLED'],
-  IN_PROGRESS: ['PENDING_REVIEW', 'CANCELLED'],
-  PENDING_REVIEW: ['EVALUATED', 'IN_PROGRESS', 'CANCELLED'],
-  EVALUATED: ['FINALIZED', 'PENDING_REVIEW', 'CANCELLED'],
-  FINALIZED: ['LOCKED', 'EVALUATED', 'CANCELLED'],
-  LOCKED: [],
-  CANCELLED: [],
-};
+/** Roles that publish their own KPIs, assign to others, and quick approve.
+ * Mirrors `KPI_AUTHORITY_ROLES` on the server, which is what actually decides. */
+export const AUTHORITY_ROLES = ['MD', 'EA', 'PA', 'HOD', 'DEPARTMENT_CONTROLLER'];

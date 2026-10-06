@@ -7,6 +7,7 @@ import {
   CreateKpiRevisionPayload,
   KpiFilters,
   RecordKpiUpdatePayload,
+  ScoreFilters,
   SetKpiContributionsPayload,
   UpdateKpiPayload,
   kpiApi,
@@ -26,6 +27,46 @@ export const useKpis = (filters: KpiFilters = {}) =>
     queryKey: ['kpi', 'list', filters],
     queryFn: () => kpiApi.getKpis(filters),
   });
+
+export const useKpiAllocation = (
+  userId: string | null,
+  periodStart: string,
+  periodEnd: string,
+) =>
+  useQuery({
+    queryKey: ['kpi', 'allocation', userId, periodStart, periodEnd],
+    queryFn: () => kpiApi.getAllocation(userId as string, periodStart, periodEnd),
+    enabled: Boolean(userId && periodStart && periodEnd),
+  });
+
+export const useKpiScores = (filters: ScoreFilters, enabled = true) =>
+  useQuery({
+    queryKey: ['kpi', 'scores', filters],
+    queryFn: () => kpiApi.searchScores(filters),
+    enabled,
+  });
+
+export const useKpiMessages = (id: string) =>
+  useQuery({
+    queryKey: ['kpi', 'chat', id],
+    queryFn: () => kpiApi.getMessages(id),
+  });
+
+export const usePostKpiMessage = (id: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (content: string) => kpiApi.postMessage(id, { content }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['kpi', 'chat', id] }),
+  });
+};
+
+export const useApproveKpi = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => kpiApi.approveKpi(id),
+    onSuccess: () => invalidate(queryClient),
+  });
+};
 
 export const useKpi = (id: string | null) =>
   useQuery({

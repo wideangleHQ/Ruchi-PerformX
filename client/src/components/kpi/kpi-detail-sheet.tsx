@@ -1,26 +1,26 @@
 'use client';
 
 import { useState } from 'react';
-import { CheckCircle2, Circle, History, X } from 'lucide-react';
+import { CheckCircle2, Circle, History, MessageSquare, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useAuth } from '@/context/AuthContext';
+import { CreateKpiPayload, KpiStatus, RecordKpiUpdatePayload, UpdateKpiPayload } from '@/api/kpi';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { KpiStatus, RecordKpiUpdatePayload } from '@/api/kpi';
-import {
+  useApproveKpi,
   useChangeKpiStatus,
   useKpi,
+  useKpiMessages,
+  usePostKpiMessage,
   useRecordKpiUpdate,
   useTickKpiMilestone,
+  useUpdateKpi,
 } from '@/hooks/useKpi';
+import { MessagesPanel } from '@/components/projects/MessagesPanel';
+import { KpiFormDialog } from '@/components/kpi/kpi-form-dialog';
 import {
+  AUTHORITY_ROLES,
   MODE_LABELS,
-  NEXT_STATUSES,
   formatNumber,
   formatPercent,
   formatValue,
@@ -43,20 +43,42 @@ function errorMessage(error: unknown) {
  * because they are separate: the same 80% achievement is 80 under a direct rule
  * and can be 100 under a threshold, and an employee asking why deserves to see
  * both halves.
+ *
+ * The buttons in the footer are the ones the caller's relation to the KPI makes
+ * worth drawing. The server decides what is actually allowed, including the
+ * department reach of a HOD, so a button here that the server refuses shows
+ * its message rather than doing anything.
  */
 export function KpiDetailSheet({ id, onClose }: { id: string; onClose: () => void }) {
+  const { user } = useAuth();
   const { data: kpi, isLoading } = useKpi(id);
   const recordUpdate = useRecordKpiUpdate();
   const tickMilestone = useTickKpiMilestone();
   const changeStatus = useChangeKpiStatus();
+  const approve = useApproveKpi();
+  const updateKpi = useUpdateKpi();
+  const [view, setView] = useState<'details' | 'chat'>('details');
+  const { data: messages = [], isLoading: messagesLoading } = useKpiMessages(id);
+  const postMessage = usePostKpiMessage(id);
 
   const [actual, setActual] = useState('');
   const [remarks, setRemarks] = useState('');
   const [evidence, setEvidence] = useState('');
   const [rating, setRating] = useState('');
-  const [cancelReason, setCancelReason] = useState('');
-  const [pendingStatus, setPendingStatus] = useState<KpiStatus | null>(null);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const isAuthority = !!user && AUTHORITY_ROLES.includes(user.role);
+  const isCreator = !!kpi && kpi.created_by_id === user?.id;
+  const isOwner = !!kpi && kpi.owner_user_id === user?.id;
+  const live = !!kpi && kpi.status !== 'DELETED';
+  const canEdit = live && (isCreator || isAuthority);
+  const canSubmit = kpi?.status === 'DRAFT' && isCreator;
+  const canApprove = kpi?.status === 'PENDING_APPROVAL' && isAuthority && !isOwner;
+  const canSendBack = kpi?.status === 'PENDING_APPROVAL' && (isAuthority || isCreator);
+  const canDelete = live && (isAuthority || (isCreator && kpi.status !== 'PUBLISHED'));
 
   const submitUpdate = async (payload: RecordKpiUpdatePayload) => {
     setError(null);
@@ -78,25 +100,42 @@ export function KpiDetailSheet({ id, onClose }: { id: string; onClose: () => voi
     }
   };
 
-  const move = async (status: KpiStatus) => {
+  const run = async (action: () => Promise<unknown>) => {
     setError(null);
-    if (status === 'CANCELLED' && !cancelReason.trim()) {
-      setPendingStatus('CANCELLED');
-      return;
-    }
     try {
-      await changeStatus.mutateAsync({
-        id,
-        data: {
-          status,
-          ...(status === 'CANCELLED' && { reason: cancelReason.trim() }),
-        },
-      });
-      setCancelReason('');
-      setPendingStatus(null);
+      await action();
+      return true;
     } catch (caught) {
       setError(errorMessage(caught));
+      return false;
     }
+  };
+
+  const move = (status: KpiStatus, reason?: string) =>
+    run(() => changeStatus.mutateAsync({ id, data: { status, ...(reason && { reason }) } }));
+
+  const remove = async () => {
+    if (await move('DELETED', deleteReason.trim())) {
+      setDeleteReason('');
+      setConfirmingDelete(false);
+    }
+  };
+
+  const saveEdit = async (payload: CreateKpiPayload) => {
+    const {
+      scope: _scope,
+      mode: _mode,
+      owner_user_id: _owner,
+      department_id: _department,
+      project_id: _project,
+      scoring_method: _method,
+      milestones: _milestones,
+      contributions: _contributions,
+      save_as_draft: _draft,
+      ...data
+    } = payload;
+    const changes: UpdateKpiPayload = data;
+    if (await run(() => updateKpi.mutateAsync({ id, data: changes }))) setEditing(false);
   };
 
   return (
@@ -120,13 +159,23 @@ export function KpiDetailSheet({ id, onClose }: { id: string; onClose: () => voi
               </div>
             ) : null}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              size="sm"
+              variant={view === 'chat' ? 'default' : 'outline'}
+              onClick={() => setView(view === 'chat' ? 'details' : 'chat')}
+            >
+              <MessageSquare size={14} /> {view === 'chat' ? 'Details' : 'Chat'}
+            </Button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 space-y-5 overflow-y-auto p-5">
@@ -134,7 +183,17 @@ export function KpiDetailSheet({ id, onClose }: { id: string; onClose: () => voi
             <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
           ) : null}
 
-          {isLoading || !kpi ? (
+          {view === 'chat' ? (
+            <MessagesPanel
+              messages={messages}
+              isLoading={messagesLoading}
+              canParticipate={live}
+              onSend={(content) => run(() => postMessage.mutateAsync(content))}
+              isSending={postMessage.isPending}
+              placeholder="Write about this KPI"
+              readOnlyNote="This KPI is deleted. Its chat is kept as history."
+            />
+          ) : isLoading || !kpi ? (
             <p className="text-sm text-slate-500">Loading the KPI...</p>
           ) : (
             <>
@@ -155,10 +214,17 @@ export function KpiDetailSheet({ id, onClose }: { id: string; onClose: () => voi
                 />
               </div>
 
-              {kpi.cancel_reason ? (
+              {kpi.status === 'DELETED' && kpi.cancel_reason ? (
                 <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                  Cancelled: {kpi.cancel_reason}. It is excluded from the PS Score
+                  Deleted: {kpi.cancel_reason}. It is excluded from the PS Score
                   rather than counted as a failure.
+                </p>
+              ) : null}
+
+              {kpi.status === 'PENDING_APPROVAL' ? (
+                <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  Waiting for approval. It does not count towards a PS Score or take
+                  updates until it is published.
                 </p>
               ) : null}
 
@@ -355,63 +421,102 @@ export function KpiDetailSheet({ id, onClose }: { id: string; onClose: () => voi
           )}
         </div>
 
-        {kpi && NEXT_STATUSES[kpi.status].length > 0 ? (
+        {kpi && (canEdit || canSubmit || canApprove || canSendBack || canDelete) ? (
           <div className="space-y-2 border-t border-slate-200 px-5 py-4">
-            {pendingStatus === 'CANCELLED' ? (
+            {confirmingDelete ? (
               <div className="flex items-center gap-2">
                 <Input
-                  placeholder="Why is this KPI being cancelled?"
-                  value={cancelReason}
-                  onChange={(event) => setCancelReason(event.target.value)}
+                  placeholder="Why is this KPI being deleted?"
+                  value={deleteReason}
+                  onChange={(event) => setDeleteReason(event.target.value)}
                   autoFocus
                 />
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
-                  disabled={!cancelReason.trim() || changeStatus.isPending}
-                  onClick={() => move('CANCELLED')}
+                  disabled={!deleteReason.trim() || changeStatus.isPending}
+                  onClick={remove}
                 >
-                  Confirm
+                  Delete
                 </Button>
                 <Button
                   type="button"
                   size="sm"
                   variant="ghost"
                   onClick={() => {
-                    setPendingStatus(null);
-                    setCancelReason('');
+                    setConfirmingDelete(false);
+                    setDeleteReason('');
                   }}
                 >
                   Back
                 </Button>
               </div>
             ) : (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-600">Move to</span>
-                <div className="w-48">
-                  <Select
-                    value={null}
-                    onValueChange={(status) => {
-                      if (status) move(status as KpiStatus);
-                    }}
-                    disabled={changeStatus.isPending}
+              <div className="flex flex-wrap gap-2">
+                {canApprove ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={approve.isPending}
+                    onClick={() => run(() => approve.mutateAsync(id))}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose a status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {NEXT_STATUSES[kpi.status].map((status) => (
-                        <SelectItem key={status} value={status}>
-                          {statusLabel(status)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                    Quick approve
+                  </Button>
+                ) : null}
+                {canSubmit ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={changeStatus.isPending}
+                    onClick={() => move(isAuthority ? 'PUBLISHED' : 'PENDING_APPROVAL')}
+                  >
+                    {isAuthority ? 'Publish' : 'Submit for approval'}
+                  </Button>
+                ) : null}
+                {canSendBack ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={changeStatus.isPending}
+                    onClick={() => move('DRAFT')}
+                  >
+                    {isCreator && !canApprove ? 'Withdraw to draft' : 'Send back'}
+                  </Button>
+                ) : null}
+                {canEdit ? (
+                  <Button type="button" size="sm" variant="outline" onClick={() => setEditing(true)}>
+                    Edit
+                  </Button>
+                ) : null}
+                {canDelete ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="text-rose-700"
+                    onClick={() => setConfirmingDelete(true)}
+                  >
+                    Delete
+                  </Button>
+                ) : null}
               </div>
             )}
           </div>
+        ) : null}
+
+        {kpi && user ? (
+          <KpiFormDialog
+            open={editing}
+            onClose={() => setEditing(false)}
+            onSubmit={saveEdit}
+            isPending={updateKpi.isPending}
+            error={error}
+            selfId={user.id}
+            canAssign={isAuthority}
+            initial={kpi}
+          />
         ) : null}
       </aside>
     </div>

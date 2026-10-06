@@ -1,30 +1,47 @@
 'use client';
 
 import { useState } from 'react';
-import type { ProjectMessage } from '@/api/projects';
-import { usePostProjectMessage } from '@/hooks/useProjects';
 import { Button } from '@/components/ui/button';
-import { fmtDateTime, userName } from '@/components/projects/ProjectMeta';
+import { fmtDateTime } from '@/components/projects/ProjectMeta';
 
-/** Conversation. The audit trail lives in the activity log and stays separate. */
+/** The fields the thread reads. A project message and a KPI message both have
+ * them, which is why the KPI chat reuses this panel rather than copying it. */
+export interface ThreadMessage {
+  id: string;
+  content: string;
+  created_at: string;
+  user_id_user?: { full_name?: string | null } | null;
+}
+
+/**
+ * Conversation. The audit trail lives in the activity log and stays separate.
+ *
+ * The thread does not know what it belongs to: the caller hands it the
+ * messages and a `onSend` that posts to the right place.
+ */
 export function MessagesPanel({
-  projectId,
   messages,
   isLoading,
   canParticipate,
+  onSend,
+  isSending,
+  placeholder = 'Write a message to the project team',
+  readOnlyNote = 'Observers can read the thread but cannot post.',
 }: {
-  projectId: string;
-  messages: ProjectMessage[];
+  messages: ThreadMessage[];
   isLoading?: boolean;
   canParticipate: boolean;
+  onSend: (content: string) => Promise<unknown>;
+  isSending?: boolean;
+  placeholder?: string;
+  readOnlyNote?: string;
 }) {
   const [content, setContent] = useState('');
-  const postMessage = usePostProjectMessage(projectId);
 
   const send = async () => {
     const value = content.trim();
     if (!value) return;
-    await postMessage.mutateAsync(value);
+    await onSend(value);
     setContent('');
   };
 
@@ -40,21 +57,21 @@ export function MessagesPanel({
             value={content}
             onChange={(event) => setContent(event.target.value)}
             rows={3}
-            placeholder="Write a message to the project team"
+            placeholder={placeholder}
             className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
           />
           <div className="mt-3 flex justify-end">
             <Button
               onClick={send}
-              disabled={!content.trim() || postMessage.isPending}
+              disabled={!content.trim() || isSending}
               className="bg-green-600 hover:bg-green-700"
             >
-              {postMessage.isPending ? 'Sending...' : 'Send'}
+              {isSending ? 'Sending...' : 'Send'}
             </Button>
           </div>
         </div>
       ) : (
-        <p className="text-sm text-gray-500">Observers can read the thread but cannot post.</p>
+        <p className="text-sm text-gray-500">{readOnlyNote}</p>
       )}
 
       {messages.length === 0 ? (
@@ -66,7 +83,7 @@ export function MessagesPanel({
           {messages.map((message) => (
             <div key={message.id} className="px-4 py-3">
               <div className="flex items-center justify-between gap-3">
-                <span className="text-sm font-medium text-gray-900">{userName(message.user_id_user)}</span>
+                <span className="text-sm font-medium text-gray-900">{message.user_id_user?.full_name ?? 'Unknown'}</span>
                 <span className="text-xs text-gray-500">{fmtDateTime(message.created_at)}</span>
               </div>
               <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">{message.content}</p>
