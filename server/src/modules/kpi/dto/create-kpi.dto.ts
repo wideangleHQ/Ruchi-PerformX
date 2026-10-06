@@ -105,7 +105,13 @@ export class KpiContributionDto {
 }
 
 /**
- * Body of `POST /kpis`. The KPI lands in DRAFT; nothing here sets a status.
+ * Body of `POST /kpis`. The status is never sent: the server derives it from
+ * the caller's role. An authority's KPI lands in PUBLISHED, anyone else's in
+ * PENDING_APPROVAL, and either lands in DRAFT when `save_as_draft` is set.
+ *
+ * Creating an INDIVIDUAL KPI for somebody else is how an authority assigns one,
+ * and is checked against the caller's department reach and the owner's
+ * remaining allocation.
  *
  * The fields that are optional at this level are the ones a mode does not use:
  * a BINARY KPI has no unit and no direction, a RATING KPI has no target. The
@@ -116,7 +122,7 @@ export class CreateKpiDto {
   @IsEnum(kpi_scope_enum)
   scope!: kpi_scope_enum;
 
-  /** Required for INDIVIDUAL, rejected otherwise. */
+  /** INDIVIDUAL only, rejected otherwise. Left out, the KPI is the caller's own. */
   @IsOptional()
   @IsUUID()
   owner_user_id?: string;
@@ -196,6 +202,11 @@ export class CreateKpiDto {
   @IsOptional()
   @IsBoolean()
   review_required?: boolean;
+
+  /** Keep it as a draft instead of publishing or submitting it for approval. */
+  @IsOptional()
+  @IsBoolean()
+  save_as_draft?: boolean;
 
   /** Required for MILESTONE, rejected otherwise. Weights must total 100. */
   @IsOptional()

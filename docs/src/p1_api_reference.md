@@ -487,32 +487,59 @@ stored zero. A user with no history at all returns an empty series.
 The outcome half of the performance model. Separate from the scores above and
 never averaged with them. See [KPIs and the PS Score](p2_kpi.md).
 
-`AUTHORS` below means MD, EA, PA, DEPARTMENT_CONTROLLER and HOD. Routes marked
-`internal` are open to every internal role, with the service deciding what comes
-back.
+`AUTHORITIES` below means MD, EA, PA, DEPARTMENT_CONTROLLER and HOD. Routes
+marked `internal` are open to every internal role, with the service deciding
+what comes back. "In reach" means MD, EA and PA anywhere, HOD and Department
+Controller in their own departments.
 
 | Method | Path | Roles |
 | --- | --- | --- |
 | GET | `/kpis/units` | internal |
 | GET | `/kpis/ps-score` | internal, own score only |
-| GET | `/kpis/ps-score/:userId` | AUTHORS, within department scope |
-| POST | `/kpis` | AUTHORS |
+| GET | `/kpis/ps-score/:userId` | AUTHORITIES, within department scope |
+| GET | `/kpis/scores` | AUTHORITIES, within department scope |
+| GET | `/kpis/allocation/:userId` | internal, own or in reach |
+| POST | `/kpis` | internal; anyone else's KPI is AUTHORITIES in reach |
 | GET | `/kpis` | internal |
 | GET | `/kpis/:id` | internal, within department scope |
-| PATCH | `/kpis/:id` | AUTHORS, draft only |
-| PATCH | `/kpis/:id/status` | AUTHORS, narrowed per transition |
+| PATCH | `/kpis/:id` | internal, creator or AUTHORITIES in reach |
+| PATCH | `/kpis/:id/status` | internal, narrowed per move |
+| POST | `/kpis/:id/approve` | AUTHORITIES in reach, never the owner |
+| GET | `/kpis/:id/chat` | internal, whoever may read the KPI |
+| POST | `/kpis/:id/chat` | internal, whoever may read the KPI |
 | POST | `/kpis/:id/updates` | internal, owner or contributor |
 | POST | `/kpis/:id/milestones/:milestoneId/tick` | internal, owner or contributor |
-| PUT | `/kpis/:id/contributions` | AUTHORS |
-| POST | `/kpis/:id/revisions` | AUTHORS |
+| PUT | `/kpis/:id/contributions` | AUTHORITIES, creator or in reach |
+| POST | `/kpis/:id/revisions` | AUTHORITIES, creator or in reach |
 
-`/kpis/units` and `/kpis/ps-score` are declared above `/kpis/:id` in the
-controller, or they would be shadowed by it.
+`/kpis/units`, `/kpis/ps-score`, `/kpis/scores` and `/kpis/allocation` are
+declared above `/kpis/:id` in the controller, or they would be shadowed by it.
 
-`PATCH /kpis/:id/status` is the only way a KPI changes state. `@Roles` lets any
-author reach it and `transitionRoles()` decides the rest, so an HOD can submit a
-KPI and cannot approve it. An illegal move is a 400, a move the caller's role
-may not make is a 403, and a cancellation without a reason is a 400.
+`POST /kpis` never takes a status. An authority's KPI is `PUBLISHED`, anyone
+else's `PENDING_APPROVAL`, and `save_as_draft: true` makes either a `DRAFT`. An
+INDIVIDUAL KPI with no `owner_user_id` is the caller's own; with somebody
+else's id it is an assignment, which is refused (403) outside the caller's
+reach and (400) when the weight does not fit the owner's remaining allocation.
+
+`GET /kpis` takes `view=own` or `view=others`, `page` (default 1) and `limit`
+(default 20, at most 100), and returns `{ items, total, page, limit }`. Every
+filter is ANDed onto the caller's visible set, and `DELETED` KPIs are left out
+unless `status=DELETED` is asked for.
+
+`PATCH /kpis/:id/status` submits a draft (creator only, to the status their
+role earns), sends a pending KPI back to `DRAFT`, or deletes (`reason`
+required). An illegal move is a 400 and a move the caller may not make is a
+403. `POST /kpis/:id/approve` is the quick approve, `PENDING_APPROVAL` to
+`PUBLISHED`.
+
+`GET /kpis/allocation/:userId?period_start=&period_end=` returns `permitted`,
+`allocated`, `remaining` and the KPIs holding the allocation.
+
+`GET /kpis/scores` reads `performance_scores` with `q` (full name, username or
+email), `department_id`, `user_id`, `role`, `month`, `year`, `page` and `limit`.
+It returns `{ items, total, page, limit, departments }`, where `departments` is
+what the caller's department filter may offer. Without `month` and `year` it
+returns every period.
 
 `POST /kpis/:id/updates` takes the actual, not a percentage: `actual_value` for
 a quantitative KPI, `binary_done` for a binary one, `rating` for a rating one,
@@ -521,7 +548,7 @@ the KPI's own owner. Updates are appended; the newest is what scores.
 
 The two PS Score routes accept `month` and `year` and default to the current
 month. Every KPI whose cycle overlaps that month is in scope, so a monthly and
-an annual KPI can be carried at once. A cancelled KPI appears in the response
+an annual KPI can be carried at once. A deleted KPI appears in the response
 marked not counted rather than being hidden.
 
 ## Holidays

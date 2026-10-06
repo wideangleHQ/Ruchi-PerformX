@@ -20,15 +20,14 @@ import {
 import { KpiScoringConfigDto } from './create-kpi.dto';
 
 /**
- * Body of `PATCH /kpis/:id`, accepted while the KPI is still a DRAFT.
+ * Body of `PATCH /kpis/:id`, the definition of a KPI its author or owner may
+ * change while it is not DELETED.
  *
- * `mode`, `scope`, and the owner are absent on purpose. Changing what a KPI
- * measures or whose it is produces a different KPI, and the milestones and
- * contributions already attached would no longer mean anything. Create a new
- * one instead.
- *
- * After approval this endpoint is closed and a target change goes through
- * `POST /kpis/:id/revisions`, which keeps the original.
+ * `mode`, `scope`, the owner, the department, and every approval and audit
+ * column are absent on purpose, and `forbidNonWhitelisted` turns an attempt to
+ * send one into a 400. Changing what a KPI measures or whose it is produces a
+ * different KPI. A target or weight change on a published KPI also writes a
+ * `kpi_revisions` row, so the original survives.
  */
 export class UpdateKpiDto {
   @IsOptional()
@@ -96,10 +95,11 @@ export class UpdateKpiDto {
 }
 
 /**
- * Body of `PATCH /kpis/:id/status`. One endpoint for every lifecycle move,
- * with `kpi-lifecycle.ts` deciding which are legal and who may make them.
+ * Body of `PATCH /kpis/:id/status`. Submitting a draft, sending a pending KPI
+ * back, and deleting, with `kpi-lifecycle.ts` deciding which moves exist. Quick
+ * approve has its own route, `POST /kpis/:id/approve`.
  *
- * `reason` is required for CANCELLED, because a KPI that disappears from a
+ * `reason` is required for DELETED, because a KPI that disappears from a
  * period's PS Score without an explanation is exactly the thing the framework's
  * fairness section is about.
  */

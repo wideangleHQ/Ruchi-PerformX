@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { kpi_status_enum, role_enum } from '@prisma/client';
 
 import { searchUnits } from './kpi-units';
 import {
@@ -12,13 +11,6 @@ import {
   type KpiScoringConfig,
   type PsScoreInput,
 } from './kpi-scoring';
-import {
-  acceptsActual,
-  acceptsReview,
-  isCountable,
-  isSettled,
-  transitionRoles,
-} from './kpi-lifecycle';
 
 /** The worked examples in the framework document, as the tests for the engine
  * that has to reproduce them. */
@@ -252,59 +244,5 @@ describe('searchUnits', () => {
 
   it('returns the library for an empty query rather than nothing', () => {
     expect(searchUnits('').length).toBeGreaterThan(0);
-  });
-});
-
-describe('kpi lifecycle', () => {
-  it('walks the documented path from draft to locked', () => {
-    const path: [kpi_status_enum, kpi_status_enum][] = [
-      ['DRAFT', 'PENDING_APPROVAL'],
-      ['PENDING_APPROVAL', 'APPROVED'],
-      ['APPROVED', 'ACTIVE'],
-      ['ACTIVE', 'IN_PROGRESS'],
-      ['IN_PROGRESS', 'PENDING_REVIEW'],
-      ['PENDING_REVIEW', 'EVALUATED'],
-      ['EVALUATED', 'FINALIZED'],
-      ['FINALIZED', 'LOCKED'],
-    ];
-    for (const [from, to] of path) {
-      expect(transitionRoles(from, to)).not.toBeNull();
-    }
-  });
-
-  it('refuses a move that skips the middle of the cycle', () => {
-    expect(transitionRoles('DRAFT', 'ACTIVE')).toBeNull();
-    expect(transitionRoles('ACTIVE', 'LOCKED')).toBeNull();
-  });
-
-  it('lets nothing out of LOCKED', () => {
-    expect(transitionRoles('LOCKED', 'EVALUATED')).toBeNull();
-    expect(transitionRoles('LOCKED', 'CANCELLED')).toBeNull();
-    expect(isSettled('LOCKED')).toBe(true);
-  });
-
-  it('keeps a HOD out of approving the target they set', () => {
-    expect(transitionRoles('PENDING_APPROVAL', 'APPROVED')).not.toContain(role_enum.HOD);
-    expect(transitionRoles('DRAFT', 'PENDING_APPROVAL')).toContain(role_enum.HOD);
-  });
-
-  it('accepts actuals only while the KPI is running', () => {
-    expect(acceptsActual('ACTIVE')).toBe(true);
-    expect(acceptsActual('IN_PROGRESS')).toBe(true);
-    expect(acceptsActual('PENDING_REVIEW')).toBe(false);
-    expect(acceptsActual('LOCKED')).toBe(false);
-  });
-
-  it('accepts a rating up to the point the KPI is evaluated', () => {
-    expect(acceptsReview('PENDING_REVIEW')).toBe(true);
-    expect(acceptsReview('EVALUATED')).toBe(false);
-  });
-
-  it('keeps drafts and cancellations out of the PS Score', () => {
-    expect(isCountable('DRAFT')).toBe(false);
-    expect(isCountable('PENDING_APPROVAL')).toBe(false);
-    expect(isCountable('CANCELLED')).toBe(false);
-    expect(isCountable('ACTIVE')).toBe(true);
-    expect(isCountable('LOCKED')).toBe(true);
   });
 });

@@ -51,6 +51,7 @@ export const NOTIFICATION_CHANNELS: Record<
   PROJECT_INVITED: ['IN_APP'],
   PROJECT_CHECKLIST_UPDATED: ['IN_APP'],
   PROJECT_MESSAGE: ['IN_APP'],
+  KPI_MESSAGE: ['IN_APP'],
   PROJECT_DEADLINE_NEAR: ['IN_APP'],
   PROJECT_OVERDUE_NO_CLOSURE: ['IN_APP', 'EMAIL'],
   PROJECT_CLOSED: ['IN_APP', 'EMAIL'],
@@ -85,6 +86,7 @@ export type NotifyEntityType =
   | 'transfer'
   | 'leave'
   | 'project'
+  | 'kpi'
   | 'poll'
   | 'visit'
   | 'rnd'

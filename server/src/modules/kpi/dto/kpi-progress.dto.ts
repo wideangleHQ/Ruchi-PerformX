@@ -105,3 +105,11 @@ export class CreateKpiRevisionDto {
   @MaxLength(500)
   reason!: string;
 }
+
+/** A post to one KPI's chat. The author comes from the JWT, never the body. */
+export class CreateKpiMessageDto {
+  @IsString()
+  @IsNotEmpty({ message: 'Message content is required' })
+  @MaxLength(4000)
+  content!: string;
+}

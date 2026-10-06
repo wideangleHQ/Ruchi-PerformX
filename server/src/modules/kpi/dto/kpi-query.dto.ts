@@ -1,6 +1,8 @@
 import { Type } from 'class-transformer';
 import {
+  IsDateString,
   IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -9,13 +11,19 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { kpi_scope_enum, kpi_status_enum } from '@prisma/client';
+import { kpi_scope_enum, kpi_status_enum, role_enum } from '@prisma/client';
 
 /**
  * Query of `GET /kpis`. Every filter is optional; what comes back without one
- * is whatever the caller's department scope allows.
+ * is whatever the caller's department scope allows, minus DELETED KPIs, which
+ * only come back when `status=DELETED` asks for them.
  */
 export class KpiFilterDto {
+  /** `own` is the caller's KPIs, `others` is everyone else's they may see. */
+  @IsOptional()
+  @IsIn(['own', 'others'])
+  view?: 'own' | 'others';
+
   @IsOptional()
   @IsEnum(kpi_scope_enum)
   scope?: kpi_scope_enum;
@@ -50,6 +58,85 @@ export class KpiFilterDto {
   @Min(2020)
   @Max(2100)
   year?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 20;
+}
+
+/**
+ * Query of `GET /kpis/allocation/:userId`: the KPI period the new weight would
+ * sit in. Anything allocating that overlaps it counts.
+ */
+export class AllocationQueryDto {
+  @IsDateString()
+  period_start!: string;
+
+  @IsDateString()
+  period_end!: string;
+}
+
+/**
+ * Query of `GET /kpis/scores`, the View Score tab. It searches the existing
+ * `performance_scores` rows; nothing here computes a score.
+ *
+ * No period means every period. The spec rules out guessing one, so a missing
+ * month is not quietly read as the current one the way `PsScoreQueryDto` does.
+ */
+export class ScoreSearchDto {
+  /** Full name, username, or email, case-insensitive. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  q?: string;
+
+  @IsOptional()
+  @IsUUID()
+  department_id?: string;
+
+  @IsOptional()
+  @IsUUID()
+  user_id?: string;
+
+  @IsOptional()
+  @IsEnum(role_enum)
+  role?: role_enum;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(12)
+  month?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(2020)
+  @Max(2100)
+  year?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 20;
 }
 
 /**

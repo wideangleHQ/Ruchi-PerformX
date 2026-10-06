@@ -1872,3 +1872,86 @@ copy in each of `assertAuthor` and `changeStatus`, which is what
 **Costs.** None known. This is a pure expansion: a HOD who previously could not
 approve, finalize, lock, cancel, or edit past DRAFT on any KPI now can, within
 their own department. Nothing that could approve before loses the ability to.
+
+## 2026-10-06 The KPI lifecycle is four statuses, backfilled rather than dropped
+
+**Decision.** `kpi_status_enum` becomes DRAFT, PENDING_APPROVAL, PUBLISHED and
+DELETED. Approved through Locked map to PUBLISHED, Cancelled maps to DELETED, and
+each moved row keeps its old value in a new `kpis.legacy_status` column.
+**Why.** The approved KPI specification limits the visible lifecycle to those
+four and asks for an explicit backfill rather than silently losing state.
+Approved, Active and the rest all meant "live and counting" in practice, so they
+collapse onto one status without changing a single PS Score.
+**Instead of.** Keeping the ten-value enum and relabelling it in the client,
+which leaves the server free to produce statuses the product no longer has. Also
+rejected: dropping the old values with no record, which the specification rules
+out, and a separate history table, which is more than one nullable column needs.
+**Costs.** The Postgres enum is rebuilt, so the migration rewrites `kpis` once.
+`locked_at` is no longer set by anything and stays only as history.
+`cancelled_at` and `cancel_reason` keep their names while recording a deletion.
+
+## 2026-10-06 KPI status comes from the creator's role, and assignment is a create
+
+**Decision.** `POST /kpis` never takes a status: an authority's KPI is
+PUBLISHED, anyone else's PENDING_APPROVAL, with `save_as_draft` for a DRAFT.
+Assigning a KPI is the same route with somebody else as `owner_user_id`, checked
+by `canActOnDepartment()` and the owner's remaining allocation. Quick approve is
+`POST /kpis/:id/approve`.
+**Why.** The specification makes an authority's own KPI immediately published
+and an employee's pending, and says an authority's must never land in pending
+by accident. Deriving it on the server is the only way that holds.
+**Instead of.** A separate `POST /kpis/:id/assign` that copies or re-owns an
+existing KPI. Re-owning would let an assignment change the owner of a KPI that
+already has updates, which the update rules forbid, and copying would be a
+second create path with the same validation.
+**Costs.** None known. The specification's endpoint names are suggestions, and
+the API reference names the routes that exist.
+
+## 2026-10-06 The KPI weight ceiling is 100 per person per overlapping period
+
+**Decision.** Every PENDING_APPROVAL or PUBLISHED INDIVIDUAL KPI of a person
+whose period overlaps the new one counts against a ceiling of 100. Drafts do
+not count. The check runs for everyone, employees included, on create, on
+submitting a draft, on a weight or period edit, and on a weight revision.
+**Why.** The specification has authorities assign against an employee's
+remaining allocation after the employee's own set. Counting pending KPIs is
+what puts the employee's set first. Applying the ceiling to the employee too
+keeps the remaining figure from going negative, which would make every later
+assignment fail with a confusing number.
+**Instead of.** A database constraint, which the specification rules out and
+which could not see period overlap anyway. Also rejected: counting drafts, which
+would let a forgotten draft block a real assignment.
+**Costs.** A monthly and an annual KPI in the same month share one ceiling,
+which is the conservative reading. Separate ceilings per cycle would be a
+change to `allocatingKpis` alone.
+
+## 2026-10-06 KPI chat is its own table, rendered by the project thread panel
+
+**Decision.** `kpi_messages (kpi_id, user_id, content, created_at)`, guarded by
+the KPI's read check, notifying owner and creator with `KPI_MESSAGE`. The
+client reuses `MessagesPanel`, which now takes an `onSend` instead of a project
+id.
+**Why.** There is no generic `entity_type`/`entity_id` comment table in
+PerformX. Comments are per entity (`task_comments`, `self_action_comments`,
+`project_messages`), and `notifications` is the only table with the generic
+pair. Following the per-entity pattern keeps every thread's authorization next
+to the entity it belongs to.
+**Instead of.** Writing KPI messages into `notifications` or a new generic
+comments table, which would be the second messaging architecture the
+specification asks not to build. Also rejected: a socket room per KPI, since
+the notification push already reaches the two people a message is for.
+**Costs.** Other people reading the open thread see a new message on refetch,
+not instantly. A `kpi:<id>` room in the gateway is the upgrade path.
+
+## 2026-10-06 View Score reads performance_scores within department scope, period optional
+
+**Decision.** `GET /kpis/scores` searches the existing `performance_scores` rows
+for MD, EA, PA, HOD and Department Controller, with the caller's department
+scope ANDed under every filter, and with no default period.
+**Why.** The specification asks for the existing PS Score data with no second
+calculation, server-side pagination, counts that do not leak, and no inferred
+period. ANDing the scope means an out-of-scope filter returns an empty page
+instead of a 403 that would confirm the department or user exists.
+**Instead of.** Defaulting to the current month like `/kpis/ps-score`, which the
+specification rules out for this tab.
+**Costs.** None known.

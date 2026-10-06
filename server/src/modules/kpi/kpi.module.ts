@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { CommonModule } from '../../common/common.module';
 import { AuthModule } from '../auth/auth.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { KpiController } from './kpi.controller';
 import { KpiService } from './kpi.service';
 
@@ -9,7 +10,7 @@ import { KpiService } from './kpi.service';
 // framework keeps the two numbers apart on purpose, so this module does not
 // import either.
 @Module({
-  imports: [PrismaModule, CommonModule, AuthModule],
+  imports: [PrismaModule, CommonModule, AuthModule, NotificationsModule],
   controllers: [KpiController],
   providers: [KpiService],
   exports: [KpiService],

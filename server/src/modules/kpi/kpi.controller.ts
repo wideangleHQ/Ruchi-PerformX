@@ -20,23 +20,27 @@ import { JwtPayload } from '../../common/types/jwt-payload.type';
 import { CreateKpiDto } from './dto/create-kpi.dto';
 import { ChangeKpiStatusDto, UpdateKpiDto } from './dto/update-kpi.dto';
 import {
+  CreateKpiMessageDto,
   CreateKpiRevisionDto,
   RecordKpiUpdateDto,
   SetKpiContributionsDto,
 } from './dto/kpi-progress.dto';
 import {
+  AllocationQueryDto,
   KpiFilterDto,
   PsScoreQueryDto,
+  ScoreSearchDto,
   UnitSearchDto,
 } from './dto/kpi-query.dto';
-import { KPI_AUTHOR_ROLES } from './kpi-lifecycle';
+import { KPI_AUTHORITY_ROLES } from './kpi-lifecycle';
 import { KpiService } from './kpi.service';
 
 /**
  * Every internal role reaches these routes and the service decides what comes
- * back, the way `rnd` does. An employee has no KPI of their own to create but
- * does have one to update, and narrowing `@Roles` here would only hide the
- * module from the people it measures.
+ * back, the way `rnd` does. An employee creates and edits their own KPIs, so
+ * narrowing `@Roles` here would only hide the module from the people it
+ * measures. Assignment, approval, and department reach are decided in the
+ * service from the caller's role and department scope.
  */
 const INTERNAL_ROLES = [
   role_enum.MD,
@@ -50,7 +54,7 @@ const INTERNAL_ROLES = [
 ];
 
 // Literal paths are declared above the parameterised ones they would otherwise
-// be shadowed by: `units` and `ps-score` before `:id`.
+// be shadowed by: `units`, `ps-score`, `scores`, and `allocation` before `:id`.
 @Controller('kpis')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class KpiController {
@@ -72,7 +76,7 @@ export class KpiController {
 
   /** Somebody else's PS Score, within the caller's department scope. */
   @Get('ps-score/:userId')
-  @Roles(...KPI_AUTHOR_ROLES)
+  @Roles(...KPI_AUTHORITY_ROLES)
   psScoreFor(
     @Param('userId') userId: string,
     @Query() query: PsScoreQueryDto,
@@ -81,14 +85,32 @@ export class KpiController {
     return this.service.psScoreFor(userId, query, user);
   }
 
-  /** Define a KPI. It lands in DRAFT and needs approval before it counts. */
+  /** The View Score tab: existing PS Score rows, searched within scope. */
+  @Get('scores')
+  @Roles(...KPI_AUTHORITY_ROLES)
+  scores(@Query() query: ScoreSearchDto, @CurrentUser() user: JwtPayload) {
+    return this.service.scores(query, user);
+  }
+
+  /** A person's taken and remaining KPI weight for a period. */
+  @Get('allocation/:userId')
+  @Roles(...INTERNAL_ROLES)
+  allocation(
+    @Param('userId') userId: string,
+    @Query() query: AllocationQueryDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.service.allocationFor(userId, query, user);
+  }
+
+  /** Define or assign a KPI. The status comes from the caller's role. */
   @Post()
-  @Roles(...KPI_AUTHOR_ROLES)
+  @Roles(...INTERNAL_ROLES)
   create(@Body() dto: CreateKpiDto, @CurrentUser() user: JwtPayload) {
     return this.service.create(dto, user);
   }
 
-  /** KPIs the caller may see, filtered. */
+  /** One page of the KPIs the caller may see, own or others, filtered. */
   @Get()
   @Roles(...INTERNAL_ROLES)
   list(@Query() filter: KpiFilterDto, @CurrentUser() user: JwtPayload) {
@@ -102,9 +124,9 @@ export class KpiController {
     return this.service.findOne(id, user);
   }
 
-  /** Edit a draft. An approved target changes through a revision instead. */
+  /** Edit a KPI's definition. An employee's edit goes back for approval. */
   @Patch(':id')
-  @Roles(...KPI_AUTHOR_ROLES)
+  @Roles(...INTERNAL_ROLES)
   update(
     @Param('id') id: string,
     @Body() dto: UpdateKpiDto,
@@ -113,15 +135,40 @@ export class KpiController {
     return this.service.update(id, dto, user);
   }
 
-  /** Every lifecycle move, from submitting a draft to locking a finished KPI. */
+  /** Submit a draft, send a pending KPI back, or delete one. */
   @Patch(':id/status')
-  @Roles(...KPI_AUTHOR_ROLES)
+  @Roles(...INTERNAL_ROLES)
   changeStatus(
     @Param('id') id: string,
     @Body() dto: ChangeKpiStatusDto,
     @CurrentUser() user: JwtPayload,
   ) {
     return this.service.changeStatus(id, dto, user);
+  }
+
+  /** Quick approve: PENDING_APPROVAL to PUBLISHED. */
+  @Post(':id/approve')
+  @Roles(...KPI_AUTHORITY_ROLES)
+  approve(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.service.approve(id, user);
+  }
+
+  /** The KPI's chat, for whoever may read the KPI. */
+  @Get(':id/chat')
+  @Roles(...INTERNAL_ROLES)
+  listMessages(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.service.listMessages(id, user);
+  }
+
+  /** Post to the KPI's chat. */
+  @Post(':id/chat')
+  @Roles(...INTERNAL_ROLES)
+  createMessage(
+    @Param('id') id: string,
+    @Body() dto: CreateKpiMessageDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.service.createMessage(id, dto, user);
   }
 
   /** Enter the actual. The server works out the percentage. */
@@ -148,7 +195,7 @@ export class KpiController {
 
   /** Replace the contribution allocation of a shared KPI. */
   @Put(':id/contributions')
-  @Roles(...KPI_AUTHOR_ROLES)
+  @Roles(...KPI_AUTHORITY_ROLES)
   setContributions(
     @Param('id') id: string,
     @Body() dto: SetKpiContributionsDto,
@@ -159,7 +206,7 @@ export class KpiController {
 
   /** Change an approved target or weight, keeping the original. */
   @Post(':id/revisions')
-  @Roles(...KPI_AUTHOR_ROLES)
+  @Roles(...KPI_AUTHORITY_ROLES)
   createRevision(
     @Param('id') id: string,
     @Body() dto: CreateKpiRevisionDto,

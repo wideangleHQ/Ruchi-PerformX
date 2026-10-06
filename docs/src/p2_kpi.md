@@ -25,8 +25,10 @@ scoring module, and neither imports it.
 server/src/modules/kpi/
   kpi-units.ts        the unit library and its search
   kpi-scoring.ts      achievement, score, PS Score, all pure
-  kpi-lifecycle.ts    the ten states and who may move between them
+  kpi-lifecycle.ts    the four statuses, the role matrix, reach, allocation
   kpi-scoring.spec.ts the framework's worked examples as tests
+  kpi-lifecycle.spec.ts  role matrix, transitions, reach, weightage
+  kpi.service.spec.ts    status on create, assignment, chat and score scoping
   kpi.service.ts
   kpi.controller.ts
   kpi.module.ts
@@ -110,7 +112,7 @@ Actual → Achievement → KPI Score → Weight → Contribution → PS Score
 `psScore()` normalises the weights over the KPIs that actually counted. One
 rule does three jobs the framework asks for separately:
 
-- A **cancelled** KPI has its weight redistributed rather than zeroed, so a KPI
+- A **deleted** KPI has its weight redistributed rather than zeroed, so a KPI
   dropped for legitimate business reasons cannot fail anybody.
 - A KPI with **no update yet** drops out on the same path, so a missing actual
   is not silently a zero. The framework marks that an open business decision;
@@ -120,49 +122,106 @@ rule does three jobs the framework asks for separately:
   and the shortfall is reported as `declared_weight` so the UI can say so.
 
 The score is computed on read. There is no cron and no `ps_scores` table: the
-KPI rows and their update history are the source, a locked KPI preserves its
-target and actual permanently, and nothing has asked for cross-cycle
-benchmarking yet.
+KPI rows and their update history are the source, and nothing has asked for
+cross-cycle benchmarking yet. Only `PUBLISHED` KPIs count.
 
 ## Lifecycle
 
+Four statuses, from the approved KPI specification of October 2026:
+
 ```
-Draft → Pending Approval → Approved → Active → In Progress →
-Pending Review → Evaluated → Finalized → Locked
+Authority self KPI:  Create -> PUBLISHED
+Employee self KPI:   Create -> PENDING_APPROVAL -> Quick approve -> PUBLISHED
+Either, saved first: DRAFT -> submit -> PUBLISHED or PENDING_APPROVAL
+Any of them:         -> DELETED (soft, with a reason)
 ```
 
-Cancelled is reachable from every state except Locked. Nothing leaves Locked.
+| Status | Meaning |
+| --- | --- |
+| `DRAFT` | Saved, not yet submitted. Holds no allocation and does not score |
+| `PENDING_APPROVAL` | An employee's own KPI waiting for a quick approve. Holds allocation, does not score |
+| `PUBLISHED` | Live. Takes actuals, milestone ticks and ratings, and counts in the PS Score |
+| `DELETED` | Soft deleted. Out of every list unless asked for by status; its updates, revisions and chat stay |
 
-Every move goes through one endpoint, `PATCH /kpis/:id/status`, with the legal
-moves and the roles allowed to make them in `TRANSITIONS` in
-`kpi-lifecycle.ts`. Adding a state is a row in that table rather than a route, a
-DTO and a service method.
+The status is never sent on create. `submittedStatus()` in `kpi-lifecycle.ts`
+derives it from the creator's role, so an authority's KPI cannot land in
+`PENDING_APPROVAL` by accident and an employee's cannot publish itself.
 
-Two moves happen without the endpoint: entering the first actual, or ticking the
-first milestone, moves an `ACTIVE` KPI to `IN_PROGRESS`, because that is what In
-Progress means and nobody should have to remember to say so.
+The ten statuses before this (Approved through Locked, and Cancelled) were
+folded in by migration `20261006120000_kpi_four_status_lifecycle_and_chat`:
+Approved to Locked became `PUBLISHED`, Cancelled became `DELETED`, and the old
+value of every moved row is kept in `kpis.legacy_status`.
 
-An HOD, EA, PA, the Department Controller and the MD office can all author and
-submit a KPI. The same set approves, finalizes, locks and cancels — `KPI_APPROVER_ROLES`
-in `kpi-lifecycle.ts` — but not with the same reach. MD, EA and PA approve
-across the company, matching their unrestricted department scope everywhere
-else in PerformX. A HOD approves too, but only within a department they head:
-`KpiService.isApproverFor` checks that department scope on every
-approver-gated move and on a draft edit, a contribution change, or a revision,
-since the role list alone cannot express "this HOD, that department." A HOD
-outside the KPI's department gets the same `ForbiddenException` an ordinary
-author would.
+### Who does what
 
-## Changing an approved target
+| Role | Own KPI | Assign to others | Quick approve |
+| --- | --- | --- | --- |
+| MD, EA, PA | Create and edit, published | Anyone | Yes |
+| HOD, Department Controller | Create and edit, published | Own departments only | Own departments only |
+| Employee, and any other role | Create and edit, pending approval | No | No |
 
-`PATCH /kpis/:id` is refused once a KPI leaves `DRAFT`. After that a target or
-weight change goes through `POST /kpis/:id/revisions`, which writes the old
-value and the new one onto a `kpi_revisions` row with an effective date, a
-reason and an author, then applies the new value to the KPI. Both remain
-visible. Nothing overwrites a target silently.
+"Own departments" is what `DepartmentScopeService` resolves: `hod_departments`
+for a HOD, `assistant_departments` for a Department Controller. The check is
+`canActOnDepartment()` against the KPI's or the target employee's department,
+on the server, for assigning, approving, sending back, deleting, editing
+someone else's KPI, contributions and revisions. Nobody approves their own KPI.
+
+An employee edits their own KPI with `PATCH /kpis/:id`. Editing a published one
+sends it back to `PENDING_APPROVAL`, because the target that was approved is no
+longer the target. An authority's edit leaves the status alone. Either way the
+DTO has no creator, owner, department, status or approval field, so an edit
+cannot move any of them.
+
+An employee may delete their own KPI while it is a draft or pending. Once it
+is published only an authority over its department can, so a KPI cannot be
+deleted to drop a bad result.
+
+### Weightage
+
+An employee's own weights do not have to total 100: 25 + 20 + 15 = 60 is a
+valid set, and the PS Score normalises over what is there exactly as before.
+
+What is enforced is the ceiling. `PERMITTED_ALLOCATION` is 100, and every
+`PENDING_APPROVAL` or `PUBLISHED` INDIVIDUAL KPI of a person whose period
+overlaps the new one counts against it. Drafts do not. Because the employee's
+own KPIs are counted, their set comes first and an authority assigns into
+what is left. A weight that does not fit is a 400 naming the remaining figure,
+and at 100 the answer is that nothing is left. The check runs on create, on
+submitting a draft, on an edit that moves weight or period, and on a weight
+revision. `GET /kpis/allocation/:userId` returns the same figures for the form.
+
+There is no database constraint on the total, in either direction.
+
+## Changing a published target
+
+`PATCH /kpis/:id` edits the definition while the KPI is not deleted. When a
+published KPI's target or weight moves, the same transaction writes a
+`kpi_revisions` row with the old and new values, so the original survives.
+`POST /kpis/:id/revisions` still takes a revision with its own effective date
+and reason for an authority who wants to record one explicitly.
 
 Updates are appended, never edited. Scoring reads the newest row and the rest
 stay as the history of how the number moved.
+
+## KPI chat
+
+`GET` and `POST /kpis/:id/chat` are a thread per KPI, stored in `kpi_messages`
+with the same shape as `project_messages`, and the client renders it with the
+project `MessagesPanel`. Reading and posting both run the KPI's own read check
+first, so whoever cannot see the KPI cannot see or write its chat. A new
+message notifies the KPI's owner and creator through `KPI_MESSAGE`, which the
+notification gateway pushes in real time. A deleted KPI's thread is read only.
+
+## View Score
+
+`GET /kpis/scores` is the View Score tab for MD, EA, PA, HOD and Department
+Controller. It reads `performance_scores`, the Action Tracker score table, and
+calculates nothing. The caller's department scope is applied to the employee
+before any filter, and every filter is ANDed onto it, so a department or user
+outside scope comes back empty and `total` counts only what the caller may see.
+Search covers full name, username and email; filters are department, user,
+role, month and year; pagination is server side. No month or year means every
+period, not a guessed one.
 
 ## Units
 
@@ -196,7 +255,7 @@ These are the framework's own open items. None of them are guessed at here.
 | Transition rules when an employee changes department | Nothing. The KPI keeps its `department_id` |
 | Manual score override | Not built. The framework has not settled whether it is permitted at all |
 
-Also absent, and absent on purpose: notifications on approval, socket events,
+Also absent, and absent on purpose: notifications on approval, a socket room per KPI chat,
 evidence upload through the attachments module (`evidence_url` is a link), and
 any combined AT + PS figure. The framework explicitly declines to define the
 last of these.

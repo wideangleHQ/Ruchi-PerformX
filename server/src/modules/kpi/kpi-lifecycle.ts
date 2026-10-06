@@ -1,132 +1,116 @@
 import { kpi_status_enum, role_enum } from '@prisma/client';
 
+import { DepartmentScope } from '../../common/types/department-scope.type';
+
 /**
- * Which moves through the KPI lifecycle are legal, and who may make them.
+ * Who may do what to a KPI, and which status moves are legal.
  *
- * Draft, Pending Approval, Approved, Active, In Progress, Pending Review,
- * Evaluated, Finalized, Locked, with Cancelled reachable from anywhere except
- * Locked. Ten states is more than a smaller product would need, and they are
- * here because the framework names them: each one is a different answer to
- * "who can change this right now".
+ * Four statuses, from the approved KPI specification: DRAFT, PENDING_APPROVAL,
+ * PUBLISHED, DELETED. An authority's KPI is published the moment it is
+ * submitted. An employee's own KPI waits for a quick approve. DELETED is a soft
+ * delete: the row, its updates, and its revisions stay.
  *
- * ponytail: one table and one lookup, rather than an endpoint per transition.
- * The controller has a single `PATCH /kpis/:id/status`, so adding a state is an
- * entry here instead of a route, a DTO, and a service method.
+ * Everything here is a pure function of the role, the status, and the caller's
+ * department scope, so the role matrix is tested without a database.
  */
 
-/** Roles that can author a KPI and drive it through its cycle. */
-export const KPI_AUTHOR_ROLES: role_enum[] = [
+/** Roles that create KPIs straight into PUBLISHED, assign them to others, and
+ * quick approve an employee's. */
+export const KPI_AUTHORITY_ROLES: role_enum[] = [
   role_enum.MD,
   role_enum.EA,
   role_enum.PA,
-  role_enum.DEPARTMENT_CONTROLLER,
   role_enum.HOD,
+  role_enum.DEPARTMENT_CONTROLLER,
 ];
+
+/** Authorities whose reach is the whole company. HOD and Department Controller
+ * are held to the departments their scope resolves to. */
+export const KPI_GLOBAL_ROLES: role_enum[] = [role_enum.MD, role_enum.EA, role_enum.PA];
+
+/** Everyone's KPI weights are measured against this. A set below it is valid;
+ * the PS Score normalises over what is there. */
+export const PERMITTED_ALLOCATION = 100;
+
+/** Weights are allowed this much float, because 33.33 three times is what a
+ * real form produces. */
+export const WEIGHT_TOLERANCE = 0.05;
+
+export function isAuthority(role: role_enum): boolean {
+  return KPI_AUTHORITY_ROLES.includes(role);
+}
 
 /**
- * Roles that approve, finalize, lock, and cancel.
- *
- * MD, EA and PA approve without restriction, matching their unrestricted
- * department scope everywhere else in PerformX. A HOD approves too, but only
- * within a department they head — `KpiService` checks that department scope
- * on every approver-gated move, since this list alone cannot express it.
+ * Where a KPI lands when its creator submits it: PUBLISHED for an authority,
+ * PENDING_APPROVAL for anyone else. Never the other way round, which is the
+ * edge case the specification calls out by name.
  */
-export const KPI_APPROVER_ROLES: role_enum[] = [
-  role_enum.MD,
-  role_enum.EA,
-  role_enum.PA,
-  role_enum.DEPARTMENT_CONTROLLER,
-  role_enum.HOD,
-];
+export function submittedStatus(role: role_enum): kpi_status_enum {
+  return isAuthority(role) ? 'PUBLISHED' : 'PENDING_APPROVAL';
+}
 
-const AUTHOR = KPI_AUTHOR_ROLES;
-const APPROVER = KPI_APPROVER_ROLES;
+/**
+ * Whether `role` with `scope` may assign a KPI to, approve a KPI of, or manage a
+ * KPI in `departmentId`.
+ *
+ * MD, EA, and PA reach anyone. HOD and Department Controller reach only their
+ * own departments, and a KPI with no department is outside every department, so
+ * it is outside theirs. Employees reach nobody.
+ */
+export function canActOnDepartment(
+  role: role_enum,
+  scope: DepartmentScope,
+  departmentId: string | null,
+): boolean {
+  if (!isAuthority(role)) return false;
+  if (KPI_GLOBAL_ROLES.includes(role)) return true;
+  return departmentId !== null && scope.departmentIds.includes(departmentId);
+}
 
-const TRANSITIONS: Readonly<
-  Partial<Record<kpi_status_enum, Partial<Record<kpi_status_enum, role_enum[]>>>>
-> = {
-  DRAFT: {
-    PENDING_APPROVAL: AUTHOR,
-    CANCELLED: AUTHOR,
-  },
-  PENDING_APPROVAL: {
-    APPROVED: APPROVER,
-    // Sent back with the target unchanged, so the author can rework it.
-    DRAFT: APPROVER,
-    CANCELLED: APPROVER,
-  },
-  APPROVED: {
-    ACTIVE: AUTHOR,
-    CANCELLED: APPROVER,
-  },
-  ACTIVE: {
-    // Also reached automatically by the first update, without this endpoint.
-    IN_PROGRESS: AUTHOR,
-    PENDING_REVIEW: AUTHOR,
-    CANCELLED: APPROVER,
-  },
-  IN_PROGRESS: {
-    PENDING_REVIEW: AUTHOR,
-    CANCELLED: APPROVER,
-  },
-  PENDING_REVIEW: {
-    EVALUATED: AUTHOR,
-    // Not good enough yet: back to the owner rather than evaluated badly.
-    IN_PROGRESS: AUTHOR,
-    CANCELLED: APPROVER,
-  },
-  EVALUATED: {
-    FINALIZED: APPROVER,
-    PENDING_REVIEW: APPROVER,
-    CANCELLED: APPROVER,
-  },
-  FINALIZED: {
-    LOCKED: APPROVER,
-    EVALUATED: APPROVER,
-    CANCELLED: APPROVER,
-  },
-  // LOCKED is the end. Target and actual are preserved from here on, and a
-  // correction means a new KPI for the next cycle, not an edit to this one.
+const MOVES: Readonly<Record<kpi_status_enum, kpi_status_enum[]>> = {
+  // Submitted, published, or thrown away before anyone saw it.
+  DRAFT: ['PUBLISHED', 'PENDING_APPROVAL', 'DELETED'],
+  // Quick approve, sent back for rework, or deleted.
+  PENDING_APPROVAL: ['PUBLISHED', 'DRAFT', 'DELETED'],
+  PUBLISHED: ['DELETED'],
+  // The end. A deleted KPI keeps its history and comes back as a new one.
+  DELETED: [],
 };
 
-/**
- * The roles allowed to make one move, or null when the move itself is illegal.
- *
- * Null and `[]` mean different things: null is "that is not a transition",
- * which is a 400, and an empty list would be "nobody may", which nothing
- * returns today.
- */
-export function transitionRoles(
-  from: kpi_status_enum,
-  to: kpi_status_enum,
-): role_enum[] | null {
-  return TRANSITIONS[from]?.[to] ?? null;
+/** Whether `from` to `to` is a move at all. Who may make it is decided by the
+ * service, because that depends on whose KPI it is. */
+export function isLegalMove(from: kpi_status_enum, to: kpi_status_enum): boolean {
+  return MOVES[from].includes(to);
 }
 
-/** Statuses where the owner may enter an actual. */
-export function acceptsActual(status: kpi_status_enum): boolean {
-  return status === 'ACTIVE' || status === 'IN_PROGRESS';
-}
-
-/** Statuses where a reviewer may enter a rating or a review remark. */
-export function acceptsReview(status: kpi_status_enum): boolean {
-  return status === 'IN_PROGRESS' || status === 'PENDING_REVIEW';
+/** The only status that accepts actuals, milestone ticks, and ratings. */
+export function acceptsProgress(status: kpi_status_enum): boolean {
+  return status === 'PUBLISHED';
 }
 
 /**
- * Whether a KPI belongs in a PS Score at all.
- *
- * A draft or an unapproved target is not a commitment yet, and a cancelled KPI
- * is explicitly not a failure. Everything from Approved onwards counts, and a
- * KPI with no update simply scores null and drops out during normalisation.
+ * Whether a KPI belongs in a PS Score. A draft or an unapproved target is not a
+ * commitment yet, and a deleted KPI is explicitly not a failure.
  */
 export function isCountable(status: kpi_status_enum): boolean {
-  return (
-    status !== 'DRAFT' && status !== 'PENDING_APPROVAL' && status !== 'CANCELLED'
-  );
+  return status === 'PUBLISHED';
 }
 
-/** Nothing about the KPI changes after this. */
-export function isSettled(status: kpi_status_enum): boolean {
-  return status === 'LOCKED' || status === 'CANCELLED';
+/** Statuses that hold a share of a person's allocation. A draft does not: it
+ * has not been committed to, and a stale one would block real assignments. */
+export const ALLOCATING_STATUSES: kpi_status_enum[] = ['PENDING_APPROVAL', 'PUBLISHED'];
+
+/** How much of a person's allocation is taken and how much is left. */
+export function allocation(weights: number[]): { allocated: number; remaining: number } {
+  const allocated = round2(weights.reduce((sum, weight) => sum + weight, 0));
+  return { allocated, remaining: round2(Math.max(0, PERMITTED_ALLOCATION - allocated)) };
+}
+
+/** Whether `weight` fits in what is left, with the float tolerance. */
+export function fitsAllocation(weights: number[], weight: number): boolean {
+  return weight <= allocation(weights).remaining + WEIGHT_TOLERANCE;
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
 }

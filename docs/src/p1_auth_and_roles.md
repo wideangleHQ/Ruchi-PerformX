@@ -220,6 +220,18 @@ Role is read from the JWT, not from the database, on every request. A role
 change does not take effect until the user's token expires or they log in
 again. There is no token revocation.
 
+### KPI authority
+
+The KPI module has its own split, `KPI_AUTHORITY_ROLES` in
+`modules/kpi/kpi-lifecycle.ts`: MD, EA, PA, HOD and Department Controller. Their
+own KPIs publish without approval, they assign KPIs to other people, and they
+quick approve an employee's. MD, EA and PA reach anyone. HOD and Department
+Controller reach only the departments `DepartmentScopeService` gives them, and
+`canActOnDepartment()` checks that against the target employee's or the KPI's
+department on the server; `@Roles` alone would let a HOD reach any department.
+Every other internal role creates only their own KPI, which waits for approval.
+See [KPIs and the PS Score](p2_kpi.md#who-does-what).
+
 ## Vendor roles are not employee roles
 
 Three permissions share the word vendor. They are granted by different people

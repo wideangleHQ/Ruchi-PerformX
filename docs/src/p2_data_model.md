@@ -848,7 +848,8 @@ model kpis {
   period_end        DateTime                @db.Date
   evidence_required Boolean                 @default(false)
   review_required   Boolean                 @default(false)
-  status            kpi_status_enum         @default(DRAFT)
+  status            kpi_status_enum         @default(DRAFT)    // DRAFT | PENDING_APPROVAL | PUBLISHED | DELETED
+  legacy_status     String?                 @db.VarChar(20)    // pre-2026-10 status of a backfilled row
   created_by_id     String                  @db.Uuid
   approved_by_id    String?                 @db.Uuid
   approved_at       DateTime?               @db.Timestamptz(6)
@@ -881,9 +882,20 @@ Scoring reads the newest and the rest are the history of how the number moved.
 `effective_from`, `reason` and `changed_by_id`. The new values are applied to
 the KPI as well; this row is what makes the change explainable a year later.
 
+`kpi_messages` is `(kpi_id, user_id, content, created_at)`, indexed on
+`(kpi_id, created_at)`: the chat on one KPI, shaped like `project_messages`.
+
+Migration `20261006120000_kpi_four_status_lifecycle_and_chat` cut
+`kpi_status_enum` from ten values to four. Approved, Active, In Progress,
+Pending Review, Evaluated, Finalized and Locked became `PUBLISHED`, Cancelled
+became `DELETED`, and every moved row keeps its old value in `legacy_status`.
+`approved_at`, `cancelled_at`, `cancel_reason` and `locked_at` were left as
+they were; `cancelled_at` and `cancel_reason` now record a deletion. The same
+migration added `KPI_MESSAGE` to `notification_type_enum`.
+
 The PS Score itself has no table. It is computed on read from the KPIs, their
-milestones and their newest updates. A locked KPI preserves its target and
-actual permanently, so the history the framework asks for is already there.
+milestones and their newest updates. The View Score tab is not the PS Score: it
+reads `performance_scores`, the Action Tracker table, and never writes it.
 
 ## Table count
 
