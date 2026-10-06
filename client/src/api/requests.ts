@@ -1,4 +1,5 @@
 import axiosClient from './client';
+import { PaginatedResponse } from './types';
 
 export interface Request {
   id: string;
@@ -69,11 +70,11 @@ export const requestsApi = {
     status?: string;
     type?: string;
     taskId?: string;
-  }): Promise<Request[]> => {
-    const response = await axiosClient.get<Request[] | { data?: Request[] }>('/requests', {
+  }): Promise<PaginatedResponse<Request>> => {
+    const response = await axiosClient.get<PaginatedResponse<Request>>('/requests', {
       params,
     });
-    return Array.isArray(response.data) ? response.data : response.data.data ?? [];
+    return response.data;
   },
 
   getRequestById: async (id: string): Promise<Request> => {

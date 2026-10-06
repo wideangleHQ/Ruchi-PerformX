@@ -1,23 +1,34 @@
 'use client';
 
 import { useState } from 'react';
-import { CheckCircle2, Circle, History, MessageSquare, X } from 'lucide-react';
+import { CheckCircle2, Circle, History, MessageSquare, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/AuthContext';
-import { CreateKpiPayload, KpiStatus, RecordKpiUpdatePayload, UpdateKpiPayload } from '@/api/kpi';
+import {
+  CreateKpiPayload,
+  CreateKpiRevisionPayload,
+  KpiContributionPayload,
+  KpiStatus,
+  RecordKpiUpdatePayload,
+  UpdateKpiPayload,
+} from '@/api/kpi';
 import {
   useApproveKpi,
   useChangeKpiStatus,
+  useCreateKpiRevision,
   useKpi,
   useKpiMessages,
   usePostKpiMessage,
   useRecordKpiUpdate,
+  useSetKpiContributions,
   useTickKpiMilestone,
   useUpdateKpi,
 } from '@/hooks/useKpi';
 import { MessagesPanel } from '@/components/projects/MessagesPanel';
 import { KpiFormDialog } from '@/components/kpi/kpi-form-dialog';
+import { KpiRevisionDialog } from '@/components/kpi/kpi-revision-dialog';
+import { KpiSharesDialog } from '@/components/kpi/kpi-shares-dialog';
 import {
   AUTHORITY_ROLES,
   MODE_LABELS,
@@ -57,6 +68,8 @@ export function KpiDetailSheet({ id, onClose }: { id: string; onClose: () => voi
   const changeStatus = useChangeKpiStatus();
   const approve = useApproveKpi();
   const updateKpi = useUpdateKpi();
+  const createRevision = useCreateKpiRevision();
+  const setContributions = useSetKpiContributions();
   const [view, setView] = useState<'details' | 'chat'>('details');
   const { data: messages = [], isLoading: messagesLoading } = useKpiMessages(id);
   const postMessage = usePostKpiMessage(id);
@@ -68,6 +81,8 @@ export function KpiDetailSheet({ id, onClose }: { id: string; onClose: () => voi
   const [deleteReason, setDeleteReason] = useState('');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [revising, setRevising] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isAuthority = !!user && AUTHORITY_ROLES.includes(user.role);
@@ -75,6 +90,11 @@ export function KpiDetailSheet({ id, onClose }: { id: string; onClose: () => voi
   const isOwner = !!kpi && kpi.owner_user_id === user?.id;
   const live = !!kpi && kpi.status !== 'DELETED';
   const canEdit = live && (isCreator || isAuthority);
+  // A published KPI's target moves by revision, which keeps the original; a
+  // draft is just edited. Shares exist only on a department or project KPI.
+  // Same people as Edit, and the server still decides.
+  const canRevise = canEdit && kpi?.status === 'PUBLISHED';
+  const canShare = canEdit && kpi?.scope !== 'INDIVIDUAL';
   const canSubmit = kpi?.status === 'DRAFT' && isCreator;
   const canApprove = kpi?.status === 'PENDING_APPROVAL' && isAuthority && !isOwner;
   const canSendBack = kpi?.status === 'PENDING_APPROVAL' && (isAuthority || isCreator);
@@ -119,6 +139,14 @@ export function KpiDetailSheet({ id, onClose }: { id: string; onClose: () => voi
       setDeleteReason('');
       setConfirmingDelete(false);
     }
+  };
+
+  const saveRevision = async (data: CreateKpiRevisionPayload) => {
+    if (await run(() => createRevision.mutateAsync({ id, data }))) setRevising(false);
+  };
+
+  const saveShares = async (data: { contributions: KpiContributionPayload[] }) => {
+    if (await run(() => setContributions.mutateAsync({ id, data }))) setSharing(false);
   };
 
   const saveEdit = async (payload: CreateKpiPayload) => {
@@ -340,11 +368,31 @@ export function KpiDetailSheet({ id, onClose }: { id: string; onClose: () => voi
                 </section>
               ) : null}
 
-              {kpi.contributions.length > 0 ? (
+              {kpi.contributions.length > 0 || canShare ? (
                 <section>
-                  <h3 className="mb-2 text-sm font-semibold text-slate-900">
-                    Contribution allocation
-                  </h3>
+                  <div className="mb-2 flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-slate-900">
+                      Contribution allocation
+                    </h3>
+                    {canShare ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setError(null);
+                          setSharing(true);
+                        }}
+                      >
+                        <Users size={14} /> Edit allocation
+                      </Button>
+                    ) : null}
+                  </div>
+                  {kpi.contributions.length === 0 ? (
+                    <p className="text-sm text-slate-500">
+                      No allocation yet, so this KPI counts in full for everyone it is read for.
+                    </p>
+                  ) : null}
                   <ul className="space-y-1 text-sm">
                     {kpi.contributions.map((entry) => (
                       <li key={entry.id} className="flex justify-between text-slate-700">
@@ -421,7 +469,7 @@ export function KpiDetailSheet({ id, onClose }: { id: string; onClose: () => voi
           )}
         </div>
 
-        {kpi && (canEdit || canSubmit || canApprove || canSendBack || canDelete) ? (
+        {kpi && (canEdit || canRevise || canSubmit || canApprove || canSendBack || canDelete) ? (
           <div className="space-y-2 border-t border-slate-200 px-5 py-4">
             {confirmingDelete ? (
               <div className="flex items-center gap-2">
@@ -490,6 +538,19 @@ export function KpiDetailSheet({ id, onClose }: { id: string; onClose: () => voi
                     Edit
                   </Button>
                 ) : null}
+                {canRevise ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setError(null);
+                      setRevising(true);
+                    }}
+                  >
+                    <History size={14} /> Revise
+                  </Button>
+                ) : null}
                 {canDelete ? (
                   <Button
                     type="button"
@@ -504,6 +565,26 @@ export function KpiDetailSheet({ id, onClose }: { id: string; onClose: () => voi
               </div>
             )}
           </div>
+        ) : null}
+
+        {revising && kpi ? (
+          <KpiRevisionDialog
+            kpi={kpi}
+            onClose={() => setRevising(false)}
+            onSubmit={saveRevision}
+            isPending={createRevision.isPending}
+            error={error}
+          />
+        ) : null}
+
+        {sharing && kpi ? (
+          <KpiSharesDialog
+            current={kpi.contributions}
+            onClose={() => setSharing(false)}
+            onSubmit={saveShares}
+            isPending={setContributions.isPending}
+            error={error}
+          />
         ) : null}
 
         {kpi && user ? (

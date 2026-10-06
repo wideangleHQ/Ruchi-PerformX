@@ -292,17 +292,22 @@ export class HodScoreService {
    * One SQL statement: all six components, all counters and both ranks are
    * aggregated inside PostgreSQL. Nothing is calculated in JavaScript beyond
    * shaping the rows into the response DTO.
+   *
+   * A Redis failure on either side never reaches the caller as an error:
+   * RedisService.get()/set() already catch internally and resolve rather
+   * than reject, but the `.catch()` here means this method doesn't have to
+   * trust that contract to still return a correct score.
    */
   private async getMatrix(period: Period): Promise<HodScoreRecord[]> {
     const key = this.cacheKey(period);
 
-    const cached = await this.redis.get<HodScoreRecord[]>(key);
+    const cached = await this.redis.get<HodScoreRecord[]>(key).catch(() => null);
     if (cached) return cached;
 
     const rows = await this.queryMatrix(period);
     const records = rows.map((row) => this.toRecord(row, period));
 
-    await this.redis.set(key, records, HOD_SCORE_CACHE_TTL_SECONDS);
+    await this.redis.set(key, records, HOD_SCORE_CACHE_TTL_SECONDS).catch(() => undefined);
     return records;
   }
 

@@ -13,11 +13,12 @@ import {
   supabaseUrlFromEnv,
 } from '../../common/helpers/supabase-env.helper';
 import { PDFDocument } from 'pdf-lib';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
 import { UploadedFile } from '../../common/types/uploaded-file.type';
 import { DepartmentScopeService } from '../../common/services/department-scope.service';
+import { RedisService } from '../../common/services/redis.service';
 
 const ASSISTANT_ROLES: role_enum[] = [role_enum.EA, role_enum.PA, role_enum.DEPARTMENT_CONTROLLER];
 
@@ -55,6 +56,12 @@ const DOCUMENT_MIME_TYPES = new Set([
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp']);
 const DOCUMENT_EXTENSIONS = new Set(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'ppt', 'pptx']);
 
+const SIGNED_URL_TTL_SECONDS = 60 * 60;
+// Comfortably shorter than SIGNED_URL_TTL_SECONDS, so a cache hit can never
+// hand back a URL that has already expired. The 15 minute margin is a
+// deliberate safety buffer, not a measured requirement.
+const ATTACHMENT_URL_CACHE_TTL_SECONDS = 45 * 60;
+
 @Injectable()
 export class AttachmentsService {
   private readonly logger = new Logger(AttachmentsService.name);
@@ -66,6 +73,7 @@ export class AttachmentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly departmentScopeService: DepartmentScopeService,
+    private readonly redis: RedisService,
   ) {
     const supabaseUrl = supabaseUrlFromEnv();
     const supabaseKey = supabaseKeyFromEnv();
@@ -447,24 +455,71 @@ export class AttachmentsService {
    * Throws BadRequestException when the path is not in the bucket.
    */
   async createSignedUrl(storagePath: string) {
-    const { data, error } = await this.supabase.storage.from(this.bucket).createSignedUrl(storagePath, 60 * 60);
+    const { data, error } = await this.supabase.storage.from(this.bucket).createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS);
     if (error || !data?.signedUrl) {
       throw new BadRequestException(error?.message || 'Unable to create signed url');
     }
     return data.signedUrl;
   }
 
-  private async mapAttachments(attachments: AttachmentRecord[]) {
-    const mapped = [];
+  /**
+   * Sign a storage path, or return null on failure — the shape `mapAttachment`
+   * already relied on. With a request-local cache, a path repeated within the
+   * same `mapAttachments` call is signed once and awaited by every caller of
+   * it. Below that, a Redis lookup skips the Supabase round trip entirely for
+   * a path another request already signed recently.
+   *
+   * Safe to share across requests and users: authorization is always checked
+   * before this runs (every `ensureXVisible` call happens first), the signed
+   * URL itself carries no caller identity, and the cache TTL is kept below
+   * the URL's own expiry so a hit can never be stale-but-served.
+   */
+  private signedUrlFor(relativePath: string, cache?: Map<string, Promise<string | null>>): Promise<string | null> {
+    const sign = async () => {
+      const cacheKey = this.attachmentUrlCacheKey(relativePath);
+      // A Redis failure here — not just a miss — still falls through to
+      // Supabase rather than failing the attachment. RedisService's own get()
+      // already never throws, but signedUrlFor doesn't lean on that promise.
+      const cached = await this.redis.get<string>(cacheKey).catch(() => null);
+      if (cached) return cached;
 
-    for (const attachment of attachments) {
-      mapped.push(await this.mapAttachment(attachment));
+      try {
+        const url = await this.createSignedUrl(relativePath);
+        await this.redis.set(cacheKey, url, ATTACHMENT_URL_CACHE_TTL_SECONDS).catch(() => undefined);
+        return url;
+      } catch {
+        return null;
+      }
+    };
+
+    if (!cache) return sign();
+
+    let pending = cache.get(relativePath);
+    if (!pending) {
+      pending = sign();
+      cache.set(relativePath, pending);
     }
-
-    return mapped;
+    return pending;
   }
 
-  private async mapAttachment(attachment: AttachmentRecord) {
+  /**
+   * Hashed rather than the raw path, so a storage path — which embeds the
+   * task/self-action/request id it belongs to — never appears in a Redis key
+   * or in logs of one.
+   */
+  private attachmentUrlCacheKey(storagePath: string): string {
+    return `performx:attachment-url:${createHash('sha256').update(storagePath).digest('hex')}`;
+  }
+
+  private async mapAttachments(attachments: AttachmentRecord[]) {
+    // ponytail: one Map per call, not shared across requests — dedupes a
+    // storage path signed twice in the same row (e.g. two comments quoting
+    // the same attachment) without turning into a cross-request cache.
+    const signedUrlCache = new Map<string, Promise<string | null>>();
+    return Promise.all(attachments.map((attachment) => this.mapAttachment(attachment, signedUrlCache)));
+  }
+
+  private async mapAttachment(attachment: AttachmentRecord, signedUrlCache?: Map<string, Promise<string | null>>) {
     let fileUrl = attachment.file_url;
 
     if (attachment.storage_path) {
@@ -474,12 +529,8 @@ export class AttachmentsService {
         : attachment.storage_path;
 
       if (relativePath) {
-        try {
-          fileUrl = await this.createSignedUrl(relativePath);
-        } catch {
-          // Fall back to stored URL — avoids crashing list endpoints on bad paths
-          fileUrl = attachment.file_url;
-        }
+        // Fall back to stored URL — avoids crashing list endpoints on bad paths
+        fileUrl = (await this.signedUrlFor(relativePath, signedUrlCache)) ?? attachment.file_url;
       }
     }
 

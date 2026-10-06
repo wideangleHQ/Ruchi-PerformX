@@ -6,6 +6,11 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Without this, SIGTERM kills the process without ever calling a module's
+  // onModuleDestroy — RedisService's quit() and PrismaService's disconnect()
+  // both existed already but neither ran on a real shutdown until now.
+  app.enableShutdownHooks();
+
   // Global prefix
   app.setGlobalPrefix('api/v1');
 

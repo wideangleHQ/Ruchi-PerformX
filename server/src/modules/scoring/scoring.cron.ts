@@ -15,9 +15,10 @@ export class ScoringCron {
     const now = new Date();
     const month = now.getMonth() + 1;
     const year = now.getFullYear();
+    const startedAt = Date.now();
 
     this.logger.log(`Running daily score update for ${month}/${year}`);
     await this.scoringService.saveMonthlyScores(month, year);
-    this.logger.log('Daily score update complete');
+    this.logger.log(`Daily score update complete in ${Date.now() - startedAt}ms`);
   }
 }

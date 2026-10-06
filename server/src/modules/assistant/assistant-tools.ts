@@ -295,7 +295,10 @@ export const ASSISTANT_TOOLS: AssistantTool[] = [
       'Tasks awaiting the asking user\'s action. Use for "what is waiting on me".',
     input_schema: NO_ARGS,
     roles: ALL_INTERNAL, // GET /tasks/pending
-    run: (_a, user, d) => d.tasks.getPending(user),
+    // Same bound as task_list's own `limit: 50` above — pending/overdue are
+    // now paginated at the API level (Phase 2), and the assistant wants one
+    // reasonably complete page rather than the new default of 20.
+    run: (_a, user, d) => d.tasks.getPending({ limit: 50 } as never, user),
   },
   {
     name: 'overdue_tasks',
@@ -303,7 +306,7 @@ export const ASSISTANT_TOOLS: AssistantTool[] = [
       'Tasks past their deadline within the asking user\'s scope. Use for "what is overdue", "are we behind", or anything about missed deadlines on tasks.',
     input_schema: NO_ARGS,
     roles: ALL_INTERNAL, // GET /tasks/overdue
-    run: (_a, user, d) => d.tasks.getOverdue(user),
+    run: (_a, user, d) => d.tasks.getOverdue({ limit: 50 } as never, user),
   },
   {
     name: 'task_detail',

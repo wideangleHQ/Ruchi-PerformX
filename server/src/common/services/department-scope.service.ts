@@ -1,6 +1,6 @@
 // src/common/services/department-scope.service.ts
 
-import { Injectable, Scope } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { role_enum } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtPayload } from '../types/jwt-payload.type';
@@ -8,31 +8,43 @@ import { DepartmentScope } from '../types/department-scope.type';
 
 /**
  * DepartmentScopeService
- * 
+ *
  * Single source of truth for department-based authorization and data visibility.
- * 
+ *
  * This service is the ONLY location allowed to determine accessible departments.
  * No business service may directly read:
  * - users.department_id
  * - assistant_departments
  * - hod_departments
- * 
- * Request-scoped to enable per-request caching.
+ *
+ * A plain singleton, not request-scoped. `JwtAuthGuard` calls `jwtService.verify()`
+ * once per request, which returns a fresh plain object every time — never the
+ * same reference twice, and `@CurrentUser()` always returns exactly that
+ * reference (`request.user`), unmodified, to every caller within the request.
+ * Caching on that object identity with a `WeakMap` gets the same "one lookup
+ * per request" behavior request-scoping gave, without forcing every service
+ * that injects this one — 13 of them — to become request-scoped too, which
+ * meant Nest re-instantiating that whole provider subgraph on every request
+ * rather than once at boot. It also removes the reason `ScoringService` could
+ * not inject this directly and had to have `ScoringController` resolve scope
+ * on its behalf instead (see the 2026-08-16 decision log entry) — not changed
+ * here, since nothing required it to be, but no longer a constraint on future
+ * cron-adjacent services either.
  */
-@Injectable({ scope: Scope.REQUEST })
+@Injectable()
 export class DepartmentScopeService {
-  private scopeCache: Map<string, DepartmentScope> = new Map();
+  private readonly scopeCache = new WeakMap<JwtPayload, DepartmentScope>();
 
   constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Resolve department scope for the current user.
-   * 
+   *
    * Caches result per request to avoid redundant database queries.
-   * 
+   *
    * @param user - JWT payload containing user identity and role
    * @returns DepartmentScope with unrestricted flag and accessible department IDs
-   * 
+   *
    * @example
    * const scope = await this.departmentScopeService.resolveDepartmentScope(user);
    * if (scope.unrestricted) {
@@ -42,15 +54,11 @@ export class DepartmentScopeService {
    * }
    */
   async resolveDepartmentScope(user: JwtPayload): Promise<DepartmentScope> {
-    const cacheKey = user.sub;
-
-    // Return cached scope if available
-    if (this.scopeCache.has(cacheKey)) {
-      return this.scopeCache.get(cacheKey)!;
-    }
+    const cached = this.scopeCache.get(user);
+    if (cached) return cached;
 
     const scope = await this.computeDepartmentScope(user);
-    this.scopeCache.set(cacheKey, scope);
+    this.scopeCache.set(user, scope);
     return scope;
   }
 

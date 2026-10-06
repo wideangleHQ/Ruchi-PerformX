@@ -102,51 +102,63 @@ export class ScoringService {
   constructor(private readonly prisma: PrismaService) {}
 
   async calculateEmployeeScore(userId: string, month: number, year: number): Promise<number> {
+    return (await this.scoreComponents(userId, month, year)).score;
+  }
+
+  /**
+   * The four independent reads one employee's score is built from, run in
+   * parallel rather than four sequential awaits, plus the score itself.
+   *
+   * `completedTasks` and `selfActions` are also what `saveMonthlyScores`
+   * persists as columns — computing them once here and having both callers
+   * share the result removes what was a duplicate query per employee
+   * (`saveMonthlyScores` used to re-run these same two counts itself after
+   * `calculateEmployeeScore` had already run them for the score math).
+   *
+   * `overdueTasks` intentionally does not double as the persisted
+   * `overdue_tasks_count` column: this query is scoped to the period
+   * (`due_date >= start`) because the score only penalises overdue days
+   * within the month, while the persisted count is all-time by design (or by
+   * bug — see "`overdue_tasks_count` counts all time, not the month" in
+   * Known gaps). Merging them would fix that mismatch as a side effect of a
+   * performance change, which is exactly what this phase is not for.
+   */
+  private async scoreComponents(
+    userId: string,
+    month: number,
+    year: number,
+  ): Promise<{ score: number; completedTasks: number; selfActions: number }> {
     const start = new Date(year, month - 1, 1);
     const end = new Date(year, month, 1);
-
-    let score = 0;
-
-    // Tasks completed in period (by completed_at, not final status — avoids double-counting CLOSED)
-    const completedTasks = await this.prisma.tasks.count({
-      where: {
-        assigned_to_id: userId,
-        completed_at: { gte: start, lt: end },
-      },
-    });
-    score += completedTasks * POINTS.TASK_COMPLETED;
-
-    // Tasks reviewed in period (reviewed_at; separate from completion bonus)
-    const reviewedTasks = await this.prisma.tasks.count({
-      where: {
-        assigned_to_id: userId,
-        reviewed_at: { gte: start, lt: end },
-      },
-    });
-    score += reviewedTasks * POINTS.TASK_REVIEWED;
-
-    // Completed self actions in period
-    const selfActions = await this.prisma.self_actions.count({
-      where: {
-        created_by_id: userId,
-        status: 'COMPLETED',
-        completed_at: { gte: start, lt: end },
-      },
-    });
-    score += selfActions * POINTS.SELF_ACTION_COMPLETED;
-
-    // Overdue tasks penalty (open tasks past due date)
     const now = new Date();
-    const overdueTasks = await this.prisma.tasks.findMany({
-      where: {
-        assigned_to_id: userId,
-        status: {
-          notIn: [task_status_enum.COMPLETED, task_status_enum.REVIEWED, task_status_enum.CLOSED, task_status_enum.REJECTED],
+
+    const [completedTasks, reviewedTasks, selfActions, overdueTasks] = await Promise.all([
+      // Tasks completed in period (by completed_at, not final status — avoids double-counting CLOSED)
+      this.prisma.tasks.count({
+        where: { assigned_to_id: userId, completed_at: { gte: start, lt: end } },
+      }),
+      // Tasks reviewed in period (reviewed_at; separate from completion bonus)
+      this.prisma.tasks.count({
+        where: { assigned_to_id: userId, reviewed_at: { gte: start, lt: end } },
+      }),
+      // Completed self actions in period
+      this.prisma.self_actions.count({
+        where: { created_by_id: userId, status: 'COMPLETED', completed_at: { gte: start, lt: end } },
+      }),
+      // Overdue tasks penalty (open tasks past due date, within this period)
+      this.prisma.tasks.findMany({
+        where: {
+          assigned_to_id: userId,
+          status: {
+            notIn: [task_status_enum.COMPLETED, task_status_enum.REVIEWED, task_status_enum.CLOSED, task_status_enum.REJECTED],
+          },
+          due_date: { lt: now, gte: start },
         },
-        due_date: { lt: now, gte: start },
-      },
-      select: { due_date: true },
-    });
+        select: { due_date: true },
+      }),
+    ]);
+
+    let score = completedTasks * POINTS.TASK_COMPLETED + reviewedTasks * POINTS.TASK_REVIEWED + selfActions * POINTS.SELF_ACTION_COMPLETED;
 
     for (const task of overdueTasks) {
       const daysOverdue = Math.floor(
@@ -159,7 +171,7 @@ export class ScoringService {
       }
     }
 
-    return Math.max(0, score);
+    return { score: Math.max(0, score), completedTasks, selfActions };
   }
 
   async calculateDepartmentScore(departmentId: string, month: number, year: number): Promise<number> {
@@ -178,83 +190,85 @@ export class ScoringService {
     return Math.round(total / users.length);
   }
 
+  /**
+   * How many employees' scores are computed and written concurrently. Each
+   * employee is 4 reads + 1 write (down from the previous 7 reads + 1 write,
+   * counting the duplicate queries this removed) — bounded so a company with
+   * a few hundred employees doesn't fire that many queries at the Supabase
+   * pooler at once. Not tuned against a measured pool limit; a conservative
+   * default for a nightly job with no user waiting on it.
+   */
+  private static readonly SCORING_BATCH_SIZE = 10;
+
   async saveMonthlyScores(month: number, year: number): Promise<void> {
     const users = await this.prisma.users.findMany({
       where: { is_active: true, role: { not: role_enum.ADMIN } },
       select: { id: true },
     });
 
-    for (const user of users) {
-      const score = await this.calculateEmployeeScore(user.id, month, year);
-      const finalScore = new Prisma.Decimal(score);
-
-      const periodStart = new Date(year, month - 1, 1);
-      const periodEnd = new Date(year, month, 1);
-
-      const [completedTasks, selfActions, overdueCount] = await Promise.all([
-        this.prisma.tasks.count({
-          where: {
-            assigned_to_id: user.id,
-            completed_at: { gte: periodStart, lt: periodEnd },
-          },
-        }),
-        this.prisma.self_actions.count({
-          where: {
-            created_by_id: user.id,
-            status: 'COMPLETED',
-            completed_at: { gte: periodStart, lt: periodEnd },
-          },
-        }),
-        this.prisma.tasks.count({
-          where: {
-            assigned_to_id: user.id,
-            status: {
-              notIn: [
-                task_status_enum.COMPLETED,
-                task_status_enum.REVIEWED,
-                task_status_enum.CLOSED,
-                task_status_enum.REJECTED,
-              ],
-            },
-            due_date: { lt: new Date() },
-          },
-        }),
-      ]);
-
-      await this.prisma.performance_scores.upsert({
-        where: {
-          user_id_month_year: {
-            user_id: user.id,
-            month,
-            year,
-          },
-        },
-        update: {
-          final_score: finalScore,
-          assigned_task_score: finalScore,
-          assigned_tasks_completed: completedTasks,
-          self_actions_completed: selfActions,
-          overdue_tasks_count: overdueCount,
-          assigned_score_status: score_status_enum.CALCULATED,
-          is_finalized: true,
-          updated_at: new Date(),
-        },
-        create: {
-          user_id: user.id,
-          month,
-          year,
-          final_score: finalScore,
-          assigned_task_score: finalScore,
-          assigned_tasks_completed: completedTasks,
-          self_actions_completed: selfActions,
-          overdue_tasks_count: overdueCount,
-          assigned_score_status: score_status_enum.CALCULATED,
-          is_finalized: true,
-        },
-      });
+    for (let i = 0; i < users.length; i += ScoringService.SCORING_BATCH_SIZE) {
+      const batch = users.slice(i, i + ScoringService.SCORING_BATCH_SIZE);
+      await Promise.all(batch.map((user) => this.saveOneMonthlyScore(user.id, month, year)));
     }
 
-    this.logger.log(`Scores saved for ${month}/${year}`);
+    this.logger.log(`Scores saved for ${month}/${year} (${users.length} employees)`);
+  }
+
+  private async saveOneMonthlyScore(userId: string, month: number, year: number): Promise<void> {
+    // `overdue_tasks_count` is deliberately a separate, all-time query — see
+    // the comment on scoreComponents() for why it isn't merged with the
+    // period-scoped overdue read the score itself uses.
+    const [{ score, completedTasks, selfActions }, overdueCount] = await Promise.all([
+      this.scoreComponents(userId, month, year),
+      this.prisma.tasks.count({
+        where: {
+          assigned_to_id: userId,
+          status: {
+            notIn: [
+              task_status_enum.COMPLETED,
+              task_status_enum.REVIEWED,
+              task_status_enum.CLOSED,
+              task_status_enum.REJECTED,
+            ],
+          },
+          due_date: { lt: new Date() },
+        },
+      }),
+    ]);
+
+    const finalScore = new Prisma.Decimal(score);
+
+    await this.prisma.performance_scores.upsert({
+      where: {
+        user_id_month_year: {
+          user_id: userId,
+          month,
+          year,
+        },
+      },
+      update: {
+        final_score: finalScore,
+        assigned_task_score: finalScore,
+        assigned_tasks_completed: completedTasks,
+        self_actions_completed: selfActions,
+        overdue_tasks_count: overdueCount,
+        assigned_score_status: score_status_enum.CALCULATED,
+        is_finalized: true,
+        updated_at: new Date(),
+      },
+      create: {
+        user_id: userId,
+        month,
+        year,
+        final_score: finalScore,
+        assigned_task_score: finalScore,
+        assigned_tasks_completed: completedTasks,
+        self_actions_completed: selfActions,
+        overdue_tasks_count: overdueCount,
+        assigned_score_status: score_status_enum.CALCULATED,
+        is_finalized: true,
+      },
+    });
   }
 
   /** The stored row for one user and month, or null if the cron never wrote one. */

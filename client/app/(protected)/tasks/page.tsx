@@ -38,13 +38,15 @@ export default function TasksPage() {
   } as any;
 
   const { data: tasksData, isLoading } = useTasks(filters);
-  const { data: reassignmentRequests } = useRequests(user?.role === 'EMPLOYEE' ? { type: 'TASK_REASSIGNMENT' } : undefined);
+  const { data: reassignmentRequestsData } = useRequests(
+    user?.role === 'EMPLOYEE' ? { type: 'TASK_REASSIGNMENT', limit: 100 } : undefined,
+  );
   const tasks = Array.isArray(tasksData) ? tasksData : (tasksData?.data ?? []);
   const reassignedTaskIds = useMemo(
-    () => (reassignmentRequests ?? [])
+    () => (reassignmentRequestsData?.data ?? [])
       .filter((request) => request.status === 'ACCEPTED' && request.taskId)
       .map((request) => request.taskId as string),
-    [reassignmentRequests],
+    [reassignmentRequestsData],
   );
 
   const clearFilters = () => {

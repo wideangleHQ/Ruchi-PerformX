@@ -61,6 +61,7 @@ function build({
       findMany: vi.fn(async () =>
         allocated.map((weight, i) => ({ id: `a${i}`, weight: new Prisma.Decimal(weight) })),
       ),
+      count: vi.fn(async (_query: unknown) => 0),
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: 'new', ...data })),
     },
     users: {
@@ -69,7 +70,10 @@ function build({
       ),
       findMany: vi.fn(async () => []),
     },
-    kpi_contributions: { findUnique: vi.fn(async () => null) },
+    kpi_contributions: {
+      findUnique: vi.fn(async () => null),
+      findMany: vi.fn(async () => [] as { kpi_id: string }[]),
+    },
     kpi_milestones: { createMany: vi.fn() },
     kpi_messages: {
       findMany: vi.fn(async (_query: unknown) => []),
@@ -249,6 +253,37 @@ describe('KpiService.scores', () => {
     expect(where.users.AND).toEqual([]);
   });
 
+  it('searches name, username and email and filters by user, role and period', async () => {
+    const { service, prisma } = build({ scope: { unrestricted: true, departmentIds: [] } });
+    await service.scores(
+      { q: ' Asha ', user_id: 'emp-1', role: role_enum.EMPLOYEE, month: 9, year: 2026 },
+      user('md', role_enum.MD),
+    );
+    const where = firstArg<ScoreQuery>(prisma.performance_scores.count).where;
+    expect(where).toMatchObject({ month: 9, year: 2026 });
+    expect(where.users.AND).toEqual(
+      expect.arrayContaining([
+        { id: 'emp-1' },
+        { role: role_enum.EMPLOYEE },
+        {
+          OR: [
+            { full_name: { contains: 'Asha', mode: 'insensitive' } },
+            { username: { contains: 'Asha', mode: 'insensitive' } },
+            { email: { contains: 'Asha', mode: 'insensitive' } },
+          ],
+        },
+      ]),
+    );
+  });
+
+  it('offers a HOD only their own departments in the filter list', async () => {
+    const { service, prisma } = build();
+    await service.scores({}, user('hod', role_enum.HOD));
+    expect(firstArg<{ where: unknown }>(prisma.departments.findMany as never).where).toEqual({
+      id: { in: [SALES] },
+    });
+  });
+
   it('paginates on the server', async () => {
     const { service, prisma } = build({ scope: { unrestricted: true, departmentIds: [] } });
     await service.scores({ page: 3, limit: 10 }, user('md', role_enum.MD));
@@ -256,5 +291,58 @@ describe('KpiService.scores', () => {
       skip: 20,
       take: 10,
     });
+  });
+});
+
+describe('KpiService.list', () => {
+  type ListQuery = { where: { AND: Record<string, unknown>[] }; skip: number; take: number };
+  const andOf = (prisma: ReturnType<typeof build>['prisma']) =>
+    firstArg<ListQuery>(prisma.kpis.findMany as never).where.AND;
+
+  it('limits the own view to the callers KPIs', async () => {
+    const { service, prisma } = build();
+    await service.list({ view: 'own' }, user('hod', role_enum.HOD));
+    expect(andOf(prisma)).toContainEqual({ owner_user_id: 'hod' });
+  });
+
+  it('limits the others view to KPIs not owned by the caller, unowned ones included', async () => {
+    const { service, prisma } = build();
+    await service.list({ view: 'others' }, user('hod', role_enum.HOD));
+    expect(andOf(prisma)).toContainEqual({
+      OR: [{ owner_user_id: null }, { owner_user_id: { not: 'hod' } }],
+    });
+  });
+
+  it('hides deleted KPIs unless status=DELETED asks for them', async () => {
+    const hidden = build();
+    await hidden.service.list({}, user('hod', role_enum.HOD));
+    expect(andOf(hidden.prisma)).toContainEqual({ status: { not: 'DELETED' } });
+
+    const asked = build();
+    await asked.service.list({ status: 'DELETED' }, user('hod', role_enum.HOD));
+    expect(andOf(asked.prisma)).toContainEqual({ status: 'DELETED' });
+  });
+
+  it('scopes a HOD to their department, and counts with the same filter', async () => {
+    const { service, prisma } = build();
+    await service.list({}, user('hod', role_enum.HOD));
+    const where = firstArg<ListQuery>(prisma.kpis.findMany as never).where;
+    expect(JSON.stringify(where)).toContain(SALES);
+    expect(firstArg<{ where: unknown }>(prisma.kpis.count as never).where).toEqual(where);
+  });
+
+  it('applies no department filter for the MD office', async () => {
+    const { service, prisma } = build({ scope: { unrestricted: true, departmentIds: [] } });
+    await service.list({}, user('md', role_enum.MD));
+    expect(andOf(prisma)[0]).toEqual({});
+  });
+
+  it('paginates on the server and returns the page envelope', async () => {
+    const { service, prisma } = build();
+    prisma.kpis.count.mockResolvedValueOnce(45);
+    const result = await service.list({ page: 3, limit: 10 }, user('hod', role_enum.HOD));
+    const query = firstArg<ListQuery>(prisma.kpis.findMany as never);
+    expect([query.skip, query.take]).toEqual([20, 10]);
+    expect(result).toMatchObject({ total: 45, page: 3, limit: 10 });
   });
 });

@@ -223,6 +223,12 @@ Search covers full name, username and email; filters are department, user,
 role, month and year; pagination is server side. No month or year means every
 period, not a guessed one.
 
+Each row has a KPIs button that opens the KPI breakdown for that person and
+month from `GET /kpis/ps-score/:userId`. That route recomputes from live KPIs,
+so after a month is finalized it can differ from the stored row; the breakdown
+says it is the live score. A department outside the caller's scope is refused
+with 403 and the message is shown in place of the table.
+
 ## Units
 
 `kpi-units.ts` is a constant, not a table. The library is read-only reference
@@ -237,6 +243,22 @@ and it is stored the same way.
 The ceiling: a custom unit is private to its KPI, not added to the library for
 everybody. The upgrade path is a `kpi_units` table seeded from that array and
 read in `searchUnits`, on the day somebody asks for a shared custom unit.
+
+## The screens
+
+`client/src/components/kpi/` has one page, `kpi-client.tsx`, with the detail
+sheet opening over it. Most actions were built with the four-status workflow;
+two were added afterwards because the endpoints existed with no screen:
+
+| Endpoint | Where it is used |
+| --- | --- |
+| `POST /kpis/:id/revisions` | **Revise** on a published KPI (`kpi-revision-dialog.tsx`): new target and/or weight, effective date, reason. |
+| `PUT /kpis/:id/contributions` | **Edit allocation** on a department or project KPI (`kpi-shares-dialog.tsx`); the whole set is replaced, an empty list clears it. |
+
+Both buttons are drawn for whoever can Edit (the creator, or an authority) and
+the server still decides; its refusal is shown in the dialog. Everything else
+(own/others/score tabs, quick approve, chat, the allocation check in the form,
+View Score) is described under its own heading above.
 
 ## Endpoints
 

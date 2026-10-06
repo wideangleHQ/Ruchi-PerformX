@@ -1955,3 +1955,379 @@ instead of a 403 that would confirm the department or user exists.
 **Instead of.** Defaulting to the current month like `/kpis/ps-score`, which the
 specification rules out for this tab.
 **Costs.** None known.
+
+## 2026-09-19 The performance roadmap is a handbook chapter, not a task tracker
+
+**Decision.** The findings of the 2026-09-19 performance audit and the plan
+for acting on them live in [Performance optimization roadmap](p1_performance_roadmap.md),
+following the same house style as every other chapter, rather than as a
+standalone report handed to the team once and left to go stale.
+
+**Why.** An audit that lives outside the handbook is read once, at the moment
+it's delivered, and nobody updates it as phases land. A handbook chapter gets
+read alongside everything else and can be corrected in the same commit as the
+work it describes, the way [Known gaps](p1_known_gaps.md) already is.
+
+**Instead of.** A one-off Markdown file outside `docs/src/`, which was the
+literal instruction that started this work; or a project-management ticket
+per phase, which this repository has no tooling for and which drifts from the
+code the moment someone reads the code instead of the ticket.
+
+**Costs.** The chapter needs `just docs-build` to keep passing as it's edited,
+same as every other page. It also surfaced a live discrepancy worth flagging
+here rather than silently fixing: `p1_known_gaps.md` still says
+`EscalationModule` is not imported into `AppModule` and its cron never runs.
+As of this audit, `app.module.ts` imports and registers it, with a stale
+comment sitting directly above the import saying otherwise. That known-gaps
+entry needs its own correction once someone confirms which is actually true
+in production — not assumed and silently rewritten as part of this chapter.
+
+## 2026-09-19 Shared task creation batches writes, not queries
+
+**Decision.** `TasksService.createTaskRecords`'s per-assignee loop now does
+one `tasks.createManyAndReturn` for every assignee's task row, then builds
+`task_departments`, `task_status_logs`, and `audit_logs` rows from its result
+and writes each with one `createMany`. All four statements still run
+sequentially on the transaction's client.
+
+**Why.** The loop did four sequential writes per assignee (up to
+`MAX_SHARED_ASSIGNEES = 50`): `tasks.create`, `task_departments.createMany`,
+`task_status_logs.create`, `audit_logs.create`. The obvious fix,
+`Promise.all` over the per-assignee writes, is unsafe here: Prisma's
+interactive transactions (`$transaction(async (tx) => ...)`, which this is)
+run on a single connection and don't support concurrent queries against that
+connection. Batching the writes themselves, one `createMany` per table
+instead of one per assignee, cuts the round trips without touching
+concurrency at all.
+
+**Instead of.** `Promise.all` per assignee, rejected for the reason above.
+Also rejected: leaving the four-writes-per-assignee shape and only removing
+the redundant reads, because there weren't any — `resolveAssignees` and
+`resolveHodIdsForDepartments` already fetch every assignee's data in one
+query each, before the loop starts. The N+1 here was entirely on the write
+side, which is what made batching the right shape rather than pre-fetching.
+
+**Costs.** This assumes `tasks.createManyAndReturn`'s result preserves the
+input array's order, so `created[i]` corresponds to `assignees[i]`. That
+assumption isn't new: `NotificationsService.notifyMany` already relies on it
+(`rows[i]` paired with `inputs[i]`) for the same reason. It would break if the
+`tasks` table ever gained a trigger or partitioning that could reorder a
+single `INSERT ... RETURNING` statement's output; neither exists today.
+
+## 2026-09-19 Requests page keeps its dual sections, backed by count-only queries for the badges
+
+**Decision.** `GET /requests` now paginates. The Requests page fetches one
+page of the combined list and still derives its "Task Requests" and
+"Reassignment Requests" sections from that page with the same `.filter()` it
+already used. The "Pending Approvals" and "Reassignment Requests" badges are
+backed by two separate `useRequests({ status/type, limit: 1 })` calls, read
+for their `total` rather than their (discarded) single row.
+
+**Why.** The page was built around holding the entire request list in memory
+so it could slice it four ways: general vs. reassignment, and a pending count
+that needed the whole table, not one page of it. Paginating the main fetch
+without a separate answer for the badges would silently make them wrong the
+moment the table exceeds one page — the exact kind of regression a
+performance-motivated change should not introduce. `status` and `type` were
+already accepted filters, so getting an accurate total for each costs one
+cheap indexed count query apiece, not a second unbounded fetch.
+
+**Instead of.** Fetching every request to keep the badges exact (the
+performance problem this phase exists to fix); or a new "exclude type"
+filter to split the general/reassignment sections into two independently
+paginated lists, which is a real DTO capability nobody asked for and expands
+this phase's scope beyond pagination itself. Also rejected: leaving the
+badges wrong (showing only the current page's count), which is a correctness
+regression dressed up as a perf fix.
+
+**Costs.** Within one page, which of a mixed set of general and reassignment
+requests appear in the "Task Requests" section versus the "Reassignment
+Requests" section depends on what happens to land on that page — a request
+type can visually appear and disappear as a user pages through, even though
+the accurate total badges never do. Splitting the two sections into
+independently paginated lists is the upgrade path, and needs the DTO to
+support excluding a type, not just matching one.
+
+## 2026-09-19 Redis uses ioredis, not CareerX's hand-rolled RESP client
+
+**Decision.** `RedisService` wraps `ioredis`, a real dependency, rather than
+porting CareerX's zero-dependency `server/src/redis/redis.service.ts`, which
+speaks RESP directly over a raw TCP/TLS socket with no library at all.
+
+**Why.** CareerX's version was read first, since a working in-house pattern
+beats a new dependency by default. It degrades to null exactly the way this
+phase needs when `REDIS_URL` is unset, and its `rediss://` handling is the
+right idea. But it does not reconnect with any backoff: a failed command
+destroys the socket and the next call opens a fresh TCP connection with a bare
+1.5s timeout, every time, for as long as Redis stays down. That is the
+"hammer an unavailable server" failure mode this phase was explicitly told to
+avoid, and fixing it means writing the reconnect strategy, offline-queue
+bound, and retry cap ioredis already ships and has been hardened by wide use.
+Copying ~250 lines of hand-rolled RESP parsing to save one dependency is not
+the lazy option once the reconnect behavior has to be correct too.
+
+**Instead of.** The CareerX client, for the reason above. Also considered:
+`node-redis` (the official client), which is equally mature; ioredis was
+picked because BullMQ — which CareerX already runs and which Phase 4 will
+likely need — requires ioredis under the hood, so Phase 4 adding a queue
+later does not mean a second Redis client living alongside this one.
+
+**Costs.** PerformX and CareerX now use two different Redis clients for the
+same job, which is worth reconciling if the two codebases converge further.
+`ioredis` is a new dependency (`server/package.json`, `bun.lock`), added via
+`bun add` to match the project's package manager rather than the `npm` this
+session tried first and reverted.
+
+## 2026-09-19 REDIS_URL unset means caching is off, not a localhost fallback
+
+**Decision.** `RedisService.onModuleInit` checks `process.env.REDIS_URL`
+directly. If it is unset, no `ioredis` client is ever constructed — not a
+client pointed at `localhost:6379`. Every method (`get`, `set`, `del`,
+`exists`) short-circuits to a cache miss / no-op before touching the client.
+
+**Why.** A silent `localhost:6379` default is how a cache someone forgot to
+provision in production looks identical to a cache with nothing cached yet,
+which is worse than either an obvious warning or an obvious failure — see the
+brief's own instruction against exactly this pattern. Redis backs a cache
+here (HOD score matrix, attachment signed URLs), not a system of record, so
+the correct failure mode is "slower, never wrong," not "the app won't start."
+
+**Instead of.** Crashing at boot when `REDIS_URL` is missing, which the task
+explicitly rejected for a cache-only dependency and which would make local
+development require a Redis instance for a feature that works fine without
+one. Also rejected: constructing an ioredis client against a bare
+`localhost:6379` default, which either connects to a developer's unrelated
+local Redis (silently wrong) or fails to connect and starts the retry-loop
+logging noise for no reason in an environment that was never meant to have
+Redis.
+
+**Costs.** A misconfigured `REDIS_URL` that is merely wrong (unreachable
+host, bad credentials) still gets ioredis's full reconnect-with-backoff
+treatment and repeated warning logs, rather than the immediate silence of
+"unset." That is intentional: an operator who set the variable and got the
+value wrong should see it failing, not have it silently behave as if they
+had left it out.
+
+## 2026-09-19 get()/set() stay JSON-transparent; no separate getJson/setJson
+
+**Decision.** `RedisService.get<T>()` and `.set()` JSON-parse and
+JSON-stringify internally, the same as the in-memory `Map` implementation did
+implicitly by storing the object reference. No `getJson`/`setJson` were
+added alongside them.
+
+**Why.** Every current and evaluated caller — `HodScoreService` storing an
+array of records, `AttachmentsService` storing a plain string — wants a typed
+value round-tripped through the cache, never a raw string it will parse
+itself. A second pair of methods that do exactly what the first pair already
+does would be two names for one behavior, which is the kind of API a caller
+has to check the implementation to tell apart.
+
+**Instead of.** The `getJson`/`setJson` split named in the brief's own
+architecture sketch, evaluated and not implemented: nothing in this codebase
+needs a Redis value treated as an opaque string rather than JSON, and adding
+the pair now would be scaffolding for a caller that does not exist yet.
+
+**Costs.** If a future caller genuinely wants a raw string (not JSON-wrapped),
+`get`/`set` will double-encode it (`JSON.stringify("foo")` stores `"foo"`
+with the quotes) rather than storing it bare. That caller adds `getRaw`/
+`setRaw` when it exists; nothing here should get named for a shape only one
+caller wants.
+
+## 2026-09-19 Attachment signed URLs are cached; the safety review passed
+
+**Decision.** `AttachmentsService.signedUrlFor` checks Redis
+(`performx:attachment-url:{sha256(storagePath)}`) before calling Supabase
+Storage, and writes the result back with a 45 minute TTL against Supabase's
+own 60 minute signed URL lifetime.
+
+**Why.** All five conditions the brief required were checked against the
+actual code before implementing, not assumed: authorization runs before this
+method is ever reached (every `ensureXVisible` call happens first in every
+caller); `storage_path` is a stable, unique per-object key; the signed URL
+Supabase returns carries no caller identity, so serving the same cached URL
+to a second, independently-authorized request for the same object is exactly
+as safe as minting a second one would have been; the lifetime is a known
+constant (`SIGNED_URL_TTL_SECONDS`); and a cache TTL below it was
+straightforward to set. Where the brief said security beats hit rate, there
+was nothing here forcing that tradeoff.
+
+**Instead of.** Deferring attachment caching as unsafe, which was the
+brief's own fallback instruction if any condition failed — none did. Also
+rejected: caching the authorization decision itself, which was never on the
+table; only the already-authorized signed URL is ever written to Redis.
+
+**Costs.** The storage path is hashed rather than used directly as the key,
+so a Redis `KEYS performx:attachment-url:*` scan cannot be reverse-mapped to
+a task or self action id without also having database access — a deliberate
+tradeoff of debuggability for not putting entity ids in a cache key. The 45
+minute TTL is a chosen safety margin, not a measured one; tightening or
+loosening it only requires changing `ATTACHMENT_URL_CACHE_TTL_SECONDS`.
+
+## 2026-09-19 Shutdown hooks are enabled application-wide, not just for Redis
+
+**Decision.** `main.ts` now calls `app.enableShutdownHooks()`, which NestJS
+needs to invoke any module's `onModuleDestroy` on `SIGTERM`/`SIGINT`.
+
+**Why.** `RedisService.onModuleDestroy` (new, this phase) and
+`PrismaService.onModuleDestroy` (already existed) were both dead code without
+it — Nest does not wire process signals to its shutdown lifecycle unless this
+is called, so neither the new Redis `quit()` nor the existing Prisma
+`$disconnect()` had ever actually run on a real deploy's restart or scale-down.
+Redis needing a real shutdown path is what surfaced this; fixing it for
+Redis alone while leaving Prisma's identical, older gap in place made no
+sense once it was found.
+
+**Instead of.** Adding shutdown handling to `RedisService` only, which cannot
+work in isolation — the gap is in `main.ts` not calling `enableShutdownHooks()`
+at all, not in any one service's own hook.
+
+**Costs.** This is a behavior change for every module with a shutdown hook,
+not only the two that currently have one, so a future `OnModuleDestroy` added
+anywhere in the app will now actually run on shutdown where it silently
+would not have before. Verified in this environment only up to confirming
+the app starts and shuts down without error; live SIGTERM delivery could not
+be observed end-to-end here because Windows/Git Bash does not reliably
+deliver POSIX signals to a native Node process the way Railway's Linux
+containers do.
+
+## 2026-09-20 Neither monthly scoring nor escalation moved to a Redis queue
+
+**Decision.** Both stay `@nestjs/schedule` crons running in the API process,
+unchanged in that respect. Only their query shape changed (see the two
+entries below).
+
+**Why.** The brief's own gate for introducing a queue is: genuinely
+long-running, no user waiting synchronously, safe retry semantics, safe
+duplicate execution, and a deployment topology that supports a worker.
+Neither job clears the first bar once its queries are fixed. Monthly scoring
+now runs 4 parallel reads plus 1 write per employee, batched 10 at a time,
+for a headcount in the dozens per the handbook — seconds, not minutes.
+Escalation is one query for overdue tasks, one for MD users, and one batched
+notification insert, for however many tasks are overdue on a given day at
+this company's scale — also seconds. Neither was ever coupled to an HTTP
+request's response time in the first place; a cron is already "background"
+in every sense that matters here.
+
+**Instead of.** Adding BullMQ (or any queue) now that Redis exists, which
+the brief explicitly warned against doing "simply to satisfy the
+architecture." A queue would add a second Redis-adjacent failure mode, an
+idempotency design neither job currently needs, and — since this repository
+has no worker process today — a new deployment topology (a second Railway
+service) to stand up for a job that finishes in single-digit seconds.
+
+**Costs.** If either job's workload grows by an order of magnitude (a much
+larger headcount, or an escalation sweep across thousands of overdue tasks),
+this decision should be revisited — the gate above is about today's scale,
+not a permanent judgment. Nothing here forecloses adding a queue later; it
+just isn't justified by what exists now.
+
+## 2026-09-20 Monthly scoring's duplicate queries were removed; its overdue-count bug was not
+
+**Decision.** `ScoringService.scoreComponents` runs its four score-math reads
+in parallel and returns `completedTasks`/`selfActions` alongside the score,
+so `saveMonthlyScores` no longer re-runs those same two counts a second time
+for the persisted columns. The persisted `overdue_tasks_count` stays its own,
+separately-scoped, all-time query — not merged with the period-scoped
+overdue read the score itself uses.
+
+**Why.** The two duplicate queries (completedTasks, selfActions) used
+byte-for-byte identical `where` clauses in both places — a pure, safe
+dedup. The overdue queries are different on purpose from the database's
+perspective right now: `known_gaps.md` already documents that
+`overdue_tasks_count` counts all time rather than the month, as an existing,
+separately-tracked correctness issue. Merging the two queries to "fix" that
+mismatch would be a scoring/business behavior change riding along on a
+performance change, which every phase of this roadmap has been told not to
+do. It is Phase 4's job to make the existing queries faster, not to decide
+they were wrong.
+
+**Instead of.** Consolidating the two overdue queries into one, which
+would have been the more thorough-looking fix and is exactly the kind of
+silent behavior change this roadmap keeps refusing to make without a
+decision recorded first.
+
+**Costs.** The known overdue-count mismatch remains exactly as it was —
+still tracked in Known gaps, still unfixed, now explicitly noted here as
+"seen and deliberately left alone" rather than "not noticed."
+
+## 2026-09-20 DepartmentScopeService is a singleton with a WeakMap, not request-scoped
+
+**Decision.** `DepartmentScopeService` dropped `@Injectable({ scope:
+Scope.REQUEST })` for a plain `@Injectable()`, and its cache moved from
+`Map<string, DepartmentScope>` keyed by `user.sub` to `WeakMap<JwtPayload,
+DepartmentScope>` keyed by the request's own decoded token object.
+
+**Why.** `JwtAuthGuard` calls `jwtService.verify()` once per request, which
+returns a fresh plain object every time, and `@CurrentUser()` always returns
+exactly that reference to every caller within the request — verified by
+reading both files, not assumed. A `WeakMap` keyed on that object identity
+gets the identical "resolve once per request, however many services ask"
+guarantee the old `Scope.REQUEST` instance-per-request gave, without forcing
+this service's 13 dependents into request scope too, which is what made
+`ScoringService` unable to inject this directly in the first place (see the
+2026-08-16 "scoring controller resolves department scope" entry).
+
+**Instead of.** Leaving it request-scoped, which is not wrong so much as a
+bigger structural cost than the caching problem needed: 13 services
+becoming request-scoped by inheritance is what forces Nest to build a fresh
+DI subtree for that portion of the graph on every request rather than once
+at boot. Also considered and rejected: passing scope through function
+arguments everywhere, which would touch every one of those 13 services'
+call sites for a change this WeakMap achieves by touching one file.
+
+**Costs.** A `WeakMap` cannot be inspected or cleared externally the way a
+`Map` can, which is fine here (nothing did that) but would matter if a
+future caller wanted to force-invalidate a scope mid-request — no code does.
+This does not by itself let `ScoringService` inject `DepartmentScopeService`
+directly; that migration is optional future cleanup, not done here, since
+nothing required it.
+
+## 2026-09-20 Socket invalidation was not narrowed — the broad case doesn't fire
+
+**Decision.** `useSocket.ts`'s `task:updated`/`comment:new` handlers were
+left exactly as they were: no code change.
+
+**Why.** Tracing every emit site server-side found that `task:updated` and
+`task:comment:new` (via the gateway's `taskUpdated`/`taskCommentAdded`
+helpers) have zero callers anywhere in the codebase — nothing ever emits
+them. `comment:new`, which the frontend actually listens for, doesn't match
+any event name the server emits at all. The only two live socket events
+that trigger a TanStack Query invalidation today are `notification:new`
+(already scoped to `['notifications']`, already narrow) and `poll:updated`
+(company-wide by design, invalidating `['polls']` and `['dashboard']` —
+both genuinely stale after a poll change, since polls are embedded directly
+in the dashboard payload per the 2026-08-16 "dashboard social layer" entry).
+There is no live over-broad invalidation to narrow.
+
+**Instead of.** Narrowing the dead `task:updated`/`comment:new` handlers
+anyway, which would optimize code that never runs, or wiring up the missing
+server-side emits so the handlers become live, which is a feature-completion
+decision (whether task updates should push live socket events at all) that
+does not belong to a performance-optimization phase and was not asked for.
+
+**Costs.** None from this decision itself. The dead handlers stay as
+harmless, inert code; if a future change wires up `task:updated` emission,
+whoever does it should revisit this entry and decide the invalidation scope
+fresh, since the assumption "broad invalidation exists and needs narrowing"
+that motivated this section of the roadmap turned out not to describe live
+behavior.
+
+## 2026-10-06 The client gets vitest, with a hand-written `@/` resolver
+
+**Decision.** `client/` now has `vitest` 3.2.7, `jsdom`, and Testing Library as
+dev dependencies, a `test` script, and a `vitest.config.ts`. The first tests
+cover the KPI screens.
+**Why.** The client had no test runner at all, and the KPI UI work needs its
+request contracts checked, not just typechecked: a filter that sends the wrong
+query key typechecks fine. The same Phase 2 pagination code that typechecked
+also had a bug only a test caught, where the "clamp the page into range" effect
+ran while the next page was loading and sent every click on Next back to page 1
+(fixed in `kpi-client.tsx` and the Requests page).
+**Instead of.** Jest, which would be a second test runner next to the server's
+vitest. And `@vitejs/plugin-react`, which was tried and dropped: v6 needs Vite 8
+and vitest 3.2.7 ships Vite 7, so JSX goes through esbuild's automatic runtime.
+**Costs.** `tsconfig` maps `@/*` to both `./*` and `./src/*`, and Vite's alias
+points at one directory, so `vitest.config.ts` carries a small resolver that
+tries both in tsc's order. If the paths in `tsconfig.json` change, that resolver
+has to change with them. Tests mock `@/api/client` rather than the network, so
+they prove what the client sends, not what the server answers.

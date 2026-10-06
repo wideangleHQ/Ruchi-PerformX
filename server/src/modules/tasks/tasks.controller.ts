@@ -16,6 +16,7 @@ import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { TaskFilterDto } from './dto/task-filter.dto';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { JwtAuthGuard } from '../../common/gaurds/jwt-auth.guard';
 import { RolesGuard } from '../../common/gaurds/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -56,16 +57,16 @@ export class TasksController {
 
   @Get('pending')
   @Roles(role_enum.MD, role_enum.HOD, role_enum.EMPLOYEE, ...ASSISTANT_ROLES, role_enum.PURCHASE_HEAD)
-  getPending(@CurrentUser() user: JwtPayload) {
-    return this.tasksService.getPending(user);
+  getPending(@Query() filter: PaginationQueryDto, @CurrentUser() user: JwtPayload) {
+    return this.tasksService.getPending(filter, user);
   }
 
   // ─── Overdue ───────────────────────────────────────────────────
 
   @Get('overdue')
   @Roles(role_enum.MD, role_enum.HOD, ...ASSISTANT_ROLES, role_enum.PURCHASE_HEAD)
-  getOverdue(@CurrentUser() user: JwtPayload) {
-    return this.tasksService.getOverdue(user);
+  getOverdue(@Query() filter: PaginationQueryDto, @CurrentUser() user: JwtPayload) {
+    return this.tasksService.getOverdue(filter, user);
   }
 
   @Get('meta/departments')

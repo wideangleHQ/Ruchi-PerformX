@@ -49,7 +49,8 @@ export default function TaskDetailPage() {
   const { user } = useAuth();
   const { data: task, isLoading } = useTask(taskId);
   const { data: comments, isLoading: commentsLoading } = useTaskComments(taskId);
-  const { data: requests = [] } = useRequests({ type: 'TASK_REASSIGNMENT', taskId });
+  const { data: requestsData } = useRequests({ type: 'TASK_REASSIGNMENT', taskId });
+  const requests = requestsData?.data ?? [];
   const [error, setError] = useState<string | null>(null);
   const [showReassign, setShowReassign] = useState(false);
   const [reason, setReason] = useState('');

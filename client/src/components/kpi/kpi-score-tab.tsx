@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScoreFilters } from '@/api/kpi';
-import { useKpiScores } from '@/hooks/useKpi';
+import { useKpiScores, usePsScoreFor } from '@/hooks/useKpi';
 import { useUserOptions } from '@/components/pickers';
 import { formatNumber } from '@/components/kpi/display';
 
@@ -37,6 +37,7 @@ function ratio(done: number | null, total: number | null) {
 export function KpiScoreTab() {
   const [filters, setFilters] = useState<ScoreFilters>(EMPTY);
   const [search, setSearch] = useState('');
+  const [open, setOpen] = useState<string | null>(null);
   const { data, isLoading, isError } = useKpiScores(filters);
   const users = useUserOptions();
 
@@ -154,12 +155,14 @@ export function KpiScoreTab() {
                 <th className="py-2 pr-3">Self actions</th>
                 <th className="py-2 pr-3">Tasks done</th>
                 <th className="py-2 pr-3">Overdue</th>
-                <th className="py-2">Finalized</th>
+                <th className="py-2 pr-3">Finalized</th>
+                <th className="py-2" />
               </tr>
             </thead>
             <tbody>
               {data.items.map((row) => (
-                <tr key={row.id} className="border-t border-slate-100">
+                <Fragment key={row.id}>
+                <tr className="border-t border-slate-100">
                   <td className="py-2 pr-3">
                     <p className="text-slate-800">{row.user.full_name}</p>
                     <p className="text-xs text-slate-400">{row.user.email}</p>
@@ -188,8 +191,29 @@ export function KpiScoreTab() {
                     {ratio(row.assigned_tasks_completed, row.assigned_tasks_total)}
                   </td>
                   <td className="py-2 pr-3 text-slate-600">{row.overdue_tasks_count ?? 0}</td>
-                  <td className="py-2 text-slate-600">{row.is_finalized ? 'Yes' : 'No'}</td>
+                  <td className="py-2 pr-3 text-slate-600">{row.is_finalized ? 'Yes' : 'No'}</td>
+                  <td className="py-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        const key = `${row.user.id}:${row.month}:${row.year}`;
+                        setOpen(open === key ? null : key);
+                      }}
+                    >
+                      {open === `${row.user.id}:${row.month}:${row.year}` ? 'Hide KPIs' : 'KPIs'}
+                    </Button>
+                  </td>
                 </tr>
+                {open === `${row.user.id}:${row.month}:${row.year}` ? (
+                  <tr>
+                    <td colSpan={11} className="bg-slate-50 px-3 py-3">
+                      <ScoreBreakdown userId={row.user.id} month={row.month} year={row.year} />
+                    </td>
+                  </tr>
+                ) : null}
+                </Fragment>
               ))}
             </tbody>
           </table>
@@ -246,5 +270,53 @@ function FilterSelect({
         </option>
       ))}
     </select>
+  );
+}
+
+/**
+ * The KPIs behind one stored score, from `GET /kpis/ps-score/:userId`. The
+ * server recomputes the month from live KPIs, so it can differ from the stored
+ * row when KPIs changed after the month was finalized.
+ */
+function ScoreBreakdown({ userId, month, year }: { userId: string; month: number; year: number }) {
+  const { data, isLoading, isError } = usePsScoreFor(userId, month, year);
+  if (isError) return <p className="text-sm text-red-700">The KPI breakdown could not be loaded.</p>;
+  if (isLoading || !data) return <p className="text-sm text-slate-500">Loading KPIs...</p>;
+  if (data.kpis.length === 0) {
+    return <p className="text-sm text-slate-500">No KPIs cover this month.</p>;
+  }
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-slate-500">
+        Live PS Score {formatNumber(data.ps_score)} from {formatNumber(data.counted_weight)} of{' '}
+        {formatNumber(data.declared_weight)} declared weight.
+      </p>
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="text-left uppercase tracking-wide text-slate-400">
+            <th className="py-1 pr-3">KPI</th>
+            <th className="py-1 pr-3">Status</th>
+            <th className="py-1 pr-3">Weight</th>
+            <th className="py-1 pr-3">Achievement</th>
+            <th className="py-1">Contribution</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.kpis.map((line) => (
+            <tr key={line.id} className="border-t border-slate-200">
+              <td className="py-1 pr-3 text-slate-800">{line.name}</td>
+              <td className="py-1 pr-3 text-slate-600">{line.status}</td>
+              <td className="py-1 pr-3 text-slate-600">{formatNumber(line.effective_weight)}</td>
+              <td className="py-1 pr-3 text-slate-600">
+                {line.achievement === null ? '-' : `${formatNumber(line.achievement)}%`}
+              </td>
+              <td className="py-1 text-slate-600">
+                {line.counted && line.contribution !== null ? formatNumber(line.contribution) : '-'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

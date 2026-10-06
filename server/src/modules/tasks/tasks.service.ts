@@ -16,6 +16,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { UploadedFile } from '../../common/types/uploaded-file.type';
 import { DepartmentScopeService } from '../../common/services/department-scope.service';
 import { DepartmentQueryHelper } from '../../common/helpers/department-query.helper';
+import { paginate } from '../../common/helpers/pagination.helper';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
 type PendingTaskNotification = {
   recipientId: string;
@@ -304,12 +306,12 @@ export class TasksService {
     return updated;
   }
 
-  async getPending(user: JwtPayload) {
+  async getPending(filter: PaginationQueryDto, user: JwtPayload) {
     const scope = await this.departmentScopeService.resolveDepartmentScope(user);
-    
+
     const baseWhere: Prisma.tasksWhereInput = { status: task_status_enum.REVIEWED, deleted_at: null };
     const departmentFilter = DepartmentQueryHelper.buildTaskDepartmentFilter(scope);
-    
+
     const ownershipFilter: Prisma.tasksWhereInput = user.role === role_enum.EMPLOYEE
       ? {
           OR: [
@@ -327,16 +329,29 @@ export class TasksService {
       ].filter(obj => Object.keys(obj).length > 0),
     };
 
-    return this.prisma.tasks.findMany({
-      where,
-      include: this.taskInclude(),
-      orderBy: { due_date: 'asc' },
-    });
+    const page = filter.page ?? 1;
+    const limit = filter.limit ?? 20;
+
+    const [data, total] = await Promise.all([
+      this.prisma.tasks.findMany({
+        where,
+        include: this.taskInclude(),
+        // `id` breaks ties between tasks sharing a due_date, which is common
+        // (a batch of daily tasks all due end of day) — without it, rows can
+        // swap pages as the underlying set changes between requests.
+        orderBy: [{ due_date: 'asc' }, { id: 'asc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.tasks.count({ where }),
+    ]);
+
+    return paginate(data, total, page, limit);
   }
 
-  async getOverdue(user: JwtPayload) {
+  async getOverdue(filter: PaginationQueryDto, user: JwtPayload) {
     const scope = await this.departmentScopeService.resolveDepartmentScope(user);
-    
+
     const terminalStatuses = [
       task_status_enum.COMPLETED,
       task_status_enum.REVIEWED,
@@ -349,9 +364,9 @@ export class TasksService {
       status: { notIn: terminalStatuses },
       deleted_at: null,
     };
-    
+
     const departmentFilter = DepartmentQueryHelper.buildTaskDepartmentFilter(scope);
-    
+
     const ownershipFilter: Prisma.tasksWhereInput = user.role === role_enum.EMPLOYEE
       ? {
           OR: [
@@ -369,11 +384,21 @@ export class TasksService {
       ].filter(obj => Object.keys(obj).length > 0),
     };
 
-    return this.prisma.tasks.findMany({
-      where,
-      include: this.taskInclude(),
-      orderBy: { due_date: 'asc' },
-    });
+    const page = filter.page ?? 1;
+    const limit = filter.limit ?? 20;
+
+    const [data, total] = await Promise.all([
+      this.prisma.tasks.findMany({
+        where,
+        include: this.taskInclude(),
+        orderBy: [{ due_date: 'asc' }, { id: 'asc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.tasks.count({ where }),
+    ]);
+
+    return paginate(data, total, page, limit);
   }
 
   async getDepartments(user: JwtPayload) {
@@ -912,63 +937,77 @@ export class TasksService {
         ? await this.resolveHodIdsForDepartments([...new Set([user.departmentId!, ...departmentIds])])
         : new Map<string, string[]>();
 
-      for (const assignee of assignees) {
-        const taskDepartmentIds = taskType === task_type_enum.EMPLOYEE_SHARED
+      // One assignee is one task row (each carries its own assigned_to_id and,
+      // for EMPLOYEE_SHARED, its own department_id), so the row itself can't be
+      // collapsed. What was a `for` loop doing 4 sequential writes per assignee
+      // (up to MAX_SHARED_ASSIGNEES = 50) is now 4 batched writes total: one
+      // createManyAndReturn for the tasks, then task_departments/status
+      // logs/audit logs built from its result and written with createMany.
+      // createManyAndReturn preserving insert order is the same assumption
+      // notifyMany() already relies on in notifications.service.ts.
+      const taskDepartmentIdsByAssignee = assignees.map((assignee) =>
+        taskType === task_type_enum.EMPLOYEE_SHARED
           ? [...new Set([user.departmentId!, assignee.department_id].filter(Boolean) as string[])]
-          : departmentIds;
+          : departmentIds,
+      );
 
-        const created = await db.tasks.create({
-          data: {
-            title: dto.title,
-            description: dto.description,
-            priority: dto.priority,
-            due_date: new Date(dto.dueDate),
-            assigned_to_id: assignee.id,
-            assigned_by_id: user.sub,
-            department_id: taskType === task_type_enum.EMPLOYEE_SHARED ? assignee.department_id! : departmentIds[0]!,
-            parent_task_id: dto.parentTaskId ?? null,
-            status: task_status_enum.CREATED,
-            task_type: taskType,
-          },
-        });
+      const created: { id: string }[] = await db.tasks.createManyAndReturn({
+        data: assignees.map((assignee) => ({
+          title: dto.title,
+          description: dto.description,
+          priority: dto.priority,
+          due_date: new Date(dto.dueDate),
+          assigned_to_id: assignee.id,
+          assigned_by_id: user.sub,
+          department_id: taskType === task_type_enum.EMPLOYEE_SHARED ? assignee.department_id! : departmentIds[0]!,
+          parent_task_id: dto.parentTaskId ?? null,
+          status: task_status_enum.CREATED,
+          task_type: taskType,
+        })),
+        select: { id: true },
+      });
 
-        await db.task_departments.createMany({
-          data: taskDepartmentIds.map((department_id) => ({
-            task_id: created.id,
+      await db.task_departments.createMany({
+        data: created.flatMap((task, index) =>
+          taskDepartmentIdsByAssignee[index]!.map((department_id) => ({
+            task_id: task.id,
             department_id,
           })),
-          skipDuplicates: true,
-        });
+        ),
+        skipDuplicates: true,
+      });
 
-        await db.task_status_logs.create({
-          data: {
-            task_id: created.id,
-            from_status: null,
-            to_status: task_status_enum.CREATED,
-            changed_by_id: user.sub,
-          },
-        });
+      await db.task_status_logs.createMany({
+        data: created.map((task) => ({
+          task_id: task.id,
+          from_status: null,
+          to_status: task_status_enum.CREATED,
+          changed_by_id: user.sub,
+        })),
+      });
 
-        await db.audit_logs.create({
-          data: {
-            user_id: user.sub,
-            action: 'TASK_CREATED',
-            entity: 'tasks',
-            entity_id: created.id,
-            old_value: null,
-            new_value: JSON.stringify({
-              taskId: created.id,
-              title: dto.title,
-              description: dto.description,
-              assignedToId: assignee.id,
-              departmentIds: taskDepartmentIds,
-              taskType,
-            }),
-          },
-        });
+      await db.audit_logs.createMany({
+        data: created.map((task, index) => ({
+          user_id: user.sub,
+          action: 'TASK_CREATED',
+          entity: 'tasks',
+          entity_id: task.id,
+          old_value: null,
+          new_value: JSON.stringify({
+            taskId: task.id,
+            title: dto.title,
+            description: dto.description,
+            assignedToId: assignees[index]!.id,
+            departmentIds: taskDepartmentIdsByAssignee[index],
+            taskType,
+          }),
+        })),
+      });
 
+      created.forEach((task, index) => {
+        const assignee = assignees[index]!;
         createdTasks.push({
-          id: created.id,
+          id: task.id,
           notifications: this.taskCreatedNotifications({
             taskTitle: dto.title,
             taskType,
@@ -980,7 +1019,7 @@ export class TasksService {
             totalAssignees: assignees.length,
           }),
         });
-      }
+      });
     } else {
       const created = await db.tasks.create({
         data: {
@@ -1223,10 +1262,12 @@ export class TasksService {
     const notifications = this.dedupeNotifications(tasks.flatMap((task) => task.notifications ?? []));
     if (!notifications.length) return;
 
+    // One batched notifyMany() instead of one createNotification() per
+    // recipient — same recipients, type, title and message, but also gets
+    // the socket push createNotification never did (email is unaffected:
+    // TASK_ASSIGNED is IN_APP-only per notification-channels.constants.ts).
     try {
-      await Promise.all(notifications.map((notification) =>
-        this.notificationsService.createNotification(notification),
-      ));
+      await this.notificationsService.notifyMany(notifications);
     } catch (error) {
       console.warn('Task notification dispatch failed', error);
     }

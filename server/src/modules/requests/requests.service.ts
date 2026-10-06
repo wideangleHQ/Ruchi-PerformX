@@ -10,6 +10,7 @@ import { TasksService } from '../tasks/tasks.service';
 import { AttachmentsService } from '../attachments/attachments.service';
 import { DepartmentScopeService } from '../../common/services/department-scope.service';
 import { DepartmentQueryHelper } from '../../common/helpers/department-query.helper';
+import { paginate } from '../../common/helpers/pagination.helper';
 
 @Injectable()
 export class RequestsService {
@@ -116,34 +117,45 @@ export class RequestsService {
       ];
     }
 
-    const items = await this.prisma.task_requests.findMany({
-      where,
-      include: {
-        departments: { select: { id: true, name: true } },
-        task: {
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            department_id: true,
-            status: true,
-            task_departments: { select: { department_id: true } },
-            users_tasks_assigned_to_idTousers: { select: { id: true, full_name: true, role: true } },
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 20;
+
+    const [items, total] = await Promise.all([
+      this.prisma.task_requests.findMany({
+        where,
+        include: {
+          departments: { select: { id: true, name: true } },
+          task: {
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              department_id: true,
+              status: true,
+              task_departments: { select: { department_id: true } },
+              users_tasks_assigned_to_idTousers: { select: { id: true, full_name: true, role: true } },
+            },
           },
+          request_attachments: {
+            select: this.attachmentSelect(),
+          },
+          current_assignee: { select: { id: true, full_name: true } },
+          requested_assignee: { select: { id: true, full_name: true } },
+          users_task_requests_requested_by_idTousers: { select: { id: true, full_name: true, department_id: true } },
+          users_task_requests_reviewed_by_idTousers: { select: { id: true, full_name: true } },
         },
-        request_attachments: {
-          select: this.attachmentSelect(),
-        },
-        current_assignee: { select: { id: true, full_name: true } },
-        requested_assignee: { select: { id: true, full_name: true } },
-        users_task_requests_requested_by_idTousers: { select: { id: true, full_name: true, department_id: true } },
-        users_task_requests_reviewed_by_idTousers: { select: { id: true, full_name: true } },
-      },
-      orderBy: { created_at: 'desc' },
-    } as any);
+        // `id` is a deterministic tiebreaker: two requests created in the
+        // same millisecond would otherwise jump between pages depending on
+        // which page a concurrent insert lands on.
+        orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      } as any),
+      this.prisma.task_requests.count({ where } as any),
+    ]);
 
     const decorated = await Promise.all(items.map((item: any) => this.decorateRequestAttachments(item)));
-    return decorated.map((item: any) => this.mapRequest(item));
+    return paginate(decorated.map((item: any) => this.mapRequest(item)), total, page, limit);
   }
 
   async findOne(id: string, user: JwtPayload) {

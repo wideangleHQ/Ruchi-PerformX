@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { authApi } from '@/api/auth';
@@ -20,11 +20,33 @@ const GENERAL_REQUEST_TYPES = [
 ] as const;
 
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const;
+const LIMIT = 20;
 
 export default function RequestsPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { data = [] } = useRequests();
+  const [page, setPage] = useState(1);
+  const { data: requestsData } = useRequests({ page, limit: LIMIT });
+  const data = useMemo(() => requestsData?.data ?? [], [requestsData]);
+  const total = requestsData?.total ?? 0;
+  const totalPages = Math.max(Math.ceil(total / LIMIT), 1);
+
+  // The two badges below need a total across the whole table, not just this
+  // page, so they're two cheap count-only fetches (limit: 1) using filters
+  // the API already supports, rather than paginating the general/reassignment
+  // sections separately.
+  const { data: pendingCount } = useRequests({ status: 'PENDING', limit: 1 });
+  const { data: reassignmentCount } = useRequests({ type: 'TASK_REASSIGNMENT', limit: 1 });
+
+  // If a mutation (approve/reject) shrinks the table below the current page
+  // — e.g. the last item on page 3 gets reviewed — step back rather than
+  // showing an empty page that looks like "no requests" (see item 19).
+  // Only once a page has loaded: while the next one is in flight the total
+  // reads as zero, and clamping then sends every click on Next back to page 1.
+  useEffect(() => {
+    if (requestsData && page > totalPages) setPage(totalPages);
+  }, [requestsData, page, totalPages]);
+
   const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
   const [newAssigneeId, setNewAssigneeId] = useState('');
   const [form, setForm] = useState({
@@ -55,10 +77,6 @@ export default function RequestsPage() {
     [departments],
   );
 
-  const pendingRequests = useMemo(
-    () => data.filter((request) => request.status === 'PENDING'),
-    [data],
-  );
   const reviewedRequests = useMemo(
     () => data.filter((request) => request.status !== 'PENDING'),
     [data],
@@ -260,10 +278,10 @@ export default function RequestsPage() {
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          Pending Approvals: <span className="font-semibold">{pendingRequests.length}</span>
+          Pending Approvals: <span className="font-semibold">{pendingCount?.total ?? 0}</span>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-700">
-          Reassignment Requests: <span className="font-semibold">{reassignmentRequests.length}</span>
+          Reassignment Requests: <span className="font-semibold">{reassignmentCount?.total ?? 0}</span>
         </div>
       </div>
 
@@ -316,7 +334,29 @@ export default function RequestsPage() {
         <div className="rounded-lg bg-gray-50 p-8 text-center text-gray-600">
           No requests found.
         </div>
-      ) : null}
+      ) : (
+        <div className="flex flex-col items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 sm:flex-row">
+          <p>
+            Showing {data.length} of {total} requests
+          </p>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>
+              Prev
+            </Button>
+            <span className="min-w-20 text-center">
+              Page {page} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= totalPages}
+              onClick={() => setPage((value) => value + 1)}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
 
       {activeRequest && canReview && activeRequest.type === 'TASK_REASSIGNMENT' ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

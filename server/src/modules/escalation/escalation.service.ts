@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { NotifyInput } from '../notifications/notification-channels.constants';
 import { task_status_enum, role_enum } from '@prisma/client';
 
 @Injectable()
@@ -26,6 +27,10 @@ export class EscalationService {
           ],
         },
         due_date: { lt: now },
+        // Every other tasks query in this codebase filters this; this one
+        // didn't, so a soft-deleted overdue task still generated escalation
+        // notifications. See the Phase 4 roadmap entry.
+        deleted_at: null,
       },
       select: {
         id: true,
@@ -49,6 +54,15 @@ export class EscalationService {
       select: { id: true },
     });
 
+    // Collected across every overdue task and sent as one notifyMany() call
+    // instead of one createNotification() per recipient per task — the
+    // recipient list, type, title and message are exactly what the previous
+    // per-row loop sent. Routing through notifyMany also means these types'
+    // already-configured channels (ESCALATION_MD/HOD are EMAIL as well as
+    // IN_APP, per notification-channels.constants.ts) are honoured, which
+    // createNotification never did on its own.
+    const notifications: NotifyInput[] = [];
+
     for (const task of overdueTasks) {
       const daysOverdue = Math.floor(
         (now.getTime() - new Date(task.due_date).getTime()) / (1000 * 60 * 60 * 24),
@@ -56,7 +70,7 @@ export class EscalationService {
 
       if (daysOverdue >= 5) {
         for (const md of mdUsers) {
-          await this.notifications.createNotification({
+          notifications.push({
             recipientId: md.id,
             type: 'ESCALATION_MD',
             title: 'Critical Escalation',
@@ -71,7 +85,7 @@ export class EscalationService {
         const hodUsers = task.departments?.users ?? [];
 
         for (const hod of hodUsers) {
-          await this.notifications.createNotification({
+          notifications.push({
             recipientId: hod.id,
             type: 'ESCALATION_HOD',
             title: 'HOD Escalation',
@@ -83,7 +97,7 @@ export class EscalationService {
       }
 
       if (daysOverdue >= 1 && task.assigned_to_id) {
-        await this.notifications.createNotification({
+        notifications.push({
           recipientId: task.assigned_to_id,
           type: 'TASK_OVERDUE',
           title: 'Task Overdue',
@@ -92,5 +106,10 @@ export class EscalationService {
         this.logger.warn(`Employee reminder: Task ${task.id} — ${daysOverdue}d overdue`);
       }
     }
+
+    await this.notifications.notifyMany(notifications);
+    this.logger.log(
+      `Escalation sweep: ${overdueTasks.length} overdue task(s), ${notifications.length} notification(s) sent`,
+    );
   }
 }

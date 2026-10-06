@@ -12,8 +12,9 @@ export class EscalationCron {
 
   @Cron(CronExpression.EVERY_DAY_AT_9AM)
   async handleEscalationCheck(): Promise<void> {
+    const startedAt = Date.now();
     this.logger.log('Running daily escalation check...');
     await this.escalationService.runEscalationCheck();
-    this.logger.log('Escalation check complete');
+    this.logger.log(`Escalation check complete in ${Date.now() - startedAt}ms`);
   }
 }

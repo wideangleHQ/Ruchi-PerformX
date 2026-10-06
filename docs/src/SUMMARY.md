@@ -14,6 +14,7 @@
 - [Notifications and realtime](p1_notifications.md)
 - [Scoring](p1_scoring.md)
 - [Visitor management](p1_vms.md)
+- [Performance optimization roadmap](p1_performance_roadmap.md)
 - [API reference](p1_api_reference.md)
 - [Code conventions](p1_conventions.md)
 - [Known gaps and dead code](p1_known_gaps.md)

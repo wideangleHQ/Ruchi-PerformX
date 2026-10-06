@@ -65,6 +65,7 @@ failing later.
 | `SUPABASE_VMS_BUCKET` | yes | Visitor photos |
 | `SCORE_TIMEZONE` | no | Defaults to `Asia/Kolkata`, used for month boundaries in HOD scoring |
 | `NODE_ENV` | no | Standard |
+| `REDIS_URL` | no | Shared cache (HOD score matrix, attachment signed URLs). Unset means caching is off, not broken — every read falls through to the source of truth. Use `rediss://` for a hosted provider that requires TLS |
 
 The two Supabase key names are a leftover from a rename that was never
 finished. Setting both to the service role key is the safe move until the
@@ -88,6 +89,14 @@ the preflight, so the request never arrives: there is no server-side trace, and
 the screen just fails. Add the client's origin here rather than editing
 `main.ts`. It is not in `server_env_required` because the default covers local
 development and the production domain, so leaving it unset cannot fail quietly.
+
+`REDIS_URL` is not in `server_env_required` for the same reason, by design
+rather than by oversight: it backs a cache, not a system of record, and
+`RedisService` logs a warning and disables itself rather than throwing when it
+is unset. A HOD score request or an attachment view works exactly the same
+either way — slower on a cache miss, never wrong and never failing. See
+[Performance optimization roadmap](p1_performance_roadmap.md) for the Phase 3
+Redis architecture.
 
 Four of these secrets kill the process at startup rather than at first use:
 `JWT_SECRET` is checked in the module body of `auth.module.ts`,
