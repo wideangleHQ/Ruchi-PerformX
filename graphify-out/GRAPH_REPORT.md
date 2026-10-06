@@ -1,16 +1,16 @@
-# Graph Report - Ruchi-PerformX  (2026-09-13)
+# Graph Report - Ruchi-PerformX  (2026-10-06)
 
 ## Corpus Check
-- 798 files · ~2,142,355 words
+- 802 files · ~2,156,893 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 6402 nodes · 12431 edges · 562 communities (388 shown, 174 thin omitted)
-- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 213 edges (avg confidence: 0.8)
+- 6446 nodes · 12542 edges · 569 communities (387 shown, 182 thin omitted)
+- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 228 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `28bc30a1`
+- Built from commit: `c8360931`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -216,12 +216,12 @@
 - [[_COMMUNITY_Community 198|Community 198]]
 - [[_COMMUNITY_Community 199|Community 199]]
 - [[_COMMUNITY_Community 200|Community 200]]
-- [[_COMMUNITY_Community 201|Community 201]]
 - [[_COMMUNITY_Community 202|Community 202]]
 - [[_COMMUNITY_Community 203|Community 203]]
 - [[_COMMUNITY_Community 204|Community 204]]
 - [[_COMMUNITY_Community 205|Community 205]]
 - [[_COMMUNITY_Community 206|Community 206]]
+- [[_COMMUNITY_Community 207|Community 207]]
 - [[_COMMUNITY_Community 208|Community 208]]
 - [[_COMMUNITY_Community 209|Community 209]]
 - [[_COMMUNITY_Community 210|Community 210]]
@@ -231,12 +231,11 @@
 - [[_COMMUNITY_Community 214|Community 214]]
 - [[_COMMUNITY_Community 215|Community 215]]
 - [[_COMMUNITY_Community 216|Community 216]]
-- [[_COMMUNITY_Community 217|Community 217]]
-- [[_COMMUNITY_Community 218|Community 218]]
 - [[_COMMUNITY_Community 219|Community 219]]
+- [[_COMMUNITY_Community 220|Community 220]]
 - [[_COMMUNITY_Community 221|Community 221]]
 - [[_COMMUNITY_Community 222|Community 222]]
-- [[_COMMUNITY_Community 223|Community 223]]
+- [[_COMMUNITY_Community 224|Community 224]]
 - [[_COMMUNITY_Community 225|Community 225]]
 - [[_COMMUNITY_Community 226|Community 226]]
 - [[_COMMUNITY_Community 227|Community 227]]
@@ -257,10 +256,10 @@
 - [[_COMMUNITY_Community 243|Community 243]]
 - [[_COMMUNITY_Community 244|Community 244]]
 - [[_COMMUNITY_Community 245|Community 245]]
+- [[_COMMUNITY_Community 246|Community 246]]
+- [[_COMMUNITY_Community 247|Community 247]]
 - [[_COMMUNITY_Community 248|Community 248]]
-- [[_COMMUNITY_Community 250|Community 250]]
 - [[_COMMUNITY_Community 251|Community 251]]
-- [[_COMMUNITY_Community 252|Community 252]]
 - [[_COMMUNITY_Community 253|Community 253]]
 - [[_COMMUNITY_Community 254|Community 254]]
 - [[_COMMUNITY_Community 255|Community 255]]
@@ -290,12 +289,14 @@
 - [[_COMMUNITY_Community 279|Community 279]]
 - [[_COMMUNITY_Community 280|Community 280]]
 - [[_COMMUNITY_Community 281|Community 281]]
-- [[_COMMUNITY_Community 286|Community 286]]
-- [[_COMMUNITY_Community 287|Community 287]]
+- [[_COMMUNITY_Community 282|Community 282]]
+- [[_COMMUNITY_Community 283|Community 283]]
 - [[_COMMUNITY_Community 288|Community 288]]
 - [[_COMMUNITY_Community 289|Community 289]]
-- [[_COMMUNITY_Community 292|Community 292]]
+- [[_COMMUNITY_Community 290|Community 290]]
+- [[_COMMUNITY_Community 291|Community 291]]
 - [[_COMMUNITY_Community 294|Community 294]]
+- [[_COMMUNITY_Community 295|Community 295]]
 - [[_COMMUNITY_Community 296|Community 296]]
 - [[_COMMUNITY_Community 297|Community 297]]
 - [[_COMMUNITY_Community 298|Community 298]]
@@ -303,29 +304,27 @@
 - [[_COMMUNITY_Community 300|Community 300]]
 - [[_COMMUNITY_Community 301|Community 301]]
 - [[_COMMUNITY_Community 302|Community 302]]
-- [[_COMMUNITY_Community 303|Community 303]]
 - [[_COMMUNITY_Community 304|Community 304]]
-- [[_COMMUNITY_Community 305|Community 305]]
 - [[_COMMUNITY_Community 306|Community 306]]
 - [[_COMMUNITY_Community 307|Community 307]]
 - [[_COMMUNITY_Community 308|Community 308]]
 - [[_COMMUNITY_Community 309|Community 309]]
 - [[_COMMUNITY_Community 310|Community 310]]
 - [[_COMMUNITY_Community 311|Community 311]]
-- [[_COMMUNITY_Community 325|Community 325]]
-- [[_COMMUNITY_Community 352|Community 352]]
+- [[_COMMUNITY_Community 312|Community 312]]
+- [[_COMMUNITY_Community 326|Community 326]]
 - [[_COMMUNITY_Community 353|Community 353]]
 - [[_COMMUNITY_Community 354|Community 354]]
-- [[_COMMUNITY_Community 359|Community 359]]
+- [[_COMMUNITY_Community 355|Community 355]]
 - [[_COMMUNITY_Community 360|Community 360]]
 - [[_COMMUNITY_Community 361|Community 361]]
-- [[_COMMUNITY_Community 363|Community 363]]
+- [[_COMMUNITY_Community 362|Community 362]]
 - [[_COMMUNITY_Community 364|Community 364]]
 - [[_COMMUNITY_Community 365|Community 365]]
 - [[_COMMUNITY_Community 366|Community 366]]
-- [[_COMMUNITY_Community 368|Community 368]]
+- [[_COMMUNITY_Community 367|Community 367]]
 - [[_COMMUNITY_Community 369|Community 369]]
-- [[_COMMUNITY_Community 371|Community 371]]
+- [[_COMMUNITY_Community 370|Community 370]]
 - [[_COMMUNITY_Community 372|Community 372]]
 - [[_COMMUNITY_Community 373|Community 373]]
 - [[_COMMUNITY_Community 374|Community 374]]
@@ -334,10 +333,13 @@
 - [[_COMMUNITY_Community 377|Community 377]]
 - [[_COMMUNITY_Community 378|Community 378]]
 - [[_COMMUNITY_Community 379|Community 379]]
+- [[_COMMUNITY_Community 380|Community 380]]
+- [[_COMMUNITY_Community 381|Community 381]]
 - [[_COMMUNITY_Community 382|Community 382]]
 - [[_COMMUNITY_Community 383|Community 383]]
 - [[_COMMUNITY_Community 384|Community 384]]
 - [[_COMMUNITY_Community 385|Community 385]]
+- [[_COMMUNITY_Community 386|Community 386]]
 - [[_COMMUNITY_Community 387|Community 387]]
 - [[_COMMUNITY_Community 388|Community 388]]
 - [[_COMMUNITY_Community 389|Community 389]]
@@ -354,13 +356,10 @@
 - [[_COMMUNITY_Community 400|Community 400]]
 - [[_COMMUNITY_Community 401|Community 401]]
 - [[_COMMUNITY_Community 402|Community 402]]
-- [[_COMMUNITY_Community 403|Community 403]]
-- [[_COMMUNITY_Community 404|Community 404]]
 - [[_COMMUNITY_Community 405|Community 405]]
 - [[_COMMUNITY_Community 406|Community 406]]
 - [[_COMMUNITY_Community 407|Community 407]]
 - [[_COMMUNITY_Community 408|Community 408]]
-- [[_COMMUNITY_Community 409|Community 409]]
 - [[_COMMUNITY_Community 410|Community 410]]
 - [[_COMMUNITY_Community 411|Community 411]]
 - [[_COMMUNITY_Community 412|Community 412]]
@@ -371,21 +370,27 @@
 - [[_COMMUNITY_Community 417|Community 417]]
 - [[_COMMUNITY_Community 418|Community 418]]
 - [[_COMMUNITY_Community 419|Community 419]]
-- [[_COMMUNITY_Community 438|Community 438]]
-- [[_COMMUNITY_Community 439|Community 439]]
-- [[_COMMUNITY_Community 440|Community 440]]
+- [[_COMMUNITY_Community 420|Community 420]]
+- [[_COMMUNITY_Community 421|Community 421]]
+- [[_COMMUNITY_Community 422|Community 422]]
+- [[_COMMUNITY_Community 441|Community 441]]
+- [[_COMMUNITY_Community 442|Community 442]]
+- [[_COMMUNITY_Community 443|Community 443]]
+- [[_COMMUNITY_Community 444|Community 444]]
+- [[_COMMUNITY_Community 445|Community 445]]
+- [[_COMMUNITY_Community 446|Community 446]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `JwtPayload` - 214 edges
-2. `react` - 138 edges
-3. `lucide-react` - 125 edges
+2. `react` - 139 edges
+3. `lucide-react` - 126 edges
 4. `CurrentUser` - 113 edges
 5. `class-validator` - 108 edges
 6. `Roles()` - 99 edges
 7. `PrismaService` - 96 edges
-8. `useAuth()` - 58 edges
-9. `PaginatedResponse` - 53 edges
-10. `Input()` - 52 edges
+8. `useAuth()` - 59 edges
+9. `Input()` - 53 edges
+10. `PaginatedResponse` - 53 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `m()` --calls--> `Error()`  [INFERRED]
@@ -394,648 +399,632 @@
   docs/book/searcher-09f2665d.js → server/src/modules/email/email.service.ts
 - `onSubmit()` --calls--> `prepareAttachmentFiles()`  [INFERRED]
   client/src/components/tasks/TaskForm.tsx → client/src/lib/attachmentUpload.ts
-- `onSubmit()` --calls--> `compactPayload()`  [INFERRED]
-  client/src/components/projects/ProjectForm.tsx → client/src/lib/projectValidation.ts
 - `globalKeyHandler()` --calls--> `mdbook_something_else_has_focus()`  [INFERRED]
   docs/book/searcher-09f2665d.js → docs/book/book-c22b7243.js
+- `e()` --calls--> `t()`  [INFERRED]
+  docs/book/mark-09e88c2c.min.js → docs/book/highlight-abc7f01d.js
 
-## Communities (562 total, 174 thin omitted)
+## Communities (569 total, 182 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.02
-Nodes (50): GrantVendorAccessDto, CreateChecklistItemDto, UpdateChecklistItemDto, class-validator, CreateClosureReportDto, CreateSuccessCriterionDto, AddProjectMemberDto, AttachmentFilterDto (+42 more)
+Nodes (51): GrantVendorAccessDto, UpdateChecklistItemDto, class-validator, CreateClosureReportDto, CreateSuccessCriterionDto, AddCoordinatorDto, AddProjectMemberDto, AddTeamMemberDto (+43 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.04
-Nodes (23): AppointmentDialog(), CameraSettingsCard(), EmployeeRequestScreen(), GeneralSettingsCard(), useDepartmentOptions(), PreferredSchedule(), PrinterSettingsCard(), SecuritySettingsCard() (+15 more)
+Nodes (37): bootstrap(), bootstrap(), bootstrap(), bootstrap(), AppModule, Module, DepartmentQueryHelper, DepartmentScopeService (+29 more)
 
 ### Community 2 - "Community 2"
-Cohesion: 0.06
-Nodes (49): ProjectClosurePage(), useAddProjectMember(), useCloseProject(), useCreateChecklistItem(), useCreateKpi(), useCreateMilestone(), useCreateOutcome(), useCreateProject() (+41 more)
+Cohesion: 0.03
+Nodes (28): AccessCodeInput(), CheckOutDialog(), CompanyLogo(), ExportDialog(), NumericKeypad(), PageContainer(), PageContent(), PermissionSlipDocument() (+20 more)
 
 ### Community 3 - "Community 3"
+Cohesion: 0.07
+Nodes (40): CurrentUser, Roles(), JwtAuthGuard, Injectable, vmsJwtService, RolesGuard, Injectable, Role (+32 more)
+
+### Community 4 - "Community 4"
+Cohesion: 0.03
+Nodes (26): AppointmentDialog(), CameraSettingsCard(), DateRangePicker(), EmployeeRequestScreen(), GeneralSettingsCard(), useDepartmentOptions(), PreferredSchedule(), PrinterSettingsCard() (+18 more)
+
+### Community 5 - "Community 5"
+Cohesion: 0.05
+Nodes (51): ProjectClosurePage(), useAddProjectMember(), useCloseProject(), useCreateChecklistItem(), useCreateKpi(), useCreateMilestone(), useCreateOutcome(), useCreateProject() (+43 more)
+
+### Community 6 - "Community 6"
+Cohesion: 0.04
+Nodes (36): ArrayNotEmpty, ArrayUnique, CreateTaskDto, IsArray, IsBoolean, IsDateString, IsEnum, IsNotEmpty (+28 more)
+
+### Community 7 - "Community 7"
 Cohesion: 0.06
 Nodes (12): decryptSecret(), encryptSecret(), loadAssetKey(), AssetsModule, AssetsService, budgetVariance(), EventsService, serialiseEvent() (+4 more)
 
-### Community 4 - "Community 4"
-Cohesion: 0.06
-Nodes (28): bootstrap(), bootstrap(), bootstrap(), bootstrap(), AppModule, Module, DepartmentScopeService, Injectable (+20 more)
-
-### Community 5 - "Community 5"
-Cohesion: 0.04
-Nodes (18): AccessCodeInput(), AppointmentCalendar(), AppointmentFilters(), AuditFilters(), CompanyLogo(), NumericKeypad(), PageContainer(), PageContent() (+10 more)
-
-### Community 6 - "Community 6"
-Cohesion: 0.06
-Nodes (39): AccessManagement(), useUserOptions(), EditVendor(), useAddVendorNote(), useCreateAssignment(), useCreateContract(), useCreateDeliverable(), useCreateDocument() (+31 more)
-
-### Community 7 - "Community 7"
-Cohesion: 0.08
-Nodes (41): ApiQuery, ReportController, ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, Controller, Get (+33 more)
-
 ### Community 8 - "Community 8"
-Cohesion: 0.07
-Nodes (11): exceljs, countLeaveDays(), datesBetween(), financialYearOf(), monthRange(), parseDateOnly(), remainingDays(), toDateKey() (+3 more)
+Cohesion: 0.08
+Nodes (29): acceptsActual(), acceptsProgress(), acceptsReview(), allocation(), canActOnDepartment(), fitsAllocation(), isAuthority(), isCountable() (+21 more)
 
 ### Community 9 - "Community 9"
-Cohesion: 0.08
-Nodes (44): CommonModule, Global, Module, AttachmentsModule, Module, AuthModule, Module, CommentsModule (+36 more)
+Cohesion: 0.05
+Nodes (36): Button(), buttonVariants, DialogContent, DialogHeader(), TabsContent, TabsList, TabsTrigger, UserTableProps (+28 more)
 
 ### Community 10 - "Community 10"
 Cohesion: 0.06
-Nodes (36): leaveTypeName(), remainingDays(), toDays(), startEdit(), useAllLeaveBalances(), useApplyLeave(), useApproveLeave(), useCancelMyLeave() (+28 more)
+Nodes (45): Page(), AdminPage(), AnalyticsPage(), CareerPage(), IncentivesPage(), ProtectedLayout(), ScoringPage(), NewTaskPage() (+37 more)
 
 ### Community 11 - "Community 11"
-Cohesion: 0.04
-Nodes (13): NavItem(), PermissionSlipFilters(), SystemInformationCard(), HolidayBanner(), useEmployees(), useKpiUnits(), useDashboard(), useSendVendorMessage() (+5 more)
+Cohesion: 0.06
+Nodes (39): AccessManagement(), useUserOptions(), EditVendor(), useAddVendorNote(), useCreateAssignment(), useCreateContract(), useCreateDeliverable(), useCreateDocument() (+31 more)
 
 ### Community 12 - "Community 12"
 Cohesion: 0.05
-Nodes (28): AdminPage(), AnalyticsPage(), rateAnswer(), Page(), AssistantPanel(), useAuth(), useDepartmentScoreTrend(), useMyScore() (+20 more)
+Nodes (35): CreateNotificationDto, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength, CreateRequestDto (+27 more)
 
 ### Community 13 - "Community 13"
-Cohesion: 0.05
-Nodes (32): class-transformer, CheckInDto, CheckOutDto, CreateVisitDto, CreateVisitorDto, CreateVisitorRequestDto, DashboardSummaryDto, GeneratePassDto (+24 more)
+Cohesion: 0.08
+Nodes (41): ApiQuery, ReportController, ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, Controller, Get (+33 more)
 
 ### Community 14 - "Community 14"
-Cohesion: 0.07
-Nodes (28): AuditModule, Module, Inject, AuditEvent, AuditFilterDto, ApiPropertyOptional, IsDateString, IsEnum (+20 more)
+Cohesion: 0.05
+Nodes (29): AdminPage(), AnalyticsPage(), rateAnswer(), Page(), AssistantPanel(), useAuth(), useDepartmentScoreTrend(), useMyScore() (+21 more)
 
 ### Community 15 - "Community 15"
 Cohesion: 0.05
-Nodes (33): ApiExcludeController, InternalApiGuard, Injectable, RedisService, Injectable, DepartmentsController, Body, Controller (+25 more)
+Nodes (37): CommentsController, Body, Controller, Delete, Get, HttpCode, Param, Patch (+29 more)
 
 ### Community 16 - "Community 16"
 Cohesion: 0.06
-Nodes (38): fetch_with_timeout(), get_saved_theme(), get_theme(), handle_crate_list_update(), hideSidebar(), mdbook_something_else_has_focus(), playground_text(), resize() (+30 more)
+Nodes (34): ChangeStatusDto, IsEnum, IsNotEmpty, CreateSelfActionCommentDto, IsNotEmpty, IsOptional, IsString, IsUUID (+26 more)
 
 ### Community 17 - "Community 17"
-Cohesion: 0.09
-Nodes (13): Roles(), Body, Controller, Delete, Get, Param, Patch, Post (+5 more)
+Cohesion: 0.07
+Nodes (36): leaveTypeName(), remainingDays(), toDays(), startEdit(), useAllLeaveBalances(), useApplyLeave(), useApproveLeave(), useCancelMyLeave() (+28 more)
 
 ### Community 18 - "Community 18"
-Cohesion: 0.07
-Nodes (31): PaginationMeta, SwaggerDecorator, CreateVisitorRequestDto, ApiProperty, ApiPropertyOptional, Exclude, Expose, IsDate (+23 more)
+Cohesion: 0.03
+Nodes (10): AppointmentCalendar(), AppointmentFilters(), NavItem(), HolidayBanner(), useAppointments(), useEmployees(), useKpiScores(), useKpiUnits() (+2 more)
 
 ### Community 19 - "Community 19"
-Cohesion: 0.09
-Nodes (21): acceptsActual(), acceptsReview(), isCountable(), isSettled(), transitionRoles(), applyCap(), binaryAchievement(), floorAtZero() (+13 more)
+Cohesion: 0.05
+Nodes (28): exportTodayVisitors(), AppointmentStatusBadge(), AuditStatusBadge(), DashboardScreen(), EmployeeReportChart(), PermissionSlipStatusBadge(), ReportSummaryCards(), ReportTable() (+20 more)
 
 ### Community 20 - "Community 20"
+Cohesion: 0.07
+Nodes (28): AuditModule, Module, Inject, AuditEvent, AuditFilterDto, ApiPropertyOptional, IsDateString, IsEnum (+20 more)
+
+### Community 21 - "Community 21"
+Cohesion: 0.09
+Nodes (39): CommonModule, Global, Module, AttachmentsModule, Module, AuthModule, Module, CommentsModule (+31 more)
+
+### Community 22 - "Community 22"
+Cohesion: 0.06
+Nodes (38): fetch_with_timeout(), get_saved_theme(), get_theme(), handle_crate_list_update(), hideSidebar(), mdbook_something_else_has_focus(), playground_text(), resize() (+30 more)
+
+### Community 23 - "Community 23"
+Cohesion: 0.09
+Nodes (16): UploadedFile, AttachmentsController, Controller, Delete, Get, Param, Post, UploadedFiles (+8 more)
+
+### Community 24 - "Community 24"
 Cohesion: 0.06
 Nodes (4): AuthService, bcrypt, bcrypt, UsersService
 
-### Community 21 - "Community 21"
-Cohesion: 0.06
-Nodes (38): SelfActionComment, AdminDashboardData, ApiError, Attachment, EmployeeDashboardData, ForgotPasswordRequest, HODDashboardData, JwtUser (+30 more)
+### Community 25 - "Community 25"
+Cohesion: 0.07
+Nodes (23): NotificationsPage(), adminApi, AuditLog, analyticsApi, AnalyticsData, axiosClient, dashboardApi, Incentive (+15 more)
 
-### Community 22 - "Community 22"
+### Community 26 - "Community 26"
+Cohesion: 0.09
+Nodes (8): countLeaveDays(), datesBetween(), financialYearOf(), monthRange(), parseDateOnly(), remainingDays(), toDateKey(), LeaveService
+
+### Community 27 - "Community 27"
+Cohesion: 0.09
+Nodes (12): Body, Controller, Delete, Get, Param, Patch, Post, Query (+4 more)
+
+### Community 28 - "Community 28"
 Cohesion: 0.07
 Nodes (37): ApiBearerAuth(), ApiOkResponse(), ApiOperation(), ApiTags(), EmployeeController, noopSwaggerDecorator(), SwaggerDecorator, Controller (+29 more)
 
-### Community 23 - "Community 23"
+### Community 29 - "Community 29"
+Cohesion: 0.06
+Nodes (27): class-transformer, CheckInDto, CheckOutDto, CreateHolidayDto, CreateTaskDto, CreateUserDto, CreateVisitDto, CreateVisitorDto (+19 more)
+
+### Community 30 - "Community 30"
+Cohesion: 0.07
+Nodes (29): CreateVisitorRequestDto, ApiProperty, ApiPropertyOptional, Exclude, Expose, IsDate, IsOptional, IsString (+21 more)
+
+### Community 31 - "Community 31"
 Cohesion: 0.08
 Nodes (20): a(), b(), c(), d(), e(), I(), l(), m() (+12 more)
 
-### Community 24 - "Community 24"
-Cohesion: 0.1
-Nodes (11): AttachmentsController, Controller, Delete, Get, Param, Post, UploadedFiles, UseGuards (+3 more)
+### Community 32 - "Community 32"
+Cohesion: 0.09
+Nodes (20): JwtPayload, Get, CreateTransferDto, IsNotEmpty, IsOptional, IsString, IsUUID, TransferActionDto (+12 more)
 
-### Community 25 - "Community 25"
-Cohesion: 0.08
-Nodes (33): Badge(), badgeVariants, TabsContent, TabsList, TabsTrigger, createVisitor(), deriveProfileImage(), getVisitor() (+25 more)
-
-### Community 26 - "Community 26"
+### Community 33 - "Community 33"
 Cohesion: 0.07
 Nodes (12): ApiBearerAuth(), ApiBody(), ApiCreatedResponse(), ApiOkResponse(), ApiOperation(), ApiParam(), ApiTags(), noopSwaggerDecorator() (+4 more)
 
-### Community 27 - "Community 27"
+### Community 34 - "Community 34"
 Cohesion: 0.07
 Nodes (7): VisitorRepositoryImpl, VisitorRequestService, extractPhoneDigits(), maskPhoneNumber(), normalizePhoneNumber(), isOptionalMobileNumber(), isValidMobileNumber()
 
-### Community 28 - "Community 28"
-Cohesion: 0.05
-Nodes (19): configuredUrl(), launchCareerX(), CareerPage(), CheckInCard(), PurposeField(), onCheckIn(), onNext(), VisitorFormDialog() (+11 more)
-
-### Community 29 - "Community 29"
-Cohesion: 0.09
-Nodes (21): Button(), buttonVariants, Checkbox(), Label(), SelectContent, SelectItem, SelectTrigger, Skeleton() (+13 more)
-
-### Community 30 - "Community 30"
-Cohesion: 0.09
-Nodes (14): ArrayNotEmpty, ArrayUnique, CreateTaskDto, IsArray, IsBoolean, IsDateString, IsEnum, IsNotEmpty (+6 more)
-
-### Community 31 - "Community 31"
-Cohesion: 0.1
-Nodes (17): IsOptional, IsString, IsUUID, UpdateRequestStatusDto, RequestsController, Body, Controller, Get (+9 more)
-
-### Community 32 - "Community 32"
-Cohesion: 0.07
-Nodes (19): assistantClient(), resolveProvider(), set(), AssistantController, AssistantService, isVmsScoped(), NOW(), as() (+11 more)
-
-### Community 33 - "Community 33"
-Cohesion: 0.12
-Nodes (15): JwtPayload, SelfActionsController, Body, Controller, Delete, Get, Param, Patch (+7 more)
-
-### Community 34 - "Community 34"
-Cohesion: 0.09
-Nodes (25): VMS_JWT_EXPIRES_IN, VMS_JWT_SECRET, VmsJwtPayload, AccessModule, Module, AccessController, Body, Controller (+17 more)
-
 ### Community 35 - "Community 35"
 Cohesion: 0.07
-Nodes (24): canViewEmployeeAssets(), copySecret(), deleteAsset(), errorMessage(), toggleShown(), class-variance-authority, class-variance-authority, useAssetDirectory() (+16 more)
+Nodes (24): canViewEmployeeAssets(), configuredUrl(), launchCareerX(), copySecret(), deleteAsset(), errorMessage(), toggleShown(), CareerPage() (+16 more)
 
 ### Community 36 - "Community 36"
-Cohesion: 0.11
-Nodes (6): AttachmentsService, clean(), urlFrom(), supabaseBucketFromEnv(), supabaseKeyFromEnv(), supabaseUrlFromEnv()
+Cohesion: 0.08
+Nodes (32): SelfAction, SelfActionFilters, SelfActionPriority, selfActionsApi, SelfActionStatus, Department, EditSelfActionDialog(), Props (+24 more)
 
 ### Community 37 - "Community 37"
 Cohesion: 0.08
-Nodes (25): LoginPage(), normalizeDepartments(), SignupFormData, SignupPage(), signupSchema, PageState, TODO: add a dedicated resend-otp endpoint when available, Input() (+17 more)
+Nodes (26): LoginPage(), normalizeDepartments(), SignupFormData, SignupPage(), signupSchema, PageState, TODO: add a dedicated resend-otp endpoint when available, Input() (+18 more)
 
 ### Community 38 - "Community 38"
+Cohesion: 0.05
+Nodes (36): axios, @base-ui/react, dependencies, axios, @base-ui/react, clsx, compressorjs, @hookform/resolvers (+28 more)
+
+### Community 39 - "Community 39"
+Cohesion: 0.07
+Nodes (19): assistantClient(), resolveProvider(), set(), AssistantController, AssistantService, isVmsScoped(), NOW(), as() (+11 more)
+
+### Community 40 - "Community 40"
+Cohesion: 0.07
+Nodes (33): AdminDashboardData, ApiError, EmployeeDashboardData, ForgotPasswordRequest, HODDashboardData, JwtUser, LoginRequest, LoginResponse (+25 more)
+
+### Community 41 - "Community 41"
+Cohesion: 0.09
+Nodes (25): VMS_JWT_EXPIRES_IN, VMS_JWT_SECRET, VmsJwtPayload, AccessModule, Module, AccessController, Body, Controller (+17 more)
+
+### Community 42 - "Community 42"
+Cohesion: 0.11
+Nodes (6): AttachmentsService, clean(), urlFrom(), supabaseBucketFromEnv(), supabaseKeyFromEnv(), supabaseUrlFromEnv()
+
+### Community 43 - "Community 43"
 Cohesion: 0.1
 Nodes (29): generatePermissionSlip(), getPermissionSlips(), reprintPermissionSlip(), PermissionSlipDocument(), PermissionSlipDocumentProps, PermissionSlipFilters(), PermissionSlipFiltersProps, PermissionSlipsScreen() (+21 more)
 
-### Community 39 - "Community 39"
-Cohesion: 0.05
-Nodes (34): axios, @base-ui/react, dependencies, axios, @base-ui/react, clsx, compressorjs, @hookform/resolvers (+26 more)
-
-### Community 40 - "Community 40"
+### Community 44 - "Community 44"
 Cohesion: 0.12
 Nodes (22): AuthenticatedUser, DashboardSummaryDto, ApiProperty, Exclude, Expose, RecentVisitorDto, RecentVisitorHostDto, RecentVisitorPersonDto (+14 more)
 
-### Community 41 - "Community 41"
-Cohesion: 0.08
-Nodes (33): UploadedFile, ChangeStatusDto, IsEnum, IsNotEmpty, CreateSelfActionCommentDto, IsNotEmpty, IsOptional, IsString (+25 more)
-
-### Community 42 - "Community 42"
-Cohesion: 0.09
-Nodes (18): CreateTransferDto, IsNotEmpty, IsOptional, IsString, IsUUID, TransferActionDto, IsOptional, IsString (+10 more)
-
-### Community 43 - "Community 43"
-Cohesion: 0.08
-Nodes (21): CommentsController, Body, Controller, Delete, Get, HttpCode, Param, Patch (+13 more)
-
-### Community 44 - "Community 44"
-Cohesion: 0.07
-Nodes (17): AppointmentStatusBadge(), AuditTable(), CheckOutDialog(), PermissionSlipStatusBadge(), RequestFilters(), RequestStatusBadge(), RequestTable(), TodayVisitorsTable() (+9 more)
-
 ### Community 45 - "Community 45"
-Cohesion: 0.1
-Nodes (27): SelfAction, SelfActionAttachment, SelfActionFilters, SelfActionPriority, selfActionsApi, SelfActionStatus, EditSelfActionDialog(), Props (+19 more)
-
-### Community 46 - "Community 46"
-Cohesion: 0.11
-Nodes (19): JwtAuthGuard, Injectable, vmsJwtService, RolesGuard, Injectable, Role, REQUEST_TYPES, RequestFilterDto (+11 more)
+Cohesion: 0.12
+Nodes (21): ApiBearerAuth(), ApiBody(), ApiCreatedResponse(), ApiOkResponse(), ApiOperation(), ApiParam(), ApiTags(), AppointmentController (+13 more)
 
 ### Community 47 - "Community 47"
-Cohesion: 0.13
-Nodes (11): VisitorRequestDbClient, VisitorRequestRecord, VisitorRequestRepository, Inject, Injectable, VisitorRequestService, ApiProperty, ApiPropertyOptional (+3 more)
+Cohesion: 0.1
+Nodes (26): Checkbox(), Textarea(), createVisitor(), deriveProfileImage(), getVisitor(), getVisitors(), searchVisitors(), uploadVisitorPhoto() (+18 more)
+
+### Community 48 - "Community 48"
+Cohesion: 0.14
+Nodes (6): VisitorRequestDbClient, VisitorRequestRecord, VisitorRequestRepository, Inject, Injectable, VisitorRequestService
 
 ### Community 49 - "Community 49"
-Cohesion: 0.1
-Nodes (24): Page(), AdminPage(), AnalyticsPage(), IncentivesPage(), ProtectedLayout(), ScoringPage(), NewTaskPage(), PublicLayout() (+16 more)
+Cohesion: 0.15
+Nodes (23): Badge(), badgeVariants, Label(), SelectContent, SelectItem, SelectTrigger, Skeleton(), Table() (+15 more)
 
 ### Community 50 - "Community 50"
-Cohesion: 0.11
-Nodes (26): createAppointment(), getAppointments(), updateAppointment(), AppointmentCalendar(), AppointmentCalendarProps, AppointmentDialog(), AppointmentFilters(), AppointmentFiltersProps (+18 more)
+Cohesion: 0.1
+Nodes (27): GENERAL_REQUEST_TYPES, PRIORITIES, RequestsPage(), formatDate(), label(), statusIcons, TaskDetailPage(), TasksPage() (+19 more)
 
 ### Community 51 - "Community 51"
-Cohesion: 0.09
-Nodes (17): NotificationsPage(), analyticsApi, AnalyticsData, axiosClient, dashboardApi, Incentive, incentivesApi, notificationsApi (+9 more)
+Cohesion: 0.11
+Nodes (25): useApproveKpi(), useChangeKpiStatus(), useCreateKpi(), useKpi(), useKpiMessages(), useKpis(), useMyPsScore(), usePostKpiMessage() (+17 more)
 
 ### Community 52 - "Community 52"
-Cohesion: 0.14
-Nodes (14): CurrentUser, Get, TasksController, Body, Controller, Delete, Get, Param (+6 more)
-
-### Community 53 - "Community 53"
-Cohesion: 0.09
-Nodes (26): CareerPage(), emptyForm, getErrorMessage(), ProfileFormState, ProfilePage(), launchCareerX(), profileApi, ProfileData (+18 more)
-
-### Community 54 - "Community 54"
-Cohesion: 0.17
-Nodes (21): ApiResponse, ApiBearerAuth(), ApiBody(), ApiCreatedResponse(), ApiOkResponse(), ApiOperation(), ApiParam(), ApiTags() (+13 more)
-
-### Community 55 - "Community 55"
-Cohesion: 0.1
-Nodes (19): DialogContent, DialogHeader(), CameraDialog(), CameraDialogProps, CameraPreview(), CameraPreviewProps, CameraToolbar(), CameraToolbarProps (+11 more)
-
-### Community 56 - "Community 56"
 Cohesion: 0.06
 Nodes (35): @nestjs/common, @nestjs/config, @nestjs/core, @nestjs/jwt, @nestjs/passport, @nestjs/platform-express, @nestjs/platform-socket.io, @nestjs/schedule (+27 more)
 
-### Community 57 - "Community 57"
-Cohesion: 0.07
-Nodes (27): SearchVisitorRequestDto, ApiPropertyOptional, Exclude, Expose, IsDateString, IsEnum, IsInt, IsOptional (+19 more)
+### Community 53 - "Community 53"
+Cohesion: 0.19
+Nodes (22): ApiResponse, ApiBearerAuth(), ApiBody(), ApiCreatedResponse(), ApiOkResponse(), ApiOperation(), ApiParam(), ApiTags() (+14 more)
 
-### Community 58 - "Community 58"
+### Community 54 - "Community 54"
 Cohesion: 0.11
 Nodes (21): checkIn(), createVisit(), getEmployees(), EmployeeSelector(), EmployeeSelectorProps, PurposeField(), PurposeFieldProps, QuickEntryCard() (+13 more)
 
-### Community 59 - "Community 59"
+### Community 55 - "Community 55"
+Cohesion: 0.07
+Nodes (27): SearchVisitorRequestDto, ApiPropertyOptional, Exclude, Expose, IsDateString, IsEnum, IsInt, IsOptional (+19 more)
+
+### Community 56 - "Community 56"
 Cohesion: 0.15
 Nodes (23): Put, ApiBearerAuth(), ApiBody(), ApiCreatedResponse(), ApiOkResponse(), ApiOperation(), ApiParam(), ApiTags() (+15 more)
 
-### Community 60 - "Community 60"
-Cohesion: 0.06
-Nodes (14): updateVisitorPhoto(), date-fns, react-dom, AuditStatusBadge(), ExportDialog(), PermissionSlipDocument(), PrintPortal(), handleUpdatePhoto() (+6 more)
+### Community 57 - "Community 57"
+Cohesion: 0.12
+Nodes (22): createAppointment(), getAppointments(), updateAppointment(), AppointmentCalendar(), AppointmentCalendarProps, AppointmentDialog(), AppointmentFilters(), AppointmentFiltersProps (+14 more)
 
-### Community 61 - "Community 61"
-Cohesion: 0.14
-Nodes (16): getSettings(), updateSettings(), CameraSettingsCard(), GeneralSettingsCard(), PrinterSettingsCard(), ReceptionSettingsCard(), SaveSettingsDialog(), SaveSettingsDialogProps (+8 more)
-
-### Community 62 - "Community 62"
+### Community 58 - "Community 58"
 Cohesion: 0.08
-Nodes (22): TaskFilterDto, IsDateString, IsEnum, IsInt, IsOptional, IsString, IsUUID, Max (+14 more)
+Nodes (17): ApiExcludeController, RedisService, Injectable, DepartmentsController, Body, Controller, Get, Param (+9 more)
 
-### Community 63 - "Community 63"
-Cohesion: 0.11
-Nodes (13): PassEmployeeDto, PassResponseDto, PassVisitorDto, ApiProperty, ApiPropertyOptional, Exclude, Expose, Transform (+5 more)
-
-### Community 64 - "Community 64"
+### Community 59 - "Community 59"
 Cohesion: 0.12
 Nodes (5): MemberTickChecklistDto, toMemberTick(), computeProgress(), deriveHealth(), ProjectExecutionService
 
-### Community 65 - "Community 65"
-Cohesion: 0.12
-Nodes (22): CreateTaskData, TaskDepartment, tasksApi, Comment, CreateSelfActionDialog(), Props, CommentNode(), Draft (+14 more)
-
-### Community 66 - "Community 66"
+### Community 60 - "Community 60"
 Cohesion: 0.12
 Nodes (18): ProfileResponseDto, IsEmail, IsOptional, IsString, MaxLength, MinLength, UpdateProfileDto, ProfileController (+10 more)
 
-### Community 67 - "Community 67"
-Cohesion: 0.19
-Nodes (20): ApiBearerAuth(), ApiBody(), ApiCreatedResponse(), ApiOkResponse(), ApiOperation(), ApiParam(), ApiTags(), AppointmentController (+12 more)
+### Community 61 - "Community 61"
+Cohesion: 0.14
+Nodes (9): VisitorExistsCriteria, VisitorLookupOptions, VisitorRecord, VisitorSortBy, VisitorSortOrder, SEARCHABLE_STRING_FIELDS, Injectable, VisitorRepositoryImpl (+1 more)
 
-### Community 68 - "Community 68"
-Cohesion: 0.12
-Nodes (18): useChangeKpiStatus(), useCreateKpi(), useKpi(), useKpis(), useMyPsScore(), useRecordKpiUpdate(), useTickKpiMilestone(), formatNumber() (+10 more)
+### Community 62 - "Community 62"
+Cohesion: 0.15
+Nodes (19): VisitorImageSource, VisitorImageType, VisitorStatus, VisitorSortBy, VisitorSortOrder, ApiProperty(), ApiPropertyOptional(), ClassType (+11 more)
 
-### Community 69 - "Community 69"
-Cohesion: 0.09
-Nodes (18): next, socket.io-client, ErrorBoundary(), disconnectSocket(), getSocket(), initializeSocket(), initAuth(), jwtToUser() (+10 more)
-
-### Community 71 - "Community 71"
+### Community 64 - "Community 64"
 Cohesion: 0.16
 Nodes (18): exportReport(), getReports(), EmployeeReportChart(), ExportDialog(), ExportDialogProps, ReportsScreen(), ReportSummaryCards(), ReportSummaryCardsProps (+10 more)
 
-### Community 72 - "Community 72"
-Cohesion: 0.15
-Nodes (19): getAuditLogs(), AuditDetailsDialog(), AuditDetailsDialogProps, AuditFilters(), AuditFiltersProps, AuditScreen(), AuditStatusBadge(), AuditStatusBadgeProps (+11 more)
+### Community 65 - "Community 65"
+Cohesion: 0.13
+Nodes (15): ApiProperty(), ApiPropertyOptional(), ClassType, PartialType(), Exclude, Expose, UpdateVisitDto, VisitBranchNotResolvedException (+7 more)
 
-### Community 73 - "Community 73"
-Cohesion: 0.17
-Nodes (18): getRequests(), updateRequest(), RequestDetailsDialog(), RequestDetailsDialogProps, RequestFilters(), RequestFiltersProps, RequestsScreen(), RequestStatusBadge() (+10 more)
+### Community 66 - "Community 66"
+Cohesion: 0.1
+Nodes (13): class-variance-authority, class-variance-authority, canApproveUsers(), useApproveUser(), useDecision(), usePendingUsers(), useRejectUser(), useCreateHoliday() (+5 more)
 
-### Community 74 - "Community 74"
+### Community 67 - "Community 67"
+Cohesion: 0.1
+Nodes (17): next, socket.io-client, ErrorBoundary(), disconnectSocket(), getSocket(), initializeSocket(), initAuth(), jwtToUser() (+9 more)
+
+### Community 68 - "Community 68"
 Cohesion: 0.12
 Nodes (17): verifyAccess(), useAccessCode(), UseAccessCodeProps, useVerifyAccess(), AccessStore, AccessSubmitHandler, AccessType, VerifyAccessRequest (+9 more)
 
-### Community 75 - "Community 75"
+### Community 69 - "Community 69"
+Cohesion: 0.17
+Nodes (18): getRequests(), updateRequest(), RequestDetailsDialog(), RequestDetailsDialogProps, RequestFilters(), RequestFiltersProps, RequestsScreen(), RequestStatusBadge() (+10 more)
+
+### Community 70 - "Community 70"
+Cohesion: 0.15
+Nodes (17): checkOutVisitor(), getVisitorsInside(), CheckOutDialog(), CheckOutDialogProps, CheckOutScreen(), VisitDurationCard(), VisitDurationCardProps, VisitorsInsideTable() (+9 more)
+
+### Community 71 - "Community 71"
+Cohesion: 0.15
+Nodes (19): getAuditLogs(), AuditDetailsDialog(), AuditDetailsDialogProps, AuditFilters(), AuditFiltersProps, AuditScreen(), AuditStatusBadge(), AuditStatusBadgeProps (+11 more)
+
+### Community 72 - "Community 72"
+Cohesion: 0.16
+Nodes (14): getSettings(), updateSettings(), CameraSettingsCard(), GeneralSettingsCard(), PrinterSettingsCard(), ReceptionSettingsCard(), SecuritySettingsCard(), SettingsScreen() (+6 more)
+
+### Community 73 - "Community 73"
 Cohesion: 0.07
 Nodes (27): compilerOptions, allowJs, esModuleInterop, incremental, isolatedModules, jsx, lib, module (+19 more)
 
-### Community 76 - "Community 76"
+### Community 74 - "Community 74"
 Cohesion: 0.12
 Nodes (15): PassController, ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, Body, Controller, Get (+7 more)
 
+### Community 76 - "Community 76"
+Cohesion: 0.1
+Nodes (3): NotificationsGateway, socket.io, socket.io
+
 ### Community 77 - "Community 77"
-Cohesion: 0.17
-Nodes (8): Exclude, Expose, UpdateVisitDto, VisitDbClient, VisitQueryRecord, VisitServiceContract, Injectable, VisitService
-
-### Community 79 - "Community 79"
-Cohesion: 0.14
-Nodes (17): checkOutVisitor(), getVisitorsInside(), CheckOutDialog(), CheckOutDialogProps, CheckOutScreen(), VisitDurationCard(), VisitDurationCardProps, VisitorsInsideTable() (+9 more)
-
-### Community 80 - "Community 80"
-Cohesion: 0.16
-Nodes (5): Inject, AppointmentRepository, DbClient, Injectable, IAppointmentService
-
-### Community 81 - "Community 81"
-Cohesion: 0.14
-Nodes (8): DepartmentQueryHelper, DepartmentScope, DashboardController, Controller, DashboardModule, Module, DashboardService, Injectable
-
-### Community 82 - "Community 82"
 Cohesion: 0.18
 Nodes (4): VisitorDbClient, VisitorSearchParams, Injectable, VisitorService
 
-### Community 83 - "Community 83"
-Cohesion: 0.15
-Nodes (12): ApiProperty(), ApiPropertyOptional(), ClassType, PartialType(), VisitBranchNotResolvedException, VisitCreateData, VisitHostEmployeeNotFoundException, VisitLockedException (+4 more)
-
-### Community 84 - "Community 84"
-Cohesion: 0.22
-Nodes (5): VisitLookupOptions, VisitRecord, VisitSearchParams, Injectable, VisitRepositoryImpl
-
-### Community 85 - "Community 85"
-Cohesion: 0.15
-Nodes (13): RequestSuccessCard, createEmployeeVisitorRequest(), EmployeeInfoCard, EmployeeRequestScreen(), RequestSuccessCardProps, VisitorRequestForm(), useCreateEmployeeRequest(), employeeRequestSchema (+5 more)
-
-### Community 86 - "Community 86"
+### Community 78 - "Community 78"
 Cohesion: 0.13
 Nodes (14): getDashboardSummary(), exportTodayVisitors(), DashboardScreen(), StatisticsCard(), StatisticsCardProps, SummaryCard(), SummaryCardProps, useDashboardSummary() (+6 more)
 
-### Community 90 - "Community 90"
+### Community 79 - "Community 79"
+Cohesion: 0.15
+Nodes (13): RequestSuccessCard, createEmployeeVisitorRequest(), EmployeeInfoCard, EmployeeRequestScreen(), RequestSuccessCardProps, VisitorRequestForm(), useCreateEmployeeRequest(), employeeRequestSchema (+5 more)
+
+### Community 83 - "Community 83"
 Cohesion: 0.08
 Nodes (23): devDependencies, postcss, tailwindcss, @tailwindcss/postcss, @types/node, @types/react, @types/react-dom, typescript (+15 more)
 
-### Community 91 - "Community 91"
-Cohesion: 0.13
-Nodes (13): formatDate(), formatMoney(), useAddCoordinator(), useBudgetReport(), useCreateEvent(), useCreateExpense(), useDeleteEvent(), useDeleteExpense() (+5 more)
-
-### Community 92 - "Community 92"
+### Community 84 - "Community 84"
 Cohesion: 0.18
 Nodes (4): holidayDateKey(), mergeEffectiveCalendar(), HolidaysService, todayUtc()
 
-### Community 96 - "Community 96"
+### Community 85 - "Community 85"
+Cohesion: 0.2
+Nodes (14): SwaggerDecorator, CreateAppointmentDto, ApiProperty, ApiPropertyOptional, IsDateString, IsNotEmpty, IsOptional, IsString (+6 more)
+
+### Community 88 - "Community 88"
 Cohesion: 0.16
 Nodes (9): ApiBearerAuth(), ApiBody(), ApiCreatedResponse(), ApiOkResponse(), ApiOperation(), ApiParam(), ApiTags(), noopSwaggerDecorator() (+1 more)
 
-### Community 97 - "Community 97"
-Cohesion: 0.31
-Nodes (13): Table(), TableBody(), TableCaption(), TableCell(), TableFooter(), TableHead(), TableHeader(), TableRow() (+5 more)
-
-### Community 98 - "Community 98"
-Cohesion: 0.13
-Nodes (16): ASSISTANT_ROLES, CreateCommentDto, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength, CreateTaskCommentDto (+8 more)
-
-### Community 99 - "Community 99"
+### Community 89 - "Community 89"
 Cohesion: 0.13
 Nodes (6): ConnectedSocket, MessageBody, NotificationsGateway, SubscribeMessage, WebSocketGateway, WebSocketServer
 
-### Community 100 - "Community 100"
-Cohesion: 0.18
-Nodes (5): VisitorLookupOptions, VisitorRecord, Injectable, VisitorRepositoryImpl, VisitorServiceContract
+### Community 90 - "Community 90"
+Cohesion: 0.15
+Nodes (4): PassRepository, PassServiceImpl, Inject, Injectable
 
-### Community 101 - "Community 101"
-Cohesion: 0.12
-Nodes (16): Body, Controller, Get, Param, Post, UseGuards, UsePipes, VisitController (+8 more)
-
-### Community 102 - "Community 102"
+### Community 91 - "Community 91"
 Cohesion: 0.09
 Nodes (21): dist, node, src/**/*.ts, compilerOptions, emitDecoratorMetadata, esModuleInterop, exactOptionalPropertyTypes, experimentalDecorators (+13 more)
 
-### Community 103 - "Community 103"
+### Community 92 - "Community 92"
+Cohesion: 0.15
+Nodes (12): formatDate(), formatMoney(), useAddCoordinator(), useBudgetReport(), useCreateEvent(), useCreateExpense(), useDeleteEvent(), useDeleteExpense() (+4 more)
+
+### Community 93 - "Community 93"
 Cohesion: 0.11
 Nodes (10): useCreateSelfAction(), useSelfActions(), useUpdateSelfAction(), applyFilters(), errorMessage(), handleCreate(), handleEdit(), parseFilters() (+2 more)
 
-### Community 105 - "Community 105"
-Cohesion: 0.14
-Nodes (15): IsJWT, LoginDto, IsNotEmpty, IsString, MaxLength, MinLength, ResetPasswordDto, IsNotEmpty (+7 more)
+### Community 94 - "Community 94"
+Cohesion: 0.1
+Nodes (10): CheckInCard(), PurposeField(), onCheckIn(), onNext(), VisitorSearch(), VisitSummary(), useCheckIn(), useCreateVisit() (+2 more)
 
-### Community 106 - "Community 106"
-Cohesion: 0.16
-Nodes (14): GeneratePassDto, ApiProperty, Exclude, Expose, IsNotEmpty, IsUUID, ReprintPassDto, ApiPropertyOptional (+6 more)
+### Community 96 - "Community 96"
+Cohesion: 0.15
+Nodes (4): IAppointmentRepository, AppointmentService, Inject, Injectable
 
-### Community 107 - "Community 107"
-Cohesion: 0.16
-Nodes (4): ReprintPermissionSlipDialog(), usePermissionSlips(), useReprintPermissionSlip(), PassRepositoryImpl
+### Community 97 - "Community 97"
+Cohesion: 0.25
+Nodes (4): VisitLookupOptions, VisitSearchParams, Injectable, VisitRepositoryImpl
 
-### Community 108 - "Community 108"
+### Community 98 - "Community 98"
 Cohesion: 0.15
 Nodes (14): useAddRndTeamMember(), useCreateRndReport(), useRemoveRndTeamMember(), useRndCategories(), useRndReport(), useRndReports(), useRndTeam(), useUpdateRndReport() (+6 more)
 
-### Community 111 - "Community 111"
+### Community 102 - "Community 102"
 Cohesion: 0.14
 Nodes (9): ApiBearerAuth(), ApiBody(), ApiCreatedResponse(), ApiOkResponse(), ApiOperation(), ApiParam(), ApiTags(), AppointmentController (+1 more)
 
-### Community 112 - "Community 112"
+### Community 103 - "Community 103"
 Cohesion: 0.17
 Nodes (5): aggregateByPeriod(), buildScoreTrend(), trendPeriods(), ScoringService, toStoredRow()
 
-### Community 113 - "Community 113"
-Cohesion: 0.16
-Nodes (14): GENERAL_REQUEST_TYPES, PRIORITIES, RequestsPage(), formatDate(), label(), statusIcons, TaskDetailPage(), TasksPage() (+6 more)
+### Community 104 - "Community 104"
+Cohesion: 0.1
+Nodes (17): Get, Query, SearchVisitDto, ApiPropertyOptional, Exclude, Expose, IsDateString, IsEnum (+9 more)
 
-### Community 114 - "Community 114"
-Cohesion: 0.13
-Nodes (5): AuthService, Injectable, ForgotPasswordDto, IsEmail, IsNotEmpty
-
-### Community 115 - "Community 115"
-Cohesion: 0.14
-Nodes (8): ScoringCron, Cron, Injectable, ScoringModule, Module, POINTS, ScoringService, Injectable
-
-### Community 116 - "Community 116"
-Cohesion: 0.16
-Nodes (4): IAppointmentRepository, AppointmentService, Inject, Injectable
-
-### Community 117 - "Community 117"
-Cohesion: 0.18
-Nodes (13): CreateAppointmentDto, ApiProperty, ApiPropertyOptional, IsDateString, IsNotEmpty, IsOptional, IsString, IsUUID (+5 more)
-
-### Community 118 - "Community 118"
+### Community 105 - "Community 105"
 Cohesion: 0.22
 Nodes (12): DashboardController, ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, Controller, Get, Inject (+4 more)
 
-### Community 119 - "Community 119"
-Cohesion: 0.1
-Nodes (15): CreateVisitorDto, ApiProperty, ApiPropertyOptional, Exclude, Expose, IsBoolean, IsEmail, IsNotEmpty (+7 more)
-
-### Community 120 - "Community 120"
-Cohesion: 0.1
-Nodes (16): Query, SearchVisitDto, ApiPropertyOptional, Exclude, Expose, IsDateString, IsEnum, IsInt (+8 more)
-
-### Community 121 - "Community 121"
+### Community 106 - "Community 106"
 Cohesion: 0.13
 Nodes (8): defaultClosesAt(), reset(), submit(), useClosePoll(), useCreatePoll(), useDeletePoll(), usePolls(), useVotePoll()
 
-### Community 122 - "Community 122"
+### Community 107 - "Community 107"
 Cohesion: 0.12
 Nodes (4): DepartmentsController, DepartmentsService, CreateDepartmentDto, UpdateDepartmentDto
 
-### Community 123 - "Community 123"
+### Community 108 - "Community 108"
 Cohesion: 0.11
 Nodes (19): @nestjs/cli, devDependencies, @nestjs/cli, ts-node, tsx, @types/bcrypt, @types/multer, @types/node (+11 more)
 
-### Community 124 - "Community 124"
+### Community 109 - "Community 109"
+Cohesion: 0.3
+Nodes (6): PaginationMeta, PassDbClient, PassRecord, PassSearchParams, PassRepositoryImpl, Injectable
+
+### Community 110 - "Community 110"
+Cohesion: 0.15
+Nodes (14): GeneratePassDto, ApiProperty, Exclude, Expose, IsNotEmpty, IsUUID, ReprintPassDto, ApiPropertyOptional (+6 more)
+
+### Community 111 - "Community 111"
 Cohesion: 0.11
 Nodes (7): CameraPreview(), CameraToolbar(), CapturedImagePreview(), PermissionDenied(), useCamera(), useCapture(), compressImage()
 
-### Community 127 - "Community 127"
+### Community 114 - "Community 114"
 Cohesion: 0.11
 Nodes (17): aliases, components, hooks, lib, ui, utils, iconLibrary, rsc (+9 more)
 
-### Community 129 - "Community 129"
-Cohesion: 0.21
-Nodes (4): Body, HttpCode, Post, Res
+### Community 115 - "Community 115"
+Cohesion: 0.15
+Nodes (7): ScoringCron, Cron, Injectable, ScoringModule, Module, ScoringService, Injectable
 
-### Community 130 - "Community 130"
+### Community 116 - "Community 116"
+Cohesion: 0.11
+Nodes (13): ApiPropertyOptional, Exclude, Expose, IsBoolean, IsEmail, IsOptional, IsString, Matches (+5 more)
+
+### Community 118 - "Community 118"
+Cohesion: 0.21
+Nodes (9): AccessCodeInput(), AccessCodeInputProps, AccessScreen(), CompanyLogo(), CompanyLogoProps, NumericKeypad(), NumericKeypadProps, PageContent() (+1 more)
+
+### Community 119 - "Community 119"
 Cohesion: 0.13
 Nodes (8): NotificationsController, Controller, Delete, Get, Param, Patch, Query, UseGuards
 
-### Community 131 - "Community 131"
-Cohesion: 0.35
-Nodes (5): PassDbClient, PassRecord, PassSearchParams, PassRepositoryImpl, Injectable
+### Community 121 - "Community 121"
+Cohesion: 0.24
+Nodes (4): VisitDbClient, VisitQueryRecord, VisitRecord, VisitServiceContract
 
-### Community 132 - "Community 132"
-Cohesion: 0.12
-Nodes (3): VisitRepository, VisitTodayParams, Inject
+### Community 122 - "Community 122"
+Cohesion: 0.21
+Nodes (12): VisitStatus, VisitSortBy, VisitSortOrder, VisitHistoryParams, VisitInsideVisitorsParams, VisitSortBy, VisitSortOrder, VisitTodayParams (+4 more)
 
-### Community 134 - "Community 134"
-Cohesion: 0.19
-Nodes (11): VisitorSortBy, VisitorSortOrder, ApiProperty(), ApiPropertyOptional(), ClassType, PartialType(), ApiProperty, ApiPropertyOptional (+3 more)
-
-### Community 135 - "Community 135"
-Cohesion: 0.23
-Nodes (11): VisitStatus, VisitSortBy, VisitSortOrder, VisitHistoryParams, VisitInsideVisitorsParams, VisitSortBy, VisitSortOrder, VisitWithHostEmployeeRecord (+3 more)
-
-### Community 136 - "Community 136"
-Cohesion: 0.13
-Nodes (7): DateRangePicker(), EmployeeReportChart(), ReportFilters(), ReportSummaryCards(), ReportTable(), VisitorTrendChart(), useReports()
-
-### Community 138 - "Community 138"
+### Community 126 - "Community 126"
 Cohesion: 0.2
 Nodes (3): attachUsers(), canWrite(), ProjectCollabService
 
-### Community 142 - "Community 142"
+### Community 130 - "Community 130"
 Cohesion: 0.14
 Nodes (12): IsArray, IsBoolean, IsEnum, IsOptional, IsString, IsUUID, MaxLength, Transform (+4 more)
 
-### Community 143 - "Community 143"
+### Community 131 - "Community 131"
+Cohesion: 0.33
+Nodes (3): AppointmentRepository, DbClient, Injectable
+
+### Community 132 - "Community 132"
 Cohesion: 0.3
 Nodes (10): AuditController, ApiBearerAuth, ApiOperation, ApiTags, Controller, Get, Param, Query (+2 more)
 
-### Community 144 - "Community 144"
-Cohesion: 0.13
-Nodes (15): SearchVisitorDto, ApiPropertyOptional, Exclude, Expose, IsEmail, IsEnum, IsInt, IsOptional (+7 more)
-
-### Community 145 - "Community 145"
+### Community 133 - "Community 133"
 Cohesion: 0.13
 Nodes (15): CreateVisitDto, ApiProperty, ApiPropertyOptional, Exclude, Expose, IsDateString, IsInt, IsOptional (+7 more)
 
-### Community 146 - "Community 146"
+### Community 134 - "Community 134"
+Cohesion: 0.13
+Nodes (15): SearchVisitorDto, ApiPropertyOptional, Exclude, Expose, IsEmail, IsEnum, IsInt, IsOptional (+7 more)
+
+### Community 135 - "Community 135"
+Cohesion: 0.14
+Nodes (6): updateVisitorPhoto(), date-fns, handleUpdatePhoto(), date-fns, useVisitor(), useVisitorHistory()
+
+### Community 136 - "Community 136"
 Cohesion: 0.22
 Nodes (6): VendorDeadlineCron, daysUntil(), deadlineFlag(), documentExpiryStatus(), onTimePercentage(), utcDay()
 
-### Community 149 - "Community 149"
-Cohesion: 0.29
-Nodes (11): VisitorImageSource, VisitorStatus, ApiProperty, ApiPropertyOptional, Exclude, Expose, Transform, Type (+3 more)
-
-### Community 150 - "Community 150"
-Cohesion: 0.18
-Nodes (5): exportTodayVisitors(), DashboardScreen(), StatisticsCard(), useDashboardSummary(), useExportTodayVisitors()
-
-### Community 151 - "Community 151"
-Cohesion: 0.38
-Nodes (12): group(), lastParamType(), normalisePath(), objectKeys(), readClientCalls(), readClientTypes(), readServerDtos(), readServerRoutes() (+4 more)
-
-### Community 155 - "Community 155"
-Cohesion: 0.15
-Nodes (6): VisitBranchNotResolvedException, VisitHostEmployeeNotFoundException, VisitLockedException, VisitNotFoundException, VisitStateViolationException, VisitVisitorNotFoundException
-
-### Community 156 - "Community 156"
+### Community 139 - "Community 139"
 Cohesion: 0.21
 Nodes (7): EscalationCron, Cron, Injectable, EscalationModule, Module, EscalationService, Injectable
 
-### Community 157 - "Community 157"
-Cohesion: 0.17
-Nodes (10): SearchAppointmentDto, ApiPropertyOptional, IsDateString, IsEnum, IsNumber, IsOptional, IsString, IsUUID (+2 more)
+### Community 140 - "Community 140"
+Cohesion: 0.38
+Nodes (12): group(), lastParamType(), normalisePath(), objectKeys(), readClientCalls(), readClientTypes(), readServerDtos(), readServerRoutes() (+4 more)
 
-### Community 158 - "Community 158"
+### Community 144 - "Community 144"
+Cohesion: 0.15
+Nodes (6): VisitBranchNotResolvedException, VisitHostEmployeeNotFoundException, VisitLockedException, VisitNotFoundException, VisitStateViolationException, VisitVisitorNotFoundException
+
+### Community 145 - "Community 145"
+Cohesion: 0.32
+Nodes (5): Public(), AuthController, Controller, Get, Param
+
+### Community 146 - "Community 146"
 Cohesion: 0.15
 Nodes (12): ApiPropertyOptional, Exclude, Expose, IsDate, IsOptional, IsString, IsUUID, Matches (+4 more)
 
+### Community 147 - "Community 147"
+Cohesion: 0.15
+Nodes (13): CreateVisitorDto, ApiProperty, ApiPropertyOptional, Exclude, Expose, IsBoolean, IsEmail, IsNotEmpty (+5 more)
+
+### Community 148 - "Community 148"
+Cohesion: 0.26
+Nodes (7): drawDebugLine(), mdbookEnableThresholdDebug(), MDBookSidebarScrollbox, reloadCurrentHeader(), updateCurrentHeader(), updateHeaderExpanded(), updateThreshold()
+
+### Community 156 - "Community 156"
+Cohesion: 0.17
+Nodes (8): AuthModule, JwtStrategy, dotenv, passport, passport-jwt, passport, passport-jwt, dotenv
+
+### Community 157 - "Community 157"
+Cohesion: 0.17
+Nodes (3): exceljs, exceljs, DashboardServiceImpl
+
+### Community 158 - "Community 158"
+Cohesion: 0.26
+Nodes (7): drawDebugLine(), mdbookEnableThresholdDebug(), MDBookSidebarScrollbox, reloadCurrentHeader(), updateCurrentHeader(), updateHeaderExpanded(), updateThreshold()
+
 ### Community 159 - "Community 159"
-Cohesion: 0.28
-Nodes (6): VisitorImageType, VisitorExistsCriteria, VisitorSortBy, VisitorSortOrder, SEARCHABLE_STRING_FIELDS, VISITOR_DOMAIN_SERVICE
+Cohesion: 0.26
+Nodes (7): drawDebugLine(), mdbookEnableThresholdDebug(), MDBookSidebarScrollbox, reloadCurrentHeader(), updateCurrentHeader(), updateHeaderExpanded(), updateThreshold()
 
 ### Community 160 - "Community 160"
 Cohesion: 0.26
 Nodes (7): drawDebugLine(), mdbookEnableThresholdDebug(), MDBookSidebarScrollbox, reloadCurrentHeader(), updateCurrentHeader(), updateHeaderExpanded(), updateThreshold()
 
-### Community 167 - "Community 167"
+### Community 161 - "Community 161"
 Cohesion: 0.26
 Nodes (7): drawDebugLine(), mdbookEnableThresholdDebug(), MDBookSidebarScrollbox, reloadCurrentHeader(), updateCurrentHeader(), updateHeaderExpanded(), updateThreshold()
 
-### Community 168 - "Community 168"
-Cohesion: 0.26
-Nodes (7): drawDebugLine(), mdbookEnableThresholdDebug(), MDBookSidebarScrollbox, reloadCurrentHeader(), updateCurrentHeader(), updateHeaderExpanded(), updateThreshold()
+### Community 162 - "Community 162"
+Cohesion: 0.23
+Nodes (8): emptyForm, getErrorMessage(), ProfileFormState, ProfilePage(), profileApi, ProfileData, UpdateProfilePayload, Role
 
-### Community 169 - "Community 169"
-Cohesion: 0.26
-Nodes (7): drawDebugLine(), mdbookEnableThresholdDebug(), MDBookSidebarScrollbox, reloadCurrentHeader(), updateCurrentHeader(), updateHeaderExpanded(), updateThreshold()
-
-### Community 170 - "Community 170"
-Cohesion: 0.26
-Nodes (7): drawDebugLine(), mdbookEnableThresholdDebug(), MDBookSidebarScrollbox, reloadCurrentHeader(), updateCurrentHeader(), updateHeaderExpanded(), updateThreshold()
-
-### Community 171 - "Community 171"
-Cohesion: 0.17
-Nodes (8): AuthModule, JwtStrategy, dotenv, passport, passport-jwt, passport, passport-jwt, dotenv
-
-### Community 172 - "Community 172"
+### Community 163 - "Community 163"
 Cohesion: 0.17
 Nodes (12): CreateUserDto, IsArray, IsBoolean, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString (+4 more)
 
-### Community 173 - "Community 173"
-Cohesion: 0.35
-Nodes (5): Public(), AuthController, Controller, Get, Param
+### Community 164 - "Community 164"
+Cohesion: 0.2
+Nodes (5): ForgotPasswordDto, IsEmail, IsNotEmpty, EmailService, Injectable
 
-### Community 174 - "Community 174"
+### Community 165 - "Community 165"
+Cohesion: 0.18
+Nodes (10): SearchAppointmentDto, ApiPropertyOptional, IsDateString, IsEnum, IsNumber, IsOptional, IsString, IsUUID (+2 more)
+
+### Community 166 - "Community 166"
 Cohesion: 0.26
 Nodes (7): isPassNumber(), normalizePassNumber(), extractPhoneDigits(), maskPhoneNumber(), normalizePhoneNumber(), isOptionalMobileNumber(), isValidMobileNumber()
 
-### Community 175 - "Community 175"
-Cohesion: 0.35
-Nodes (9): handleApprove(), handleCreateVisit(), handleReject(), readError(), useApproveRequest(), useCreateVisitFromRequest(), useRejectRequest(), useRequestAction() (+1 more)
-
-### Community 179 - "Community 179"
+### Community 170 - "Community 170"
 Cohesion: 0.18
 Nodes (5): VisitorRequestAccessDeniedException, VisitorRequestConversionException, VisitorRequestHostEmployeeNotFoundException, VisitorRequestInvalidStateException, VisitorRequestNotFoundException
 
-### Community 180 - "Community 180"
-Cohesion: 0.24
-Nodes (3): adminApi, AuditLog, AuditLogsTableProps
+### Community 171 - "Community 171"
+Cohesion: 0.29
+Nodes (5): LoginDto, IsNotEmpty, IsString, MaxLength, MinLength
 
-### Community 181 - "Community 181"
-Cohesion: 0.18
-Nodes (11): ApiPropertyOptional, Exclude, Expose, IsBoolean, IsEmail, IsOptional, IsString, Matches (+3 more)
+### Community 172 - "Community 172"
+Cohesion: 0.27
+Nodes (7): Body, Controller, Param, Post, UseGuards, UsePipes, VisitController
 
-### Community 186 - "Community 186"
+### Community 173 - "Community 173"
+Cohesion: 0.29
+Nodes (5): useSendVendorMessage(), useSubmitDeliverable(), useVendorDashboard(), useVendorTask(), useVendorTaskStatus()
+
+### Community 178 - "Community 178"
 Cohesion: 0.27
 Nodes (5): metadata, ErrorBoundary(), ErrorBoundaryProps, QueryProvider(), queryClient
 
-### Community 187 - "Community 187"
+### Community 179 - "Community 179"
 Cohesion: 0.2
 Nodes (9): RegisterDto, IsArray, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID (+1 more)
 
-### Community 191 - "Community 191"
+### Community 181 - "Community 181"
+Cohesion: 0.38
+Nodes (9): PassEmployeeDto, PassResponseDto, PassVisitorDto, ApiProperty, ApiPropertyOptional, Exclude, Expose, Transform (+1 more)
+
+### Community 184 - "Community 184"
 Cohesion: 0.33
 Nodes (6): ApiBearerAuth(), ApiOkResponse(), ApiOperation(), ApiTags(), EmployeeController, noopSwaggerDecorator()
 
-### Community 195 - "Community 195"
-Cohesion: 0.22
+### Community 188 - "Community 188"
+Cohesion: 0.39
+Nodes (4): Body, HttpCode, Post, Res
+
+### Community 198 - "Community 198"
+Cohesion: 0.29
+Nodes (5): IsEmail, IsNotEmpty, IsString, Matches, VerifyResetOtpDto
+
+### Community 199 - "Community 199"
+Cohesion: 0.25
 Nodes (8): CheckInDto, ApiProperty, ApiPropertyOptional, Exclude, Expose, IsDateString, IsUUID, Transform
 
-### Community 196 - "Community 196"
-Cohesion: 0.43
-Nodes (5): canApproveUsers(), useApproveUser(), useDecision(), usePendingUsers(), useRejectUser()
-
-### Community 206 - "Community 206"
+### Community 200 - "Community 200"
 Cohesion: 0.25
-Nodes (7): CreateNotificationDto, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength
+Nodes (8): CheckOutDto, ApiProperty, ApiPropertyOptional, Exclude, Expose, IsDateString, IsUUID, Transform
 
-### Community 208 - "Community 208"
+### Community 202 - "Community 202"
+Cohesion: 0.33
+Nodes (3): getPageTitle(), ReceptionHeader(), ReceptionLayout()
+
+### Community 203 - "Community 203"
+Cohesion: 0.29
+Nodes (3): AuditFilters(), AuditTable(), useAuditLogs()
+
+### Community 204 - "Community 204"
 Cohesion: 0.43
 Nodes (5): createVisitor(), deriveProfileImage(), getVisitor(), getVisitors(), searchVisitors()
 
-### Community 214 - "Community 214"
+### Community 210 - "Community 210"
 Cohesion: 0.48
 Nodes (4): countByProject(), daysUntil(), deriveHealth(), ProjectDeadlineCron
 
-### Community 217 - "Community 217"
+### Community 213 - "Community 213"
 Cohesion: 0.33
 Nodes (6): actionToneStyles, criticalActionConfig, DashboardPage(), kpiConfig, statusStyles, useDashboard()
 
-### Community 219 - "Community 219"
-Cohesion: 0.29
-Nodes (6): CreateRequestDto, IsIn, IsNotEmpty, IsOptional, IsString, IsUUID
+### Community 215 - "Community 215"
+Cohesion: 0.33
+Nodes (5): IsJWT, ResetPasswordDto, IsNotEmpty, IsString, Matches
 
-### Community 223 - "Community 223"
+### Community 216 - "Community 216"
+Cohesion: 0.29
+Nodes (6): CreateDepartmentDto, IsNotEmpty, IsOptional, IsString, MaxLength, Transform
+
+### Community 220 - "Community 220"
+Cohesion: 0.33
+Nodes (5): AllocationQueryDto, KpiFilterDto, PsScoreQueryDto, ScoreSearchDto, UnitSearchDto
+
+### Community 221 - "Community 221"
 Cohesion: 0.33
 Nodes (5): CreateKpiDto, KpiContributionDto, KpiMilestoneDto, KpiScoringConfigDto, ThresholdBandDto
+
+### Community 224 - "Community 224"
+Cohesion: 0.33
+Nodes (5): scripts, build, dev, start, start:dev
 
 ### Community 225 - "Community 225"
 Cohesion: 0.4
@@ -1043,11 +1032,11 @@ Nodes (3): metadata, VMSLayout(), VMSLayoutProps
 
 ### Community 226 - "Community 226"
 Cohesion: 0.33
-Nodes (5): scripts, build, dev, start, start:dev
+Nodes (5): Length, IsEmail, IsNotEmpty, IsString, VerifyOtpDto
 
 ### Community 227 - "Community 227"
 Cohesion: 0.33
-Nodes (5): Length, IsEmail, IsNotEmpty, IsString, VerifyOtpDto
+Nodes (5): ApiProperty, ApiPropertyOptional, Exclude, Expose, VisitResponseDto
 
 ### Community 232 - "Community 232"
 Cohesion: 0.6
@@ -1055,111 +1044,115 @@ Nodes (3): holder(), nobody(), scopeFor()
 
 ### Community 237 - "Community 237"
 Cohesion: 0.4
-Nodes (4): LeaveApplicationFilterDto, LeaveBalanceFilterDto, LeaveCalendarQueryDto, MonthlyReportQueryDto
+Nodes (4): SubmitDeliverableDto, VendorMessageDto, VendorTaskFilterDto, VendorTaskStatusDto
 
 ### Community 238 - "Community 238"
 Cohesion: 0.4
-Nodes (4): SubmitDeliverableDto, VendorMessageDto, VendorTaskFilterDto, VendorTaskStatusDto
+Nodes (4): LeaveApplicationFilterDto, LeaveBalanceFilterDto, LeaveCalendarQueryDto, MonthlyReportQueryDto
 
 ### Community 239 - "Community 239"
 Cohesion: 0.4
-Nodes (4): EmployeeListResponseDto, EmployeeResponseDto, EmployeeSearchDto, PaginationMetaDto
+Nodes (4): CreateKpiMessageDto, CreateKpiRevisionDto, RecordKpiUpdateDto, SetKpiContributionsDto
 
 ### Community 240 - "Community 240"
 Cohesion: 0.4
-Nodes (4): VendorDeliverableQueryDto, VendorDocumentQueryDto, VendorNoteQueryDto, VendorWorkQueryDto
+Nodes (4): EmployeeListResponseDto, EmployeeResponseDto, EmployeeSearchDto, PaginationMetaDto
 
-### Community 243 - "Community 243"
+### Community 241 - "Community 241"
 Cohesion: 0.4
-Nodes (3): Compressor, compressorjs, CompressorOptions
+Nodes (4): VendorDeliverableQueryDto, VendorDocumentQueryDto, VendorNoteQueryDto, VendorWorkQueryDto
 
 ### Community 244 - "Community 244"
 Cohesion: 0.4
-Nodes (4): ACTIVE_TASK_STATUSES, COMPLETED_TASK_STATUSES, TaskStatus, TERMINAL_TASK_STATUSES
+Nodes (3): Compressor, compressorjs, CompressorOptions
 
 ### Community 245 - "Community 245"
+Cohesion: 0.4
+Nodes (3): EmailModule, Global, Module
+
+### Community 246 - "Community 246"
+Cohesion: 0.4
+Nodes (4): ACTIVE_TASK_STATUSES, COMPLETED_TASK_STATUSES, TaskStatus, TERMINAL_TASK_STATUSES
+
+### Community 247 - "Community 247"
 Cohesion: 0.6
 Nodes (4): AppointmentResponseDto, PaginatedAppointmentResponseDto, PaginationMetaDto, ApiProperty
 
-### Community 258 - "Community 258"
-Cohesion: 0.5
-Nodes (3): KpiFilterDto, PsScoreQueryDto, UnitSearchDto
-
-### Community 259 - "Community 259"
-Cohesion: 0.5
-Nodes (3): RecentVisitorDto, RecentVisitorHostDto, RecentVisitorPersonDto
+### Community 248 - "Community 248"
+Cohesion: 0.4
+Nodes (5): ApiProperty, ApiPropertyOptional, Exclude, Expose, VisitHistoryResponseDto
 
 ### Community 260 - "Community 260"
 Cohesion: 0.5
-Nodes (3): CreateKpiRevisionDto, RecordKpiUpdateDto, SetKpiContributionsDto
+Nodes (3): ChatDto, ChatTurnDto, FeedbackDto
 
 ### Community 261 - "Community 261"
 Cohesion: 0.5
-Nodes (3): ChatDto, ChatTurnDto, FeedbackDto
+Nodes (3): PassEmployeeDto, PassResponseDto, PassVisitorDto
 
 ### Community 262 - "Community 262"
 Cohesion: 0.5
 Nodes (3): ApproveLeaveDto, HrCancelLeaveDto, RejectLeaveDto
 
-### Community 263 - "Community 263"
+### Community 264 - "Community 264"
 Cohesion: 0.5
-Nodes (3): PassEmployeeDto, PassResponseDto, PassVisitorDto
+Nodes (3): RecentVisitorDto, RecentVisitorHostDto, RecentVisitorPersonDto
 
-### Community 265 - "Community 265"
+### Community 266 - "Community 266"
 Cohesion: 0.5
 Nodes (3): AppointmentResponseDto, PaginatedAppointmentResponseDto, PaginationMetaDto
 
-### Community 268 - "Community 268"
+### Community 269 - "Community 269"
 Cohesion: 0.5
 Nodes (3): DailyReportDto, DailyStatsDto, HourlyBreakdownDto
 
-### Community 269 - "Community 269"
+### Community 270 - "Community 270"
 Cohesion: 0.5
 Nodes (3): EmployeeReportDto, EmployeeStatsDto, EmployeeVisitDto
 
-### Community 270 - "Community 270"
+### Community 271 - "Community 271"
 Cohesion: 0.5
 Nodes (3): DailyTotalDto, MonthlyReportDto, MonthlyStatsDto
 
-### Community 271 - "Community 271"
+### Community 272 - "Community 272"
 Cohesion: 0.5
 Nodes (3): VisitorHistoryDto, VisitorInfoDto, VisitTimelineDto
 
-### Community 272 - "Community 272"
+### Community 273 - "Community 273"
 Cohesion: 0.5
 Nodes (3): AuditResponseDto, PaginatedAuditResponseDto, PaginationMetaDto
 
-### Community 278 - "Community 278"
+### Community 280 - "Community 280"
 Cohesion: 0.5
 Nodes (3): AttachmentFilterDto, IsOptional, IsUUID
 
-### Community 279 - "Community 279"
+### Community 281 - "Community 281"
 Cohesion: 0.5
 Nodes (3): IsNotEmpty, IsUUID, UploadAttachmentDto
 
-### Community 280 - "Community 280"
+### Community 282 - "Community 282"
 Cohesion: 0.5
 Nodes (3): PRIORITY_LABELS, PRIORITY_WEIGHT, TaskPriority
 
 ## Knowledge Gaps
-- **486 isolated node(s):** `Compressor`, `AppModule`, `PrismaModule`, `CommonModule`, `AssistantModule` (+481 more)
+- **489 isolated node(s):** `Compressor`, `AppModule`, `PrismaModule`, `CommonModule`, `AssistantModule` (+484 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **174 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **182 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `JwtPayload` connect `Community 33` to `Community 129`, `Community 130`, `Community 4`, `Community 142`, `Community 15`, `Community 17`, `Community 18`, `Community 24`, `Community 30`, `Community 31`, `Community 41`, `Community 42`, `Community 43`, `Community 173`, `Community 46`, `Community 52`, `Community 54`, `Community 59`, `Community 62`, `Community 66`, `Community 67`, `Community 81`, `Community 98`, `Community 101`, `Community 105`?**
-  _High betweenness centrality (0.065) - this node is a cross-community bridge._
-- **Why does `AuthProvider()` connect `Community 49` to `Community 186`, `Community 45`, `Community 173`?**
-  _High betweenness centrality (0.060) - this node is a cross-community bridge._
-- **Why does `CurrentUser` connect `Community 52` to `Community 129`, `Community 130`, `Community 17`, `Community 18`, `Community 24`, `Community 31`, `Community 33`, `Community 41`, `Community 42`, `Community 43`, `Community 173`, `Community 46`, `Community 54`, `Community 59`, `Community 62`, `Community 66`, `Community 67`, `Community 81`, `Community 98`, `Community 101`, `Community 105`?**
-  _High betweenness centrality (0.025) - this node is a cross-community bridge._
+- **Why does `JwtPayload` connect `Community 32` to `Community 1`, `Community 130`, `Community 3`, `Community 6`, `Community 12`, `Community 15`, `Community 16`, `Community 145`, `Community 23`, `Community 27`, `Community 171`, `Community 172`, `Community 45`, `Community 53`, `Community 56`, `Community 60`, `Community 188`, `Community 85`, `Community 119`?**
+  _High betweenness centrality (0.057) - this node is a cross-community bridge._
+- **Why does `AuthProvider()` connect `Community 10` to `Community 145`, `Community 178`, `Community 36`?**
+  _High betweenness centrality (0.056) - this node is a cross-community bridge._
+- **Why does `CurrentUser` connect `Community 3` to `Community 32`, `Community 1`, `Community 6`, `Community 171`, `Community 12`, `Community 45`, `Community 60`, `Community 15`, `Community 16`, `Community 145`, `Community 172`, `Community 119`, `Community 85`, `Community 53`, `Community 23`, `Community 56`, `Community 27`, `Community 188`?**
+  _High betweenness centrality (0.021) - this node is a cross-community bridge._
 - **What connects `Compressor`, `AppModule`, `PrismaModule` to the rest of the system?**
-  _486 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _489 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 0` be split into smaller, more focused modules?**
   _Cohesion score 0.02 - nodes in this community are weakly interconnected._
 - **Should `Community 1` be split into smaller, more focused modules?**
   _Cohesion score 0.04 - nodes in this community are weakly interconnected._
 - **Should `Community 2` be split into smaller, more focused modules?**
-  _Cohesion score 0.06 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.03 - nodes in this community are weakly interconnected._
