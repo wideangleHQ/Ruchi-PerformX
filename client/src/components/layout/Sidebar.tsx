@@ -25,6 +25,7 @@ import {
   KeyRound,
   Building2,
   CalendarHeart,
+  CalendarOff,
   ShieldCheck,
   Target,
 } from 'lucide-react';
@@ -50,6 +51,7 @@ const navItems: NavItem[] = [
   { href: '/tasks', label: 'Tasks', icon: <ClipboardList size={20} /> },
   { href: '/self-actions', label: 'Self Actions', icon: <ClipboardCheck size={20} /> },
   { href: '/projects', label: 'Projects', icon: <FolderKanban size={20} /> },
+  { href: '/leave', label: 'Leave', icon: <CalendarOff size={20} /> },
   { href: '/requests', label: 'Requests', icon: <FileText size={20} /> },
   { href: '/transfers', label: 'Transfers', icon: <ArrowRightLeft size={20} /> },
   { href: '/assets', label: 'Assets', icon: <KeyRound size={20} /> },
