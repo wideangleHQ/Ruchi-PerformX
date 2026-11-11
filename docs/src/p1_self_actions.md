@@ -75,8 +75,13 @@ by words that only ever appeared in the description.
 
 ## Filtering
 
-By name, not by date. The date range was two unlabelled inputs, and the question
-people actually ask of this list is whose work it is.
+By name first: the question people actually ask of this list is whose work it
+is, which is why the lookup is a name rather than a date. The published-date
+bounds came back beside it as the narrowing that follows — `dateFrom` and
+`dateTo` were always on the server DTO, and the filter bar now sends them. A
+date-only bound covers the whole day: `lte` on `new Date('2026-11-11')` is
+midnight UTC and would drop every record created on the last day the picker
+named, so the service builds the bound from the calendar components instead.
 
 The name filter is `createdById`, and it is shown to anyone who can already see
 other people's entries rather than to ADMIN alone, which is who could reach it
@@ -96,7 +101,22 @@ than above them. An employee searching a colleague's name gets their own
 entries or nothing. `self-action-search.spec.ts` reads the `where` that reaches
 Prisma and fails if that stops being true.
 
-`dateFrom` and `dateTo` remain on the server DTO. Nothing sends them.
+## Export
+
+`GET /self-actions/export` returns the list as an `.xlsx` file instead of a page
+of JSON. It takes the same query params as the list and builds its `where`
+through the same `buildListWhere`, so the file can only ever contain rows the
+screen would have shown for those filters — same department scope, same
+EMPLOYEE ownership, same soft-delete. It queries once with no `skip`/`take`,
+which is what keeps a multi-page result set free of duplicates and leaves the
+page the user is on untouched.
+
+Empty result sets answer 404 with `No Self Actions found for the selected
+filters.`, which the client shows as a warning rather than a failure. The sheet
+is named `Self Actions`, headers are bold, timestamps read `DD-MMM-YYYY HH:mm`
+as text so the format does not drift with Excel's locale, and values that would
+start with `=`, `+`, `-` or `@` are escaped so they can never be read back as a
+formula. `self-action-export.spec.ts` pins all of this.
 
 ## Endpoints
 
@@ -108,6 +128,7 @@ not.
 | --- | --- | --- |
 | POST | `/self-actions` | create |
 | GET | `/self-actions` | list, scoped by department |
+| GET | `/self-actions/export` | the same list as `.xlsx`, same filters and scope |
 | GET | `/self-actions/:id` | detail |
 | PATCH | `/self-actions/:id` | edit the work text, priority, and a legacy description |
 | PATCH | `/self-actions/:id/status` | change status |

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Plus, RefreshCcw, Clock3 } from 'lucide-react';
+import { Plus, RefreshCcw, Clock3, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SelfActionsFilters } from '@/components/self-actions/self-actions-filters';
 import { SelfActionsStats } from '@/components/self-actions/self-actions-stats';
@@ -23,6 +23,7 @@ import {
 import { usersApi } from '@/api/users';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/hooks/useToast';
 
 const DEFAULT_LIMIT = 20;
 
@@ -38,6 +39,8 @@ function parseFilters(searchParams: SearchParamsLike): SelfActionFilters {
     priority: (searchParams.get('priority') as SelfActionFilters['priority']) || undefined,
     departmentId: searchParams.get('departmentId') || undefined,
     createdById: searchParams.get('createdById') || undefined,
+    dateFrom: searchParams.get('dateFrom') || undefined,
+    dateTo: searchParams.get('dateTo') || undefined,
     page: Number(searchParams.get('page') || 1),
     limit: Number(searchParams.get('limit') || DEFAULT_LIMIT),
   };
@@ -45,6 +48,24 @@ function parseFilters(searchParams: SearchParamsLike): SelfActionFilters {
 
 function errorMessage(error: unknown) {
   return (error as any)?.response?.data?.message || 'Something went wrong';
+}
+
+/**
+ * A failed export answers with a blob like any other response, so the reason
+ * lives in the body rather than in `error.response.data.message` — it has to
+ * be read back out of the blob before anything can be said about the failure.
+ */
+async function exportErrorMessage(error: unknown): Promise<string | null> {
+  const data = (error as any)?.response?.data;
+  if (data instanceof Blob) {
+    try {
+      const parsed = JSON.parse(await data.text());
+      return typeof parsed?.message === 'string' ? parsed.message : null;
+    } catch {
+      return null;
+    }
+  }
+  return typeof data?.message === 'string' ? data.message : null;
 }
 
 function setQueryParams(
@@ -63,6 +84,8 @@ function setQueryParams(
     ['priority', normalized.priority],
     ['departmentId', normalized.departmentId],
     ['createdById', normalized.createdById],
+    ['dateFrom', normalized.dateFrom],
+    ['dateTo', normalized.dateTo],
   ];
 
   entries.forEach(([key, value]) => {
@@ -80,6 +103,7 @@ export function SelfActionsClient() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const filters = useMemo(() => parseFilters(searchParams), [searchParams]);
   const activeTab: 'all' | 'mine' = searchParams.get('tab') === 'mine' ? 'mine' : 'all';
 
@@ -136,6 +160,7 @@ export function SelfActionsClient() {
   const [editAction, setEditAction] = useState<SelfAction | null>(null);
   const [detailsAction, setDetailsAction] = useState<SelfAction | null>(null);
   const [dialogError, setDialogError] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: SelfActionStatus }) =>
@@ -159,6 +184,31 @@ export function SelfActionsClient() {
   const resetFilters = () => {
     const tabParam = activeTab === 'mine' ? '&tab=mine' : '';
     router.replace(`${pathname}?page=1&limit=${DEFAULT_LIMIT}${tabParam}`);
+  };
+
+  /**
+   * Exports the filters this screen is showing: the same `queryFilters` the
+   * list itself is keyed on, so the file can only hold what the list would.
+   * The server reads every matching record in one query, so the page number in
+   * the URL is neither read nor changed — nothing here touches the URL or the
+   * query cache, and the table stays exactly where it was.
+   */
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      await selfActionsApi.exportSelfActions(queryFilters);
+      toast.success('Self Actions exported successfully.');
+    } catch (error) {
+      const status = (error as any)?.response?.status;
+      const message = await exportErrorMessage(error);
+      if (status === 404) {
+        toast.warning(message ?? 'No Self Actions found for the selected filters.');
+      } else {
+        toast.error(message ?? 'Could not export Self Actions. Please try again.');
+      }
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const changeTab = (tab: 'all' | 'mine') => {
@@ -253,11 +303,22 @@ export function SelfActionsClient() {
             Track, manage and monitor department activities.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
             <Clock3 size={16} className="text-green-600" />
             <span>{currentDate}</span>
           </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2"
+            onClick={handleExport}
+            disabled={isExporting}
+            aria-busy={isExporting}
+          >
+            <FileSpreadsheet size={16} />
+            {isExporting ? 'Exporting...' : 'Export to Excel'}
+          </Button>
           <Button
             type="button"
             className="gap-2 bg-green-600 hover:bg-green-700"

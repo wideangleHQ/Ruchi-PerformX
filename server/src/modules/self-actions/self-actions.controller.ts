@@ -7,11 +7,13 @@ import {
   Param,
   Body,
   Query,
+  Res,
   UseGuards,
   UseInterceptors,
   UploadedFiles,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
 import { SelfActionsService } from './self-actions.service';
 import { CreateSelfActionDto } from './dto/create-self-action.dto';
 import { UpdateSelfActionDto } from './dto/update-self-action.dto';
@@ -49,6 +51,28 @@ export class SelfActionsController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.selfActionsService.findAll(user, filter);
+  }
+
+  /**
+   * The same list as xlsx, with the same query params and the same roles as
+   * `findAll`. Declared before `:id` so the path is not read as an id.
+   * Streams a file, so it sets its own headers — as the leave report does.
+   */
+  @Get('export')
+  @Roles(role_enum.EMPLOYEE, role_enum.HOD, role_enum.MD, role_enum.EA, role_enum.PA, role_enum.DEPARTMENT_CONTROLLER, role_enum.ADMIN)
+  async export(
+    @Query() filter: SelfActionFilterDto,
+    @CurrentUser() user: JwtPayload,
+    @Res() res: Response,
+  ): Promise<void> {
+    const { buffer, filename } = await this.selfActionsService.exportToExcel(user, filter);
+
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.send(buffer);
   }
 
   @Get(':id')

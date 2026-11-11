@@ -13,6 +13,7 @@ import { SelfActionFilterDto } from './dto/self-action-filter.dto';
 import { CreateSelfActionCommentDto } from './dto/create-self-action-comment.dto';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
 import { Prisma, role_enum, self_action_status_enum } from '@prisma/client';
+import * as ExcelJS from 'exceljs';
 import { AttachmentsService } from '../attachments/attachments.service';
 import { UploadedFile } from '../../common/types/uploaded-file.type';
 import { DepartmentScopeService } from '../../common/services/department-scope.service';
@@ -65,6 +66,96 @@ const SELECT = {
     },
   },
 };
+
+/**
+ * What the xlsx export reads: the fields the screen shows, and nothing that
+ * costs a signature per row. `mapAction` decorates attachments with signed
+ * URLs, which is right for a page of twenty and wrong for a file of thousands.
+ */
+const EXPORT_SELECT = {
+  title: true,
+  description: true,
+  priority: true,
+  status: true,
+  completed_at: true,
+  created_at: true,
+  updated_at: true,
+  users: {
+    select: {
+      full_name: true,
+      role: true,
+    },
+  },
+  self_action_departments: {
+    select: {
+      departments: {
+        select: {
+          name: true,
+        },
+      },
+    },
+  },
+} satisfies Prisma.self_actionsSelect;
+
+const MONTHS = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * A date-only bound covers that whole day. `new Date('2026-11-11')` is midnight
+ * UTC, so an `lte` on it would drop every record created on the last day the
+ * picker named — "to the 11th" coming back without the 11th. Built from the
+ * calendar components so the day typed is the day matched, in whatever
+ * timezone the API runs. A full timestamp keeps the time it carries.
+ */
+function startOfFilterDay(value: string): Date {
+  const parts = DATE_ONLY.exec(value);
+  if (!parts) return new Date(value);
+  return new Date(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3]));
+}
+
+function endOfFilterDay(value: string): Date {
+  const parts = DATE_ONLY.exec(value);
+  if (!parts) return new Date(value);
+  return new Date(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3]), 23, 59, 59, 999);
+}
+
+/**
+ * `DD-MMM-YYYY HH:mm` as text rather than an Excel date cell: `mmm` renders in
+ * the workbook's own locale otherwise (Nov, nov., nov…), and one format
+ * everywhere is the point. No value — or an unparsable one — stays a blank
+ * cell instead of becoming a zero.
+ */
+function formatTimestamp(value?: Date | string | null): string | undefined {
+  if (!value) return undefined;
+  const date = typeof value === 'string' ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return undefined;
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return `${pad(date.getDate())}-${MONTHS[date.getMonth()]}-${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+/**
+ * Exported text is a data cell — Excel never parses a shared string as a
+ * formula — but the leading character is escaped anyway (the spreadsheet
+ * export rule from OWASP), so the value also survives being copied into a CSV
+ * or pasted back into a formula bar. An absent optional value is a blank cell.
+ */
+function excelText(value: unknown): string | undefined {
+  if (value == null) return undefined;
+  const text = String(value);
+  if (!text) return undefined;
+  return /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+}
+
+/** `PerformX_Self_Actions_Export_2026-11-11.xlsx`, in server-local date. */
+function exportStamp(): string {
+  const now = new Date();
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
 
 @Injectable()
 export class SelfActionsService {
@@ -181,6 +272,39 @@ export class SelfActionsService {
   }
 
   async findAll(user: JwtPayload, filter: SelfActionFilterDto) {
+    const where = await this.buildListWhere(user, filter);
+
+    const [data, total] = await Promise.all([
+      this.prisma.self_actions.findMany({
+        where,
+        select: SELECT,
+        orderBy: { created_at: 'desc' },
+        skip: ((filter.page || 1) - 1) * (filter.limit || 20),
+        take: filter.limit || 20,
+      }),
+      this.prisma.self_actions.count({ where }),
+    ]);
+
+    return {
+      data: await Promise.all(data.map((item) => this.mapAction(item))),
+      total,
+      page: filter.page || 1,
+      limit: filter.limit || 20,
+      hasMore: (filter.page || 1) * (filter.limit || 20) < total,
+    };
+  }
+
+  /**
+   * The one place a list of self actions is narrowed. Scope comes first —
+   * department, then identity for an EMPLOYEE, or ownership alone in mine mode
+   * — and the screen's filters are clauses beside it, never above it, so a
+   * filter can only narrow what the caller could already see.
+   *
+   * `findAll` pages over this and the xlsx export reads it whole, which is the
+   * point: both answer the same question for the same user, and the file can
+   * only ever contain rows the screen would have shown.
+   */
+  private async buildListWhere(user: JwtPayload, filter: SelfActionFilterDto) {
     const clauses: any[] = [{ deleted_at: null }];
 
     if (filter.mine) {
@@ -222,8 +346,8 @@ export class SelfActionsService {
     }
     if (filter.dateFrom || filter.dateTo) {
       const createdAt: any = {};
-      if (filter.dateFrom) createdAt.gte = new Date(filter.dateFrom);
-      if (filter.dateTo) createdAt.lte = new Date(filter.dateTo);
+      if (filter.dateFrom) createdAt.gte = startOfFilterDay(filter.dateFrom);
+      if (filter.dateTo) createdAt.lte = endOfFilterDay(filter.dateTo);
       clauses.push({ created_at: createdAt });
     }
 
@@ -231,25 +355,75 @@ export class SelfActionsService {
     // createdById is ignored in "mine" mode — identity comes exclusively from JWT
     if (filter.createdById && !filter.mine) clauses.push({ created_by_id: filter.createdById });
 
-    const where = clauses.length === 1 ? clauses[0] : { AND: clauses };
+    return clauses.length === 1 ? clauses[0] : { AND: clauses };
+  }
 
-    const [data, total] = await Promise.all([
-      this.prisma.self_actions.findMany({
-        where,
-        select: SELECT,
-        orderBy: { created_at: 'desc' },
-        skip: ((filter.page || 1) - 1) * (filter.limit || 20),
-        take: filter.limit || 20,
-      }),
-      this.prisma.self_actions.count({ where }),
-    ]);
+  /**
+   * The list, unpaginated, as an xlsx workbook — the same rows `findAll`
+   * would return for these filters, read straight from the shared
+   * `buildListWhere`, with no `skip`/`take`: one query returns every matching
+   * record exactly once whatever page the screen is on, so the export neither
+   * duplicates across pages nor disturbs the pagination state.
+   *
+   * Returns the buffer and the filename; the controller sets the headers,
+   * following the leave report export.
+   */
+  async exportToExcel(user: JwtPayload, filter: SelfActionFilterDto) {
+    const where = await this.buildListWhere(user, filter);
 
+    const rows = await this.prisma.self_actions.findMany({
+      where,
+      select: EXPORT_SELECT,
+      orderBy: { created_at: 'desc' },
+    });
+
+    if (!rows.length) {
+      throw new NotFoundException('No Self Actions found for the selected filters.');
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Self Actions');
+    sheet.columns = [
+      { header: 'Employee Name', key: 'employee_name', width: 26 },
+      { header: 'Self Action Title', key: 'title', width: 34 },
+      { header: 'Description', key: 'description', width: 52 },
+      { header: 'Published Date', key: 'published_date', width: 20 },
+      { header: 'Department', key: 'department', width: 24 },
+      { header: 'Designation', key: 'designation', width: 22 },
+      { header: 'Priority', key: 'priority', width: 12 },
+      { header: 'Status', key: 'status', width: 14 },
+      { header: 'Completed Date', key: 'completed_date', width: 20 },
+      { header: 'Last Updated', key: 'last_updated', width: 20 },
+    ];
+    sheet.getRow(1).font = { bold: true };
+    sheet.getRow(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0E0E0' },
+    };
+
+    rows.forEach((action) => {
+      sheet.addRow({
+        // The department the screen shows, and the one the department filter
+        // narrows on: a self-action's linked department, which defaults to the
+        // creator's own scope when it is created.
+        employee_name: excelText(action.users?.full_name),
+        title: excelText(action.title),
+        description: excelText(action.description),
+        published_date: formatTimestamp(action.created_at),
+        department: excelText(action.self_action_departments?.[0]?.departments?.name),
+        designation: excelText(action.users?.role),
+        priority: excelText(action.priority),
+        status: excelText(action.status),
+        completed_date: formatTimestamp(action.completed_at),
+        last_updated: formatTimestamp(action.updated_at),
+      });
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
     return {
-      data: await Promise.all(data.map((item) => this.mapAction(item))),
-      total,
-      page: filter.page || 1,
-      limit: filter.limit || 20,
-      hasMore: (filter.page || 1) * (filter.limit || 20) < total,
+      buffer: Buffer.from(buffer),
+      filename: `PerformX_Self_Actions_Export_${exportStamp()}.xlsx`,
     };
   }
 

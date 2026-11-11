@@ -46,6 +46,11 @@ async function bootstrap() {
   app.enableCors({
     origin: corsOrigins,
     credentials: true,
+    // File downloads answer with their name in `Content-Disposition`, and a
+    // cross-origin response hides every header the browser does not list here.
+    // Without it the client never sees the server's filename and has to guess
+    // one of its own.
+    exposedHeaders: ['Content-Disposition'],
   });
 
   const port = process.env.PORT ?? 4000;

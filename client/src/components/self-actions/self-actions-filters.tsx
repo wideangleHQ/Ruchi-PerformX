@@ -91,9 +91,10 @@ export function SelfActionsFilters({
         ) : null}
 
         {/*
-          By name, not by date. The date range was two unlabelled inputs that
-          nobody used to find anything; the question people actually ask of this
-          list is whose work it is.
+          By name first: the question people actually ask of this list is whose
+          work it is, which is why the lookup is a name rather than a date. The
+          published-date bounds below are the narrowing that comes after it —
+          and the export reads both from these same values.
         */}
         {showCreatorField ? (
           <select
@@ -110,6 +111,27 @@ export function SelfActionsFilters({
             ))}
           </select>
         ) : null}
+
+        {/* Published date bounds, one cell so the grid stays four across. */}
+        <div className="flex items-center gap-2">
+          <Input
+            type="date"
+            aria-label="Published from"
+            value={values.dateFrom ?? ''}
+            onChange={(event) =>
+              setValues((current) => ({ ...current, dateFrom: event.target.value || undefined }))
+            }
+          />
+          <span className="text-xs text-slate-400">to</span>
+          <Input
+            type="date"
+            aria-label="Published to"
+            value={values.dateTo ?? ''}
+            onChange={(event) =>
+              setValues((current) => ({ ...current, dateTo: event.target.value || undefined }))
+            }
+          />
+        </div>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">

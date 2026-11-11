@@ -58,6 +58,8 @@ export interface SelfActionFilters {
   priority?: SelfActionPriority;
   departmentId?: string;
   createdById?: string;
+  dateFrom?: string;
+  dateTo?: string;
   page?: number;
   limit?: number;
 }
@@ -76,6 +78,33 @@ export const selfActionsApi = {
       params: filters,
     });
     return response.data;
+  },
+
+  /**
+   * The same list as xlsx, carrying whatever filters the screen is showing so
+   * the file matches it row for row — the server reads every matching record
+   * from the same clauses the list uses, not the rows already on the page.
+   *
+   * `page` and `limit` are dropped on purpose: the export is the whole result
+   * set, and the visible pagination must stay where it is. Returned as a blob
+   * and saved from the browser because the endpoint names the file itself in
+   * the content-disposition, which axios does not follow.
+   */
+  exportSelfActions: async (filters?: SelfActionFilters): Promise<void> => {
+    const response = await axiosClient.get('/self-actions/export', {
+      params: filters ? { ...filters, page: undefined, limit: undefined } : undefined,
+      responseType: 'blob',
+    });
+
+    const disposition = String(response.headers?.['content-disposition'] ?? '');
+    const serverName = /filename="([^"]+)"/.exec(disposition)?.[1];
+
+    const url = URL.createObjectURL(response.data as Blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = serverName ?? `PerformX_Self_Actions_Export_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    link.click();
+    URL.revokeObjectURL(url);
   },
 
   getSelfActionById: async (id: string): Promise<SelfAction> => {
