@@ -548,25 +548,34 @@ export class LeaveService {
   // ------------------------------------------------------------------ balance
 
   /**
-   * The caller's balance for the current financial year, one entry per active
-   * leave type.
-   *
-   * Creates the rows it does not find. That is the year rollover: no cron, no
-   * job to fail silently at midnight on 1 April, at the cost of a read that
-   * writes. See decisions.md.
+   * The caller's balance for the requested financial year, strictly read-only
+   * from existing database records. Does not fabricate or insert missing balances.
    */
-  async myBalance(user: JwtPayload) {
-    const year = financialYearOf(new Date());
-    const types = await this.prisma.leave_types.findMany({
-      where: { is_active: true },
-      orderBy: { name: 'asc' },
+  async myBalance(user: JwtPayload, yearParam?: number) {
+    const year = yearParam ?? financialYearOf(new Date());
+
+    const rows = await this.prisma.leave_balances.findMany({
+      where: {
+        user_id: user.sub,
+        year,
+      },
+      orderBy: { created_at: 'asc' },
     });
 
-    const balances = await Promise.all(
-      types.map(async (type) => {
-        const row = await this.ensureBalance(user.sub, type, year);
+    const types = await this.typeMap(rows.map((r) => r.leave_type_id));
+    const balances = rows
+      .filter((row) => types.has(row.leave_type_id))
+      .map((row) => {
+        const type = types.get(row.leave_type_id)!;
+        const entitled = Number(row.entitled);
+        const used = Number(row.used);
+        const carried_over = Number(row.carried_over);
+        const compensated_to_key_date = Number(row.compensated_to_key_date ?? 0);
+        const available_balance = Math.round((entitled + carried_over - used - compensated_to_key_date) * 100) / 100;
+
         return {
           id: row.id,
+          user_id: row.user_id,
           leave_type_id: type.id,
           leave_type: {
             id: type.id,
@@ -576,14 +585,14 @@ export class LeaveService {
             requires_proof: type.requires_proof,
           },
           year,
-          entitled: Number(row.entitled),
-          used: Number(row.used),
-          carried_over: Number(row.carried_over),
-          compensated_to_key_date: Number(row.compensated_to_key_date ?? 0),
-          remaining: remainingDays(row),
+          entitled,
+          used,
+          carried_over,
+          compensated_to_key_date,
+          remaining: available_balance,
+          available_balance,
         };
-      }),
-    );
+      });
 
     return { year, balances };
   }
@@ -605,6 +614,7 @@ export class LeaveService {
 
     const userWhere: Prisma.usersWhereInput = {
       deleted_at: null,
+      is_active: true,
       ...(filter.department_id ? { department_id: filter.department_id } : {}),
     };
 
@@ -624,55 +634,73 @@ export class LeaveService {
 
     let targetUserIds: string[] | undefined = undefined;
     if (filter.user_id) {
+      if (userIdsInScope !== null && !userIdsInScope.includes(filter.user_id)) {
+        throw new ForbiddenException('Requested employee is outside your departmental scope');
+      }
       targetUserIds = [filter.user_id];
-    } else if (q || filter.department_id || userIdsInScope !== null) {
+    } else {
       const matchedUsers = await this.prisma.users.findMany({
         where: userWhere,
         select: { id: true },
       });
       targetUserIds = matchedUsers.map((u) => u.id);
       if (targetUserIds.length === 0) {
-        return { items: [], total: 0, page, limit };
+        return { items: [], total: 0, page, limit, totalPages: 0 };
       }
     }
 
+    const activeTypes = await this.prisma.leave_types.findMany({
+      where: { is_active: true },
+      select: { id: true },
+    });
+    const activeTypeIds = activeTypes.map((t) => t.id);
+    const leaveTypeCondition = filter.leave_type_id
+      ? (activeTypeIds.includes(filter.leave_type_id) ? filter.leave_type_id : '__non_existent__')
+      : { in: activeTypeIds };
+
+    const balanceWhere: Prisma.leave_balancesWhereInput = {
+      year,
+      user_id: { in: targetUserIds },
+      leave_type_id: leaveTypeCondition,
+    };
+
     const [rows, total] = await Promise.all([
       this.prisma.leave_balances.findMany({
-        where: {
-          year,
-          ...(targetUserIds ? { user_id: { in: targetUserIds } } : {}),
-          ...(filter.leave_type_id ? { leave_type_id: filter.leave_type_id } : {}),
-        },
+        where: balanceWhere,
         orderBy: { updated_at: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
       }),
-      this.prisma.leave_balances.count({
-        where: {
-          year,
-          ...(targetUserIds ? { user_id: { in: targetUserIds } } : {}),
-          ...(filter.leave_type_id ? { leave_type_id: filter.leave_type_id } : {}),
-        },
-      }),
+      this.prisma.leave_balances.count({ where: balanceWhere }),
     ]);
 
     const types = await this.typeMap(rows.map((r) => r.leave_type_id));
     const withUsers = await attachUsers(this.prisma, rows, ['user_id']);
-    const items = withUsers.map((row) => ({
-      ...row,
-      entitled: Number(row.entitled),
-      used: Number(row.used),
-      carried_over: Number(row.carried_over),
-      compensated_to_key_date: Number(row.compensated_to_key_date ?? 0),
-      remaining: remainingDays(row),
-      leave_type: types.get(row.leave_type_id) ?? null,
-    }));
+    const items = withUsers.map((row) => {
+      const entitled = Number(row.entitled);
+      const used = Number(row.used);
+      const carried_over = Number(row.carried_over);
+      const compensated_to_key_date = Number(row.compensated_to_key_date ?? 0);
+      const available_balance = Math.round((entitled + carried_over - used - compensated_to_key_date) * 100) / 100;
+
+      return {
+        ...row,
+        entitled,
+        used,
+        carried_over,
+        compensated_to_key_date,
+        remaining: available_balance,
+        available_balance,
+        leave_type: types.get(row.leave_type_id) ?? null,
+      };
+    });
 
     return {
       items,
       total,
       page,
       limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
     };
   }
 
@@ -826,33 +854,14 @@ export class LeaveService {
       }
     }
 
-    const types = await this.prisma.leave_types.findMany({
-      where: { is_active: true },
-      orderBy: { name: 'asc' },
-    });
-
-    const [balances, adjustments, applications] = await Promise.all([
-      Promise.all(
-        types.map(async (t) => {
-          const row = await this.ensureBalance(userId, t, targetYear);
-          return {
-            id: row.id,
-            leave_type_id: t.id,
-            leave_type: {
-              id: t.id,
-              name: t.name,
-              description: t.description,
-              is_paid: t.is_paid,
-            },
-            year: targetYear,
-            entitled: Number(row.entitled),
-            used: Number(row.used),
-            carried_over: Number(row.carried_over),
-            compensated_to_key_date: Number(row.compensated_to_key_date ?? 0),
-            remaining: remainingDays(row),
-          };
-        }),
-      ),
+    const [rows, adjustments, applications] = await Promise.all([
+      this.prisma.leave_balances.findMany({
+        where: {
+          user_id: userId,
+          year: targetYear,
+        },
+        orderBy: { created_at: 'asc' },
+      }),
       this.getAdjustments(userId, targetYear),
       this.prisma.leave_applications.findMany({
         where: {
@@ -866,6 +875,36 @@ export class LeaveService {
       }),
     ]);
 
+    const types = await this.typeMap(rows.map((r) => r.leave_type_id));
+    const balances = rows
+      .filter((row) => types.has(row.leave_type_id))
+      .map((row) => {
+        const t = types.get(row.leave_type_id)!;
+        const entitled = Number(row.entitled);
+        const used = Number(row.used);
+        const carried_over = Number(row.carried_over);
+        const compensated_to_key_date = Number(row.compensated_to_key_date ?? 0);
+        const available_balance = Math.round((entitled + carried_over - used - compensated_to_key_date) * 100) / 100;
+
+        return {
+          id: row.id,
+          leave_type_id: t.id,
+          leave_type: {
+            id: t.id,
+            name: t.name,
+            description: t.description,
+            is_paid: t.is_paid,
+          },
+          year: targetYear,
+          entitled,
+          used,
+          carried_over,
+          compensated_to_key_date,
+          remaining: available_balance,
+          available_balance,
+        };
+      });
+
     return {
       user,
       year: targetYear,
@@ -873,6 +912,57 @@ export class LeaveService {
       adjustments,
       applications: await this.decorate(applications),
     };
+  }
+
+  async searchEmployees(query: string | undefined, caller: JwtPayload) {
+    const visibleIds = await this.visibleUserIds(caller);
+    const q = query?.trim();
+
+    const isUuid = Boolean(q && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(q));
+
+    const where: Prisma.usersWhereInput = {
+      deleted_at: null,
+      is_active: true,
+      ...(visibleIds !== null ? { id: { in: visibleIds } } : {}),
+      ...(q
+        ? {
+            OR: [
+              ...(isUuid ? [{ id: q }] : []),
+              { full_name: { contains: q, mode: 'insensitive' as const } },
+              { username: { contains: q, mode: 'insensitive' as const } },
+              { email: { contains: q, mode: 'insensitive' as const } },
+              { personnel_number: { contains: q, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+    };
+
+    const users = await this.prisma.users.findMany({
+      where,
+      select: {
+        id: true,
+        full_name: true,
+        username: true,
+        email: true,
+        personnel_number: true,
+        role: true,
+        department_id: true,
+        departments: { select: { id: true, name: true } },
+      },
+      orderBy: { full_name: 'asc' },
+      take: 20,
+    });
+
+    return users.map((u) => ({
+      id: u.id,
+      full_name: u.full_name,
+      username: u.username,
+      email: u.email,
+      personnel_number: u.personnel_number,
+      role: u.role,
+      department_id: u.department_id,
+      department_name: u.departments?.name ?? 'General',
+    }));
   }
 
   // -------------------------------------------------------------------- types
@@ -1433,12 +1523,12 @@ export class LeaveService {
   private async typeMap(ids: string[]) {
     const unique = [...new Set(ids)];
     if (unique.length === 0) {
-      return new Map<string, Pick<leave_types, 'id' | 'name' | 'is_paid' | 'requires_proof'>>();
+      return new Map<string, Pick<leave_types, 'id' | 'name' | 'description' | 'is_paid' | 'requires_proof'>>();
     }
 
     const types = await this.prisma.leave_types.findMany({
       where: { id: { in: unique } },
-      select: { id: true, name: true, is_paid: true, requires_proof: true },
+      select: { id: true, name: true, description: true, is_paid: true, requires_proof: true },
     });
     return new Map(types.map((type) => [type.id, type]));
   }

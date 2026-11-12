@@ -4,8 +4,8 @@ import { ApplyLeavePayload, LeaveStatus, LeaveTypePayload, leaveApi } from '@/ap
 export const useLeaveTypes = () =>
   useQuery({ queryKey: ['leave', 'types'], queryFn: () => leaveApi.getTypes() });
 
-export const useLeaveBalance = () =>
-  useQuery({ queryKey: ['leave', 'balance'], queryFn: () => leaveApi.getMyBalance() });
+export const useLeaveBalance = (year?: number) =>
+  useQuery({ queryKey: ['leave', 'balance', year], queryFn: () => leaveApi.getMyBalance(year) });
 
 export const useMyLeaveApplications = (filters?: { status?: LeaveStatus; year?: number }) =>
   useQuery({
@@ -109,6 +109,14 @@ export const useAllLeaveBalances = (
     queryKey: ['leave', 'balances', filters],
     queryFn: () => leaveApi.getBalances(filters),
     enabled,
+  });
+
+export const useSearchLeaveEmployees = (query: string, enabled = true) =>
+  useQuery({
+    queryKey: ['leave', 'search-employees', query],
+    queryFn: () => leaveApi.searchEmployees(query.trim() || undefined),
+    enabled,
+    staleTime: 1000 * 30,
   });
 
 export const useEmployeeLeaveSummary = (userId: string | null, year?: number, enabled = true) =>

@@ -122,6 +122,23 @@ export class LeaveController {
     return this.leaveService.findOthers(user, filter);
   }
 
+  /**
+   * Unified applications endpoint based on role:
+   * - EMPLOYEE: strictly own applications
+   * - Authorized roles: applications scoped to departmental permissions
+   */
+  @Get('applications')
+  @Roles(...STAFF_ROLES)
+  listApplications(
+    @Query() filter: LeaveApplicationFilterDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    if (user.role === role_enum.EMPLOYEE) {
+      return this.leaveService.findMine(user, filter);
+    }
+    return this.leaveService.findOthers(user, filter);
+  }
+
   // Alias routes matching requested logical paths
   @Get('my-leaves')
   @Roles(...STAFF_ROLES)
@@ -134,8 +151,11 @@ export class LeaveController {
 
   @Get('my-balances')
   @Roles(...STAFF_ROLES)
-  getMyBalances(@CurrentUser() user: JwtPayload) {
-    return this.leaveService.myBalance(user);
+  getMyBalances(
+    @Query('year') year: number | undefined,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.leaveService.myBalance(user, year ? Number(year) : undefined);
   }
 
   @Get('others')
@@ -154,6 +174,15 @@ export class LeaveController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.leaveService.listBalances(filter, user);
+  }
+
+  @Get('search-employees')
+  @Roles(...LEAVE_ADMIN_ROLES)
+  searchEmployees(
+    @Query('q') q: string | undefined,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.leaveService.searchEmployees(q, user);
   }
 
   @Get('applications/:id')
@@ -206,8 +235,11 @@ export class LeaveController {
 
   @Get('balance')
   @Roles(...STAFF_ROLES)
-  myBalance(@CurrentUser() user: JwtPayload) {
-    return this.leaveService.myBalance(user);
+  myBalance(
+    @Query('year') year: number | undefined,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.leaveService.myBalance(user, year ? Number(year) : undefined);
   }
 
   @Get('calendar')
@@ -278,7 +310,7 @@ export class LeaveController {
   }
 
   @Get('summary/:userId')
-  @Roles(...LEAVE_ADMIN_ROLES)
+  @Roles(...STAFF_ROLES)
   getEmployeeSummary(
     @Param('userId', ParseUUIDPipe) userId: string,
     @Query('year') year: number | undefined,

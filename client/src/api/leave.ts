@@ -21,6 +21,17 @@ export interface LeaveType {
   is_active: boolean;
 }
 
+export interface LeaveSearchEmployee {
+  id: string;
+  full_name: string;
+  username: string;
+  email: string;
+  personnel_number: string | null;
+  role: string;
+  department_id: string | null;
+  department_name: string;
+}
+
 /** Shape of `attachUsers` output on the server: a FK column plus `_user`. */
 export interface LeaveUserSummary {
   id: string;
@@ -117,9 +128,15 @@ export interface LeaveTypePayload {
 export const leaveTypeName = (types: LeaveType[], id: string) =>
   types.find((type) => type.id === id)?.name ?? 'Leave';
 
-/** Entitlement plus anything carried over, less what has been approved. */
-export const remainingDays = (balance: LeaveBalance) =>
-  toDays(balance.entitled) + toDays(balance.carried_over) - toDays(balance.used);
+/** Available balance: Entitlement + Carried Over - Used - Compensated to Key Date */
+export const remainingDays = (balance: LeaveBalance) => {
+  const entitled = toDays(balance.entitled);
+  const carried = toDays(balance.carried_over);
+  const used = toDays(balance.used);
+  const compensated = toDays(balance.compensated_to_key_date);
+  const raw = entitled + carried - used - compensated;
+  return Math.round(raw * 100) / 100;
+};
 
 export interface LeaveApplication {
   id: string;
@@ -184,8 +201,8 @@ async function getList<T>(url: string, params?: Record<string, unknown>): Promis
 export const leaveApi = {
   getTypes: () => getList<LeaveType>('/leave/types'),
 
-  /** Own balance for the current year, one row per active leave type. */
-  getMyBalance: () => getList<LeaveBalance>('/leave/balance'),
+  /** Own balance for the requested year, one row per active leave type. */
+  getMyBalance: (year?: number) => getList<LeaveBalance>('/leave/balance', { year }),
 
   getMyApplications: (params?: { status?: LeaveStatus; year?: number }) =>
     getList<LeaveApplication>('/leave/applications/mine', params),
@@ -328,6 +345,14 @@ export const leaveApi = {
     remarks?: string;
   }): Promise<LeaveAdjustment> => {
     const response = await axiosClient.post<LeaveAdjustment>('/leave/adjustments', payload);
+    return response.data;
+  },
+
+  /** Search employees for leave profile directory */
+  searchEmployees: async (q?: string): Promise<LeaveSearchEmployee[]> => {
+    const response = await axiosClient.get<LeaveSearchEmployee[]>('/leave/search-employees', {
+      params: { q },
+    });
     return response.data;
   },
 
