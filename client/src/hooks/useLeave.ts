@@ -9,8 +9,29 @@ export const useLeaveBalance = () =>
 
 export const useMyLeaveApplications = (filters?: { status?: LeaveStatus; year?: number }) =>
   useQuery({
-    queryKey: ['leave', 'applications', filters],
+    queryKey: ['leave', 'applications', 'mine', filters],
     queryFn: () => leaveApi.getMyApplications(filters),
+  });
+
+export const useOthersLeaveApplications = (
+  filters?: {
+    status?: LeaveStatus;
+    leave_type_id?: string;
+    department_id?: string;
+    user_id?: string;
+    year?: number;
+    start_date?: string;
+    end_date?: string;
+    q?: string;
+    page?: number;
+    limit?: number;
+  },
+  enabled = true,
+) =>
+  useQuery({
+    queryKey: ['leave', 'applications', 'others', filters],
+    queryFn: () => leaveApi.getOthersApplications(filters),
+    enabled,
   });
 
 export const useLeaveApplication = (id: string) =>
@@ -71,15 +92,30 @@ export const useHrCancelLeave = () =>
 
 // ---------------------------------------------------------------------- admin
 
-/** Every balance for the year, HR only. Separate key from the caller's own. */
+/** Every balance for the year. Separate key from the caller's own. */
 export const useAllLeaveBalances = (
-  filters?: { user_id?: string; leave_type_id?: string; year?: number },
+  filters?: {
+    user_id?: string;
+    leave_type_id?: string;
+    department_id?: string;
+    year?: number;
+    q?: string;
+    page?: number;
+    limit?: number;
+  },
   enabled = true,
 ) =>
   useQuery({
     queryKey: ['leave', 'balances', filters],
     queryFn: () => leaveApi.getBalances(filters),
     enabled,
+  });
+
+export const useEmployeeLeaveSummary = (userId: string | null, year?: number, enabled = true) =>
+  useQuery({
+    queryKey: ['leave', 'summary', userId, year],
+    queryFn: () => (userId ? leaveApi.getEmployeeSummary(userId, year) : Promise.reject('No user')),
+    enabled: Boolean(userId) && enabled,
   });
 
 export const useMonthlyLeaveReport = (
@@ -107,6 +143,26 @@ export const useUpdateLeaveBalance = () =>
       payload,
     }: {
       id: string;
-      payload: { entitled?: number; used?: number; carried_over?: number };
+      payload: {
+        entitled?: number;
+        used?: number;
+        carried_over?: number;
+        compensated_to_key_date?: number;
+        remarks?: string;
+      };
     }) => leaveApi.updateBalance(id, payload),
+  );
+
+export const useCreateLeaveAdjustment = () =>
+  useLeaveMutation(
+    (payload: {
+      user_id: string;
+      leave_type_id: string;
+      year: number;
+      adjustment_type: 'OPENING_BALANCE' | 'ANNUAL_ALLOCATION' | 'MANUAL_CORRECTION' | 'ENCASHMENT' | 'LAPSE';
+      amount: number;
+      effective_date?: string;
+      reference?: string;
+      remarks?: string;
+    }) => leaveApi.createAdjustment(payload),
   );

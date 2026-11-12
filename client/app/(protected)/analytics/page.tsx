@@ -136,7 +136,13 @@ function MemberRow({ member, peak }: { member: DepartmentMemberTrend; peak: numb
   );
 }
 
+const SHOW_SCORING = false;
+
 export default function AnalyticsPage() {
+  if (!SHOW_SCORING) {
+    redirect('/dashboard');
+  }
+
   const { user, isLoading: authLoading } = useAuth();
   const now = new Date();
   const [period, setPeriod] = useState({

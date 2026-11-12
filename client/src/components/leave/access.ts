@@ -35,10 +35,20 @@ export const canActOnLeave = (role?: string | null) => Boolean(role && APPROVER_
  * can read the report but not edit a type. Showing one screen's button on
  * another's role is exactly the 403 this file exists to avoid.
  */
+const BALANCE_VIEW_ROLES = ['HR', 'ADMIN', 'MD', 'EA', 'PA', 'HOD', 'DEPARTMENT_CONTROLLER'];
+const OTHERS_LEAVE_VIEW_ROLES = ['ADMIN', 'MD', 'EA', 'PA', 'HOD', 'HR', 'DEPARTMENT_CONTROLLER'];
+
+export const canViewOthersLeaves = (role?: string | null) =>
+  Boolean(role && OTHERS_LEAVE_VIEW_ROLES.includes(role));
+
 export const canManageLeaveTypes = (role?: string | null) =>
   Boolean(role && HR_ROLES.includes(role));
 
-export const canManageLeaveBalances = (role?: string | null) => role === 'HR';
+export const canManageLeaveBalances = (role?: string | null) =>
+  Boolean(role && BALANCE_VIEW_ROLES.includes(role));
+
+export const canEditLeaveBalances = (role?: string | null) =>
+  Boolean(role && (role === 'HR' || role === 'ADMIN'));
 
 export const canReadLeaveReports = (role?: string | null) =>
   Boolean(role && (role === 'HR' || role === 'MD'));

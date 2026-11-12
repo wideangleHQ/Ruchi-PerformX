@@ -34,6 +34,20 @@ import {
 } from './dto/leave-query.dto';
 import { CreateLeaveTypeDto, UpdateLeaveTypeDto } from './dto/leave-type.dto';
 import { UpdateLeaveBalanceDto } from './dto/update-leave-balance.dto';
+import { CreateLeaveAdjustmentDto } from './dto/create-leave-adjustment.dto';
+
+/**
+ * Roles permitted to view departmental or organization-wide leave balances.
+ */
+const LEAVE_ADMIN_ROLES: role_enum[] = [
+  role_enum.HR,
+  role_enum.ADMIN,
+  role_enum.MD,
+  role_enum.EA,
+  role_enum.PA,
+  role_enum.HOD,
+  role_enum.DEPARTMENT_CONTROLLER,
+];
 
 /**
  * Everybody on the payroll. Listed rather than left open, because an empty
@@ -91,6 +105,55 @@ export class LeaveController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.leaveService.findMine(user, filter);
+  }
+
+  /**
+   * Leave applications of others based on authorization:
+   * - MD, EA, PA, ADMIN, HR: all employees across all departments
+   * - HOD: only their department's employees
+   * - EMPLOYEE: 403 Forbidden
+   */
+  @Get('applications/others')
+  @Roles(...LEAVE_ADMIN_ROLES)
+  findOthers(
+    @Query() filter: LeaveApplicationFilterDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.leaveService.findOthers(user, filter);
+  }
+
+  // Alias routes matching requested logical paths
+  @Get('my-leaves')
+  @Roles(...STAFF_ROLES)
+  getMyLeaves(
+    @Query() filter: LeaveApplicationFilterDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.leaveService.findMine(user, filter);
+  }
+
+  @Get('my-balances')
+  @Roles(...STAFF_ROLES)
+  getMyBalances(@CurrentUser() user: JwtPayload) {
+    return this.leaveService.myBalance(user);
+  }
+
+  @Get('others')
+  @Roles(...LEAVE_ADMIN_ROLES)
+  getOthers(
+    @Query() filter: LeaveApplicationFilterDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.leaveService.findOthers(user, filter);
+  }
+
+  @Get('others/balances')
+  @Roles(...LEAVE_ADMIN_ROLES)
+  getOthersBalances(
+    @Query() filter: LeaveBalanceFilterDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.leaveService.listBalances(filter, user);
   }
 
   @Get('applications/:id')
@@ -178,18 +241,54 @@ export class LeaveController {
   }
 
   @Get('balances')
-  @Roles(role_enum.HR)
-  listBalances(@Query() filter: LeaveBalanceFilterDto) {
-    return this.leaveService.listBalances(filter);
+  @Roles(...LEAVE_ADMIN_ROLES)
+  listBalances(
+    @Query() filter: LeaveBalanceFilterDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.leaveService.listBalances(filter, user);
   }
 
   @Patch('balances/:id')
-  @Roles(role_enum.HR)
+  @Roles(role_enum.HR, role_enum.ADMIN)
   updateBalance(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateLeaveBalanceDto,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.leaveService.updateBalance(id, dto);
+    return this.leaveService.updateBalance(id, dto, user);
+  }
+
+  @Post('adjustments')
+  @Roles(role_enum.HR, role_enum.ADMIN)
+  createAdjustment(
+    @Body() dto: CreateLeaveAdjustmentDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.leaveService.createAdjustment(dto, user);
+  }
+
+  @Get('adjustments/:userId')
+  @Roles(...LEAVE_ADMIN_ROLES)
+  getAdjustments(
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Query('year') year?: number,
+  ) {
+    return this.leaveService.getAdjustments(userId, year ? Number(year) : undefined);
+  }
+
+  @Get('summary/:userId')
+  @Roles(...LEAVE_ADMIN_ROLES)
+  getEmployeeSummary(
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Query('year') year: number | undefined,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.leaveService.getEmployeeLeaveSummary(
+      userId,
+      year ? Number(year) : undefined,
+      user,
+    );
   }
 
   @Get('reports/monthly')

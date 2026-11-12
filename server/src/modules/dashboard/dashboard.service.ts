@@ -15,6 +15,10 @@ import { DepartmentQueryHelper } from '../../common/helpers/department-query.hel
 // have to fall where the office falls, not where the database server does.
 import { SCORE_TIMEZONE } from '../hod-score/hod-score.constants';
 import { PollsService } from '../polls/polls.service';
+import {
+  isRestrictedFromDigitalMarketing,
+  isDigitalMarketingDepartment,
+} from '../../common/helpers/department-restriction.helper';
 
 type DepartmentScope = Awaited<ReturnType<DepartmentScopeService['resolveDepartmentScope']>>;
 
@@ -160,11 +164,17 @@ export class DashboardService {
       this.polls.listActive(user.sub, DASHBOARD_POLL_LIMIT),
     ]);
 
-    const birthdays = birthdayRows.map((row) => ({
+    let birthdays = birthdayRows.map((row) => ({
       id: row.id,
       fullName: row.full_name,
       departmentName: row.department_name,
     }));
+
+    if (isRestrictedFromDigitalMarketing(user.role)) {
+      birthdays = birthdays.filter(
+        (b) => !isDigitalMarketingDepartment(b.departmentName),
+      );
+    }
 
     const upcomingHoliday = holidayRow && {
       id: holidayRow.id,
@@ -182,7 +192,7 @@ export class DashboardService {
     const departmentNames = new Map(departments.map((d) => [d.id, d.name]));
     const sortOrderMap = new Map(departments.map((d) => [d.id, d.sort_order]));
 
-    const departmentSummary = departmentGroups.map((group) => {
+    let departmentSummary = departmentGroups.map((group) => {
       const completed = completedByDepartment.get(group.department_id) ?? 0;
       const completionRate = this.percent(completed, group._count.id);
       return {
@@ -193,6 +203,12 @@ export class DashboardService {
         sortOrder: sortOrderMap.get(group.department_id) ?? 999,
       };
     });
+
+    if (isRestrictedFromDigitalMarketing(user.role)) {
+      departmentSummary = departmentSummary.filter(
+        (d) => !isDigitalMarketingDepartment(d.department),
+      );
+    }
 
     departmentSummary.sort((a, b) => a.sortOrder - b.sortOrder);
 

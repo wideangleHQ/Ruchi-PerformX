@@ -19,6 +19,10 @@ import { DepartmentScopeService } from '../../common/services/department-scope.s
 import { attachUsers } from '../../common/helpers/user-lookup.helper';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
 import { NotificationsService } from '../notifications/notifications.service';
+import {
+  isRestrictedFromDigitalMarketing,
+  isDigitalMarketingDepartment,
+} from '../../common/helpers/department-restriction.helper';
 
 import { CreateKpiDto } from './dto/create-kpi.dto';
 import {
@@ -835,6 +839,21 @@ export class KpiService {
     if (!scope.unrestricted) {
       userAnd.push({ department_id: { in: scope.departmentIds } });
     }
+    if (isRestrictedFromDigitalMarketing(user.role)) {
+      const dmDepts = await this.prisma.departments.findMany({
+        where: { name: { contains: 'Digital Marketing', mode: 'insensitive' } },
+        select: { id: true },
+      });
+      const dmIds = dmDepts.map((d) => d.id);
+      if (dmIds.length > 0) {
+        userAnd.push({
+          OR: [
+            { department_id: null },
+            { department_id: { notIn: dmIds } },
+          ],
+        });
+      }
+    }
     if (query.department_id) userAnd.push({ department_id: query.department_id });
     if (query.user_id) userAnd.push({ id: query.user_id });
     if (query.role) userAnd.push({ role: query.role });
@@ -878,7 +897,12 @@ export class KpiService {
       }),
       this.prisma.performance_scores.count({ where }),
       this.prisma.departments.findMany({
-        where: scope.unrestricted ? {} : { id: { in: scope.departmentIds } },
+        where: {
+          ...(scope.unrestricted ? {} : { id: { in: scope.departmentIds } }),
+          ...(isRestrictedFromDigitalMarketing(user.role)
+            ? { name: { not: { contains: 'Digital Marketing', mode: 'insensitive' } } }
+            : {}),
+        },
         select: { id: true, name: true },
         orderBy: { name: 'asc' },
       }),
@@ -967,9 +991,15 @@ export class KpiService {
     if (userId !== user.sub) {
       const subject = await this.prisma.users.findFirst({
         where: { id: userId, deleted_at: null },
-        select: { id: true, department_id: true },
+        select: { id: true, department_id: true, departments: { select: { name: true } } },
       });
       if (!subject) throw new NotFoundException('User not found');
+      if (
+        isRestrictedFromDigitalMarketing(user.role) &&
+        isDigitalMarketingDepartment(subject.departments?.name)
+      ) {
+        throw new ForbiddenException('Outside your department scope');
+      }
       const scope = await this.departmentScope.resolveDepartmentScope(user);
       const visible =
         scope.unrestricted ||
@@ -1226,6 +1256,15 @@ export class KpiService {
     user: JwtPayload,
   ) {
     if (kpi.created_by_id === user.sub) return;
+    if (isRestrictedFromDigitalMarketing(user.role) && kpi.department_id) {
+      const dept = await this.prisma.departments.findUnique({
+        where: { id: kpi.department_id },
+        select: { name: true },
+      });
+      if (isDigitalMarketingDepartment(dept?.name)) {
+        throw new ForbiddenException('Only the author or an authority over its department can change this KPI');
+      }
+    }
     const scope = await this.departmentScope.resolveDepartmentScope(user);
     if (canActOnDepartment(user.role, scope, kpi.department_id)) return;
     throw new ForbiddenException('Only the author or an authority over its department can change this KPI');
@@ -1302,6 +1341,15 @@ export class KpiService {
     user: JwtPayload,
   ) {
     if (kpi.owner_user_id === user.sub || kpi.created_by_id === user.sub) return;
+    if (isRestrictedFromDigitalMarketing(user.role) && kpi.department_id) {
+      const dept = await this.prisma.departments.findUnique({
+        where: { id: kpi.department_id },
+        select: { name: true },
+      });
+      if (isDigitalMarketingDepartment(dept?.name)) {
+        throw new ForbiddenException('Outside your department scope');
+      }
+    }
     const scope = await this.departmentScope.resolveDepartmentScope(user);
     if (scope.unrestricted) return;
     if (kpi.department_id && scope.departmentIds.includes(kpi.department_id)) return;
@@ -1322,7 +1370,30 @@ export class KpiService {
    */
   private async visibilityFilter(user: JwtPayload): Promise<Prisma.kpisWhereInput> {
     const scope = await this.departmentScope.resolveDepartmentScope(user);
-    if (scope.unrestricted) return {};
+    const dmCondition: Prisma.kpisWhereInput[] = [];
+
+    if (isRestrictedFromDigitalMarketing(user.role)) {
+      const dmDepts = await this.prisma.departments.findMany({
+        where: { name: { contains: 'Digital Marketing', mode: 'insensitive' } },
+        select: { id: true },
+      });
+      const dmIds = dmDepts.map((d) => d.id);
+      if (dmIds.length > 0) {
+        dmCondition.push({
+          OR: [
+            { department_id: null },
+            { department_id: { notIn: dmIds } },
+          ],
+        });
+      }
+    }
+
+    if (scope.unrestricted) {
+      if (dmCondition.length > 0) {
+        return { AND: dmCondition };
+      }
+      return {};
+    }
 
     const shares = await this.prisma.kpi_contributions.findMany({
       where: { user_id: user.sub },
@@ -1330,13 +1401,18 @@ export class KpiService {
     });
 
     return {
-      OR: [
-        { owner_user_id: user.sub },
-        { created_by_id: user.sub },
-        { id: { in: shares.map((row) => row.kpi_id) } },
-        ...(scope.departmentIds.length
-          ? [{ department_id: { in: scope.departmentIds } }]
-          : []),
+      AND: [
+        ...dmCondition,
+        {
+          OR: [
+            { owner_user_id: user.sub },
+            { created_by_id: user.sub },
+            { id: { in: shares.map((row) => row.kpi_id) } },
+            ...(scope.departmentIds.length
+              ? [{ department_id: { in: scope.departmentIds } }]
+              : []),
+          ],
+        },
       ],
     };
   }

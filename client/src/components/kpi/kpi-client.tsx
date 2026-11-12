@@ -20,12 +20,13 @@ import {
   statusTone,
 } from '@/components/kpi/display';
 
-type Tab = 'own' | 'others' | 'score';
+type Tab = 'own' | 'others';
 
 const TABS: [Tab, string][] = [
   ['own', 'View your KPI'],
   ['others', 'View others KPI'],
-  ['score', 'View score'],
+  // Scoring features are temporarily hidden from the UI.
+  // ['score', 'View score'],
 ];
 
 const PAGE_SIZE = 20;
@@ -59,7 +60,7 @@ export function KpiClient() {
   const [page, setPage] = useState(1);
   const { data: psScore } = useMyPsScore();
   const { data: kpiPage, isLoading } = useKpis({
-    ...(isAuthority && tab !== 'score' && { view: tab }),
+    ...(isAuthority && { view: tab }),
     page,
     limit: PAGE_SIZE,
   });
@@ -93,10 +94,9 @@ export function KpiClient() {
     <div className="space-y-6 p-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">KPIs and PS Score</h1>
+          <h1 className="text-2xl font-bold text-slate-900">KPIs</h1>
           <p className="text-sm text-slate-500">
             Whether your role is delivering the outcomes it exists to deliver.
-            Separate from the Action Tracker score, on purpose.
           </p>
         </div>
         {user ? (
@@ -106,7 +106,8 @@ export function KpiClient() {
         ) : null}
       </header>
 
-      {psScore ? (
+      {/* PS Score section temporarily hidden from UI */}
+      {/* {psScore ? (
         <section className="rounded-2xl border border-slate-200 bg-white p-5">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
@@ -199,7 +200,7 @@ export function KpiClient() {
             </p>
           )}
         </section>
-      ) : null}
+      ) : null} */}
 
       {isAuthority ? (
         <nav className="flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1">
@@ -221,9 +222,10 @@ export function KpiClient() {
         </nav>
       ) : null}
 
-      {isAuthority && tab === 'score' ? (
+      {/* Scoring tab temporarily hidden */}
+      {/* {isAuthority && (tab as string) === 'score' ? (
         <KpiScoreTab />
-      ) : (
+      ) : ( */}
         <section className="rounded-2xl border border-slate-200 bg-white">
           <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
             <h2 className="text-sm font-semibold text-slate-900">
@@ -328,7 +330,7 @@ export function KpiClient() {
             </div>
           ) : null}
         </section>
-      )}
+      {/* )} */}
 
       {user ? (
         <KpiFormDialog

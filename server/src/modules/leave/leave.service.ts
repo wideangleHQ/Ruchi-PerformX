@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  leave_adjustment_type_enum,
   leave_applications,
   leave_status_enum,
   leave_types,
@@ -37,9 +38,11 @@ import {
 } from './dto/leave-query.dto';
 import { CreateLeaveTypeDto, UpdateLeaveTypeDto } from './dto/leave-type.dto';
 import { UpdateLeaveBalanceDto } from './dto/update-leave-balance.dto';
+import { CreateLeaveAdjustmentDto } from './dto/create-leave-adjustment.dto';
 import {
   countLeaveDays,
   financialYearOf,
+  FINANCIAL_YEAR_START_MONTH,
   MIN_LEAVE_DAYS,
   monthRange,
   parseDateOnly,
@@ -174,7 +177,82 @@ export class LeaveService {
       user_id: user.sub,
       ...(filter.status ? { status: filter.status } : {}),
       ...(filter.leave_type_id ? { leave_type_id: filter.leave_type_id } : {}),
+      ...(filter.year
+        ? {
+            start_date: {
+              gte: new Date(Date.UTC(filter.year, FINANCIAL_YEAR_START_MONTH, 1)),
+              lte: new Date(Date.UTC(filter.year + 1, FINANCIAL_YEAR_START_MONTH, 0)),
+            },
+          }
+        : {}),
     };
+    return this.paginate(where, filter);
+  }
+
+  /**
+   * Leave applications of other employees based on role-based access.
+   * - MD, EA, PA, ADMIN, HR: view all employees across all departments.
+   * - HOD: view only employees in their assigned departments.
+   * - EMPLOYEE: Forbidden.
+   */
+  async findOthers(user: JwtPayload, filter: LeaveApplicationFilterDto) {
+    if (user.role === role_enum.EMPLOYEE) {
+      throw new ForbiddenException("Employees are not authorized to view others' leaves");
+    }
+
+    const visibleUserIds = await this.visibleUserIds(user);
+    const userWhere: Prisma.usersWhereInput = {
+      deleted_at: null,
+      ...(filter.department_id ? { department_id: filter.department_id } : {}),
+    };
+
+    if (visibleUserIds !== null) {
+      userWhere.id = { in: visibleUserIds };
+    }
+
+    const q = filter.q?.trim();
+    if (q) {
+      userWhere.OR = [
+        { full_name: { contains: q, mode: 'insensitive' } },
+        { username: { contains: q, mode: 'insensitive' } },
+        { email: { contains: q, mode: 'insensitive' } },
+        { personnel_number: { contains: q, mode: 'insensitive' } },
+      ];
+    }
+
+    let targetUserIds: string[] | undefined = undefined;
+    if (filter.user_id) {
+      if (visibleUserIds !== null && !visibleUserIds.includes(filter.user_id)) {
+        throw new ForbiddenException('Requested employee is outside your department scope');
+      }
+      targetUserIds = [filter.user_id];
+    } else if (q || filter.department_id || visibleUserIds !== null) {
+      const matchedUsers = await this.prisma.users.findMany({
+        where: userWhere,
+        select: { id: true },
+      });
+      targetUserIds = matchedUsers.map((u) => u.id);
+      if (targetUserIds.length === 0) {
+        return { items: [], total: 0, page: filter.page ?? 1, limit: filter.limit ?? 20 };
+      }
+    }
+
+    const where: Prisma.leave_applicationsWhereInput = {
+      ...(targetUserIds ? { user_id: { in: targetUserIds } } : {}),
+      ...(filter.status ? { status: filter.status } : {}),
+      ...(filter.leave_type_id ? { leave_type_id: filter.leave_type_id } : {}),
+      ...(filter.year
+        ? {
+            start_date: {
+              gte: new Date(Date.UTC(filter.year, FINANCIAL_YEAR_START_MONTH, 1)),
+              lte: new Date(Date.UTC(filter.year + 1, FINANCIAL_YEAR_START_MONTH, 0)),
+            },
+          }
+        : {}),
+      ...(filter.start_date ? { start_date: { gte: parseDateOnly(filter.start_date) } } : {}),
+      ...(filter.end_date ? { end_date: { lte: parseDateOnly(filter.end_date) } } : {}),
+    };
+
     return this.paginate(where, filter);
   }
 
@@ -493,6 +571,7 @@ export class LeaveService {
           leave_type: {
             id: type.id,
             name: type.name,
+            description: type.description,
             is_paid: type.is_paid,
             requires_proof: type.requires_proof,
           },
@@ -500,6 +579,7 @@ export class LeaveService {
           entitled: Number(row.entitled),
           used: Number(row.used),
           carried_over: Number(row.carried_over),
+          compensated_to_key_date: Number(row.compensated_to_key_date ?? 0),
           remaining: remainingDays(row),
         };
       }),
@@ -508,50 +588,291 @@ export class LeaveService {
     return { year, balances };
   }
 
-  /** Every balance row HR asked for, with the employee attached. */
-  async listBalances(filter: LeaveBalanceFilterDto) {
-    const rows = await this.prisma.leave_balances.findMany({
-      where: {
-        year: filter.year ?? financialYearOf(new Date()),
-        ...(filter.user_id ? { user_id: filter.user_id } : {}),
-        ...(filter.leave_type_id ? { leave_type_id: filter.leave_type_id } : {}),
-      },
-      orderBy: { updated_at: 'desc' },
-    });
+  /**
+   * Every balance row matching filters, with the employee attached.
+   * Accessible to HR, ADMIN, MD, EA, PA, and HOD (scoped to permitted departments).
+   * Supports search by name, username, email, and personnel_number.
+   */
+  async listBalances(filter: LeaveBalanceFilterDto, caller?: JwtPayload) {
+    const year = filter.year ?? financialYearOf(new Date());
+    const page = filter.page ?? 1;
+    const limit = filter.limit ?? 50;
+
+    let userIdsInScope: string[] | null = null;
+    if (caller) {
+      userIdsInScope = await this.visibleUserIds(caller);
+    }
+
+    const userWhere: Prisma.usersWhereInput = {
+      deleted_at: null,
+      ...(filter.department_id ? { department_id: filter.department_id } : {}),
+    };
+
+    if (userIdsInScope !== null) {
+      userWhere.id = { in: userIdsInScope };
+    }
+
+    const q = filter.q?.trim();
+    if (q) {
+      userWhere.OR = [
+        { full_name: { contains: q, mode: 'insensitive' } },
+        { username: { contains: q, mode: 'insensitive' } },
+        { email: { contains: q, mode: 'insensitive' } },
+        { personnel_number: { contains: q, mode: 'insensitive' } },
+      ];
+    }
+
+    let targetUserIds: string[] | undefined = undefined;
+    if (filter.user_id) {
+      targetUserIds = [filter.user_id];
+    } else if (q || filter.department_id || userIdsInScope !== null) {
+      const matchedUsers = await this.prisma.users.findMany({
+        where: userWhere,
+        select: { id: true },
+      });
+      targetUserIds = matchedUsers.map((u) => u.id);
+      if (targetUserIds.length === 0) {
+        return { items: [], total: 0, page, limit };
+      }
+    }
+
+    const [rows, total] = await Promise.all([
+      this.prisma.leave_balances.findMany({
+        where: {
+          year,
+          ...(targetUserIds ? { user_id: { in: targetUserIds } } : {}),
+          ...(filter.leave_type_id ? { leave_type_id: filter.leave_type_id } : {}),
+        },
+        orderBy: { updated_at: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.leave_balances.count({
+        where: {
+          year,
+          ...(targetUserIds ? { user_id: { in: targetUserIds } } : {}),
+          ...(filter.leave_type_id ? { leave_type_id: filter.leave_type_id } : {}),
+        },
+      }),
+    ]);
 
     const types = await this.typeMap(rows.map((r) => r.leave_type_id));
     const withUsers = await attachUsers(this.prisma, rows, ['user_id']);
-    return withUsers.map((row) => ({
+    const items = withUsers.map((row) => ({
       ...row,
+      entitled: Number(row.entitled),
+      used: Number(row.used),
+      carried_over: Number(row.carried_over),
+      compensated_to_key_date: Number(row.compensated_to_key_date ?? 0),
       remaining: remainingDays(row),
       leave_type: types.get(row.leave_type_id) ?? null,
     }));
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+    };
   }
 
   /**
-   * HR's manual correction of one balance row.
-   *
-   * Sets the columns outright rather than incrementing, because this exists for
-   * migrated numbers that are simply wrong. Throws `NotFoundException` if the
-   * row is gone.
+   * HR's manual correction or administrative adjustment of one balance row.
+   * Records an auditable leave_balance_adjustments entry when updated.
    */
-  async updateBalance(id: string, dto: UpdateLeaveBalanceDto) {
+  async updateBalance(id: string, dto: UpdateLeaveBalanceDto, caller?: JwtPayload) {
     const existing = await this.prisma.leave_balances.findUnique({
       where: { id },
     });
     if (!existing) throw new NotFoundException('Balance row not found');
 
-    return this.prisma.leave_balances.update({
-      where: { id },
-      data: {
-        ...(dto.entitled === undefined ? {} : { entitled: dto.entitled }),
-        ...(dto.used === undefined ? {} : { used: dto.used }),
-        ...(dto.carried_over === undefined
-          ? {}
-          : { carried_over: dto.carried_over }),
-        updated_at: new Date(),
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.leave_balances.update({
+        where: { id },
+        data: {
+          ...(dto.entitled === undefined ? {} : { entitled: dto.entitled }),
+          ...(dto.used === undefined ? {} : { used: dto.used }),
+          ...(dto.carried_over === undefined
+            ? {}
+            : { carried_over: dto.carried_over }),
+          ...(dto.compensated_to_key_date === undefined
+            ? {}
+            : { compensated_to_key_date: dto.compensated_to_key_date }),
+          updated_at: new Date(),
+        },
+      });
+
+      if (caller && (dto.entitled !== undefined || dto.carried_over !== undefined || dto.used !== undefined)) {
+        await tx.leave_balance_adjustments.create({
+          data: {
+            user_id: existing.user_id,
+            leave_type_id: existing.leave_type_id,
+            year: existing.year,
+            adjustment_type: leave_adjustment_type_enum.MANUAL_CORRECTION,
+            amount: dto.entitled !== undefined ? dto.entitled : Number(existing.entitled),
+            effective_date: new Date(),
+            reference: 'MANUAL_CORRECTION',
+            remarks: dto.remarks || 'HR manual adjustment of leave balance',
+            created_by_id: caller.sub,
+          },
+        });
+      }
+
+      return row;
+    });
+
+    return {
+      ...updated,
+      entitled: Number(updated.entitled),
+      used: Number(updated.used),
+      carried_over: Number(updated.carried_over),
+      compensated_to_key_date: Number(updated.compensated_to_key_date ?? 0),
+      remaining: remainingDays(updated),
+    };
+  }
+
+  /** Create an explicit leave balance adjustment audit record */
+  async createAdjustment(dto: CreateLeaveAdjustmentDto, caller: JwtPayload) {
+    const effective = dto.effective_date ? parseDateOnly(dto.effective_date) : new Date();
+
+    return this.prisma.$transaction(async (tx) => {
+      const adjustment = await tx.leave_balance_adjustments.create({
+        data: {
+          user_id: dto.user_id,
+          leave_type_id: dto.leave_type_id,
+          year: dto.year,
+          adjustment_type: dto.adjustment_type,
+          amount: dto.amount,
+          effective_date: effective,
+          reference: dto.reference ?? null,
+          remarks: dto.remarks ?? null,
+          created_by_id: caller.sub,
+        },
+      });
+
+      // Update the user's leave balance accordingly
+      const where = {
+        user_id_leave_type_id_year: {
+          user_id: dto.user_id,
+          leave_type_id: dto.leave_type_id,
+          year: dto.year,
+        },
+      };
+
+      const existing = await tx.leave_balances.findUnique({ where });
+      if (existing) {
+        if (dto.adjustment_type === leave_adjustment_type_enum.OPENING_BALANCE) {
+          await tx.leave_balances.update({
+            where,
+            data: { entitled: dto.amount, updated_at: new Date() },
+          });
+        } else if (dto.adjustment_type === leave_adjustment_type_enum.ANNUAL_ALLOCATION) {
+          await tx.leave_balances.update({
+            where,
+            data: { entitled: { increment: dto.amount }, updated_at: new Date() },
+          });
+        }
+      }
+
+      return adjustment;
+    });
+  }
+
+  /** Get audit trail of leave balance adjustments */
+  async getAdjustments(userId: string, year?: number) {
+    const targetYear = year ?? financialYearOf(new Date());
+    const adjustments = await this.prisma.leave_balance_adjustments.findMany({
+      where: {
+        user_id: userId,
+        year: targetYear,
+      },
+      orderBy: { created_at: 'desc' },
+    });
+
+    const types = await this.typeMap(adjustments.map((a) => a.leave_type_id));
+    const withCreators = await attachUsers(this.prisma, adjustments, ['created_by_id']);
+    return withCreators.map((a) => ({
+      ...a,
+      amount: Number(a.amount),
+      leave_type: types.get(a.leave_type_id) ?? null,
+    }));
+  }
+
+  /** Detailed leave balance summary for an individual employee */
+  async getEmployeeLeaveSummary(userId: string, year?: number, caller?: JwtPayload) {
+    const targetYear = year ?? financialYearOf(new Date());
+    const user = await this.prisma.users.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        full_name: true,
+        username: true,
+        email: true,
+        personnel_number: true,
+        role: true,
+        department_id: true,
+        departments: { select: { id: true, name: true } },
       },
     });
+
+    if (!user) {
+      throw new NotFoundException('Employee not found');
+    }
+
+    if (caller) {
+      const allowed = await this.visibleUserIds(caller);
+      if (allowed !== null && !allowed.includes(userId) && caller.sub !== userId) {
+        throw new ForbiddenException('Outside your departmental scope');
+      }
+    }
+
+    const types = await this.prisma.leave_types.findMany({
+      where: { is_active: true },
+      orderBy: { name: 'asc' },
+    });
+
+    const [balances, adjustments, applications] = await Promise.all([
+      Promise.all(
+        types.map(async (t) => {
+          const row = await this.ensureBalance(userId, t, targetYear);
+          return {
+            id: row.id,
+            leave_type_id: t.id,
+            leave_type: {
+              id: t.id,
+              name: t.name,
+              description: t.description,
+              is_paid: t.is_paid,
+            },
+            year: targetYear,
+            entitled: Number(row.entitled),
+            used: Number(row.used),
+            carried_over: Number(row.carried_over),
+            compensated_to_key_date: Number(row.compensated_to_key_date ?? 0),
+            remaining: remainingDays(row),
+          };
+        }),
+      ),
+      this.getAdjustments(userId, targetYear),
+      this.prisma.leave_applications.findMany({
+        where: {
+          user_id: userId,
+          start_date: {
+            gte: new Date(Date.UTC(targetYear, FINANCIAL_YEAR_START_MONTH, 1)),
+            lte: new Date(Date.UTC(targetYear + 1, FINANCIAL_YEAR_START_MONTH, 0)),
+          },
+        },
+        orderBy: { created_at: 'desc' },
+      }),
+    ]);
+
+    return {
+      user,
+      year: targetYear,
+      balances,
+      adjustments,
+      applications: await this.decorate(applications),
+    };
   }
 
   // -------------------------------------------------------------------- types
@@ -751,7 +1072,8 @@ export class LeaveService {
 
   /** What last year leaves behind, capped at the type's `max_carry_forward`. */
   private async carryForward(userId: string, type: leave_types, year: number) {
-    if (!type.carry_forward || type.max_carry_forward <= 0) return 0;
+    const maxCarry = Number(type.max_carry_forward);
+    if (!type.carry_forward || maxCarry <= 0) return 0;
 
     const prior = await this.prisma.leave_balances.findUnique({
       where: {
@@ -766,7 +1088,7 @@ export class LeaveService {
 
     return Math.max(
       0,
-      Math.min(remainingDays(prior), type.max_carry_forward),
+      Math.min(remainingDays(prior), maxCarry),
     );
   }
 

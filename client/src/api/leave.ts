@@ -12,6 +12,7 @@ export const toDays = (value: Days | null | undefined) => Number(value ?? 0);
 export interface LeaveType {
   id: string;
   name: string;
+  description?: string | null;
   annual_entitlement: number;
   is_paid: boolean;
   carry_forward: boolean;
@@ -27,6 +28,7 @@ export interface LeaveUserSummary {
   email: string;
   role: string;
   department_id: string | null;
+  personnel_number?: string | null;
 }
 
 export interface LeaveBalance {
@@ -37,6 +39,40 @@ export interface LeaveBalance {
   entitled: Days;
   used: Days;
   carried_over: Days;
+  compensated_to_key_date?: Days;
+}
+
+export interface LeaveAdjustment {
+  id: string;
+  user_id: string;
+  leave_type_id: string;
+  year: number;
+  adjustment_type: 'OPENING_BALANCE' | 'ANNUAL_ALLOCATION' | 'MANUAL_CORRECTION' | 'ENCASHMENT' | 'LAPSE';
+  amount: number;
+  effective_date: string;
+  reference?: string | null;
+  remarks?: string | null;
+  created_by_id: string;
+  created_at: string;
+  created_by_id_user?: LeaveUserSummary | null;
+  leave_type?: LeaveType | null;
+}
+
+export interface EmployeeLeaveSummary {
+  user: {
+    id: string;
+    full_name: string;
+    username: string;
+    email: string;
+    personnel_number: string | null;
+    role: string;
+    department_id: string | null;
+    departments?: { id: string; name: string } | null;
+  };
+  year: number;
+  balances: (LeaveBalance & { leave_type: Partial<LeaveType>; remaining: number })[];
+  adjustments: LeaveAdjustment[];
+  applications: LeaveApplication[];
 }
 
 /** `GET /leave/balances`, HR only. The list rows carry the person and the type
@@ -154,6 +190,20 @@ export const leaveApi = {
   getMyApplications: (params?: { status?: LeaveStatus; year?: number }) =>
     getList<LeaveApplication>('/leave/applications/mine', params),
 
+  /** Applications of other employees based on role-based permissions */
+  getOthersApplications: (params?: {
+    status?: LeaveStatus;
+    leave_type_id?: string;
+    department_id?: string;
+    user_id?: string;
+    year?: number;
+    start_date?: string;
+    end_date?: string;
+    q?: string;
+    page?: number;
+    limit?: number;
+  }) => getList<LeaveApplication>('/leave/applications/others', params),
+
   /** Everything still `PENDING` that the caller may act on. HOD, HR and MD only. */
   getPending: () => getList<LeaveApplication>('/leave/applications/pending'),
 
@@ -238,19 +288,54 @@ export const leaveApi = {
     return response.data;
   },
 
-  /** Every balance for the financial year, or one person's. HR only. */
-  getBalances: (params?: { user_id?: string; leave_type_id?: string; year?: number }) =>
-    getList<LeaveBalanceRow>('/leave/balances', params),
+  /** Every balance for the financial year, or matching filters. */
+  getBalances: (params?: {
+    user_id?: string;
+    leave_type_id?: string;
+    department_id?: string;
+    year?: number;
+    q?: string;
+    page?: number;
+    limit?: number;
+  }) => getList<LeaveBalanceRow>('/leave/balances', params),
 
   /**
-   * HR's manual correction of one row. Sets the columns outright rather than
-   * incrementing, because this exists for migrated numbers that are wrong.
+   * Manual correction or adjustment of one row. Sets the columns outright.
    */
   updateBalance: async (
     id: string,
-    payload: { entitled?: number; used?: number; carried_over?: number },
+    payload: {
+      entitled?: number;
+      used?: number;
+      carried_over?: number;
+      compensated_to_key_date?: number;
+      remarks?: string;
+    },
   ): Promise<LeaveBalanceRow> => {
     const response = await axiosClient.patch<LeaveBalanceRow>(`/leave/balances/${id}`, payload);
+    return response.data;
+  },
+
+  /** Create an audit-tracked leave balance adjustment */
+  createAdjustment: async (payload: {
+    user_id: string;
+    leave_type_id: string;
+    year: number;
+    adjustment_type: 'OPENING_BALANCE' | 'ANNUAL_ALLOCATION' | 'MANUAL_CORRECTION' | 'ENCASHMENT' | 'LAPSE';
+    amount: number;
+    effective_date?: string;
+    reference?: string;
+    remarks?: string;
+  }): Promise<LeaveAdjustment> => {
+    const response = await axiosClient.post<LeaveAdjustment>('/leave/adjustments', payload);
+    return response.data;
+  },
+
+  /** Get individual employee full leave summary */
+  getEmployeeSummary: async (userId: string, year?: number): Promise<EmployeeLeaveSummary> => {
+    const response = await axiosClient.get<EmployeeLeaveSummary>(`/leave/summary/${userId}`, {
+      params: { year },
+    });
     return response.data;
   },
 

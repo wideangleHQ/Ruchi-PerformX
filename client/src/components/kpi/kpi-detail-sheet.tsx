@@ -229,30 +229,29 @@ export function KpiDetailSheet({ id, onClose }: { id: string; onClose: () => voi
                 <p className="text-sm text-slate-600">{kpi.description}</p>
               ) : null}
 
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="grid grid-cols-3 gap-3">
                 <Stat label="Target" value={formatValue(kpi.target_value, kpi.unit_symbol)} />
                 <Stat
                   label="Actual"
                   value={formatValue(kpi.actual_value, kpi.unit_symbol)}
                 />
                 <Stat label="Achievement" value={formatPercent(kpi.achievement)} />
-                <Stat
+                {/* Scoring UI temporarily hidden */}
+                {/* <Stat
                   label="KPI score"
                   value={kpi.score === null ? 'Not scored' : formatNumber(kpi.score)}
-                />
+                /> */}
               </div>
 
               {kpi.status === 'DELETED' && kpi.cancel_reason ? (
                 <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                  Deleted: {kpi.cancel_reason}. It is excluded from the PS Score
-                  rather than counted as a failure.
+                  Deleted: {kpi.cancel_reason}.
                 </p>
               ) : null}
 
               {kpi.status === 'PENDING_APPROVAL' ? (
                 <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                  Waiting for approval. It does not count towards a PS Score or take
-                  updates until it is published.
+                  Waiting for approval. It does not take updates until it is published.
                 </p>
               ) : null}
 

@@ -501,6 +501,7 @@ model users {
   can_access_career_hr                                 Boolean                 @default(false)
   date_of_birth                                        DateTime?               @db.Date
   joined_on                                            DateTime?               @db.Date
+  personnel_number                                     String?                 @unique @db.VarChar(50)
   vendor_id                                            String?                 @db.Uuid
   reporting_to_id                                      String?                 @db.Uuid
   audit_logs                                           audit_logs[]
@@ -879,27 +880,48 @@ model VisitorImage {
 model leave_types {
   id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name               String   @unique @db.VarChar(50)
-  annual_entitlement Int      @default(0)
+  description        String?
+  annual_entitlement Decimal  @default(0) @db.Decimal(5, 2)
   is_paid            Boolean  @default(true)
   carry_forward      Boolean  @default(false)
-  max_carry_forward  Int      @default(0)
+  max_carry_forward  Decimal  @default(0) @db.Decimal(5, 2)
   requires_proof     Boolean  @default(false)
   is_active          Boolean  @default(true)
   created_at         DateTime @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime @default(now()) @updatedAt @db.Timestamptz(6)
 }
 
 model leave_balances {
-  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id       String   @db.Uuid
-  leave_type_id String   @db.Uuid
-  year          Int
-  entitled      Decimal  @default(0) @db.Decimal(5, 1)
-  used          Decimal  @default(0) @db.Decimal(5, 1)
-  carried_over  Decimal  @default(0) @db.Decimal(5, 1)
-  updated_at    DateTime @default(now()) @db.Timestamptz(6)
+  id                      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id                 String   @db.Uuid
+  leave_type_id           String   @db.Uuid
+  year                    Int
+  entitled                Decimal  @default(0) @db.Decimal(6, 2)
+  used                    Decimal  @default(0) @db.Decimal(6, 2)
+  carried_over            Decimal  @default(0) @db.Decimal(6, 2)
+  compensated_to_key_date Decimal  @default(0) @db.Decimal(6, 2)
+  created_at              DateTime @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime @default(now()) @updatedAt @db.Timestamptz(6)
 
   @@unique([user_id, leave_type_id, year])
   @@index([user_id, year])
+}
+
+model leave_balance_adjustments {
+  id              String                         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id         String                         @db.Uuid
+  leave_type_id   String                         @db.Uuid
+  year            Int
+  adjustment_type leave_adjustment_type_enum
+  amount          Decimal                        @db.Decimal(6, 2)
+  effective_date  DateTime                       @default(now()) @db.Date
+  reference       String?                        @db.VarChar(100)
+  remarks         String?
+  created_by_id   String                         @db.Uuid
+  created_at      DateTime                       @default(now()) @db.Timestamptz(6)
+
+  @@index([user_id, leave_type_id, year])
+  @@index([created_by_id])
 }
 
 model leave_applications {
@@ -908,7 +930,7 @@ model leave_applications {
   leave_type_id       String            @db.Uuid
   start_date          DateTime          @db.Date
   end_date            DateTime          @db.Date
-  days_count          Decimal           @db.Decimal(5, 1)
+  days_count          Decimal           @db.Decimal(6, 2)
   reason              String
   status              leave_status_enum @default(PENDING)
   manager_id          String?           @db.Uuid
@@ -948,6 +970,14 @@ enum leave_status_enum {
   APPROVED
   REJECTED
   CANCELLED
+}
+
+enum leave_adjustment_type_enum {
+  OPENING_BALANCE
+  ANNUAL_ALLOCATION
+  MANUAL_CORRECTION
+  ENCASHMENT
+  LAPSE
 }
 
 // ---- Projects

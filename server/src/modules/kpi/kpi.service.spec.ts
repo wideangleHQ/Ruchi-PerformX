@@ -331,10 +331,19 @@ describe('KpiService.list', () => {
     expect(firstArg<{ where: unknown }>(prisma.kpis.count as never).where).toEqual(where);
   });
 
-  it('applies no department filter for the MD office', async () => {
+  it('applies no department filter for the ADMIN role', async () => {
     const { service, prisma } = build({ scope: { unrestricted: true, departmentIds: [] } });
-    await service.list({}, user('md', role_enum.MD));
+    await service.list({}, user('admin', role_enum.ADMIN));
     expect(andOf(prisma)[0]).toEqual({});
+  });
+
+  it('excludes Digital Marketing department for the MD office', async () => {
+    const { service, prisma } = build({ scope: { unrestricted: true, departmentIds: [] } });
+    (prisma.departments.findMany as unknown as { mockResolvedValueOnce: (val: unknown) => void }).mockResolvedValueOnce([
+      { id: 'dm-dept-1' },
+    ]);
+    await service.list({}, user('md', role_enum.MD));
+    expect(JSON.stringify(andOf(prisma)[0])).toContain('dm-dept-1');
   });
 
   it('paginates on the server and returns the page envelope', async () => {

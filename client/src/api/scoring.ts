@@ -85,6 +85,136 @@ export interface ScorePeriod {
 
 export type ScoreTrendParams = ScorePeriod & { months?: number };
 
+export interface SubcomponentDetail {
+  score: number;
+  weight: number;
+  value?: string | number;
+}
+
+export interface ComponentBreakdown {
+  score: number;
+  weight: number;
+  weightedScore: number;
+  applicable: boolean;
+  subcomponents: Record<string, SubcomponentDetail>;
+}
+
+export interface AtScoreDetail {
+  score: number;
+  status: string;
+  isNormalized: boolean;
+  components: {
+    selfAction: ComponentBreakdown;
+    assignedTask: ComponentBreakdown;
+    project: ComponentBreakdown;
+    departmentExecution?: ComponentBreakdown;
+    leadership?: ComponentBreakdown;
+  };
+}
+
+export interface DetailedScoreProfile {
+  user: {
+    id: string;
+    fullName: string;
+    role: string;
+    department: string;
+    departmentId: string | null;
+  };
+  period: {
+    month: number;
+    year: number;
+  };
+  atScore: AtScoreDetail;
+  psScore: {
+    ps_score: number;
+    counted_weight: number;
+    declared_weight: number;
+    kpis: Array<{
+      id: string;
+      name: string;
+      scope: string;
+      mode: string;
+      status: string;
+      unit_label: string | null;
+      unit_symbol: string | null;
+      target_value: number | null;
+      actual_value: number | null;
+      achievement: number | null;
+      score: number | null;
+      weight: number;
+      effective_weight: number;
+      contribution_share: number;
+      contribution: number | null;
+      counted: boolean;
+    }>;
+  };
+}
+
+export interface ManagementScoresParams extends ScorePeriod {
+  department_id?: string;
+  role?: string;
+  q?: string;
+  page?: number;
+  limit?: number;
+  minAt?: number;
+  maxAt?: number;
+  minPs?: number;
+  maxPs?: number;
+}
+
+export interface ManagementScoreItem {
+  id: string;
+  fullName: string;
+  role: string;
+  department: string;
+  departmentId: string | null;
+  atScore: number;
+  psScore: number;
+  atStatus: string;
+  isNormalized: boolean;
+  period: string;
+}
+
+export interface ManagementScoresOverview {
+  summary: {
+    totalEmployees: number;
+    avgAtScore: number;
+    avgPsScore: number;
+    completedCalculations: number;
+    pendingCalculations: number;
+  };
+  items: ManagementScoreItem[];
+  departments: Array<{ id: string; name: string }>;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface DepartmentExecutionOverview {
+  department: {
+    id: string;
+    name: string;
+    totalActiveEmployees: number;
+    departmentAtExecutionScore: number;
+    departmentPsScore: number | null;
+    completedTasks: number;
+    pendingTasks: number;
+    overdueTasks: number;
+    period: string;
+  };
+  employees: Array<{
+    id: string;
+    fullName: string;
+    role: string;
+    atScore: number;
+    psScore: number;
+    period: string;
+  }>;
+}
+
 export const scoringApi = {
   /** GET /scoring/me - the caller's own month. Identity comes from the JWT. */
   getMyScore: async (period?: ScorePeriod): Promise<EmployeeScoreSummary> => {
@@ -99,6 +229,42 @@ export const scoringApi = {
     const response = await axiosClient.get<EmployeeScoreTrend>('/scoring/me/trend', {
       params,
     });
+    return response.data;
+  },
+
+  /** GET /scoring/profile - caller's complete AT & PS detailed profile. */
+  getMyProfile: async (period?: ScorePeriod): Promise<DetailedScoreProfile> => {
+    const response = await axiosClient.get<DetailedScoreProfile>('/scoring/profile', {
+      params: period,
+    });
+    return response.data;
+  },
+
+  /** GET /scoring/profile/:userId - specific employee's complete AT & PS detailed profile. */
+  getUserProfile: async (userId: string, period?: ScorePeriod): Promise<DetailedScoreProfile> => {
+    const response = await axiosClient.get<DetailedScoreProfile>(`/scoring/profile/${userId}`, {
+      params: period,
+    });
+    return response.data;
+  },
+
+  /** GET /scoring/overview - management scores dashboard overview for EA, PA, MD and HODs. */
+  getOverview: async (params?: ManagementScoresParams): Promise<ManagementScoresOverview> => {
+    const response = await axiosClient.get<ManagementScoresOverview>('/scoring/overview', {
+      params,
+    });
+    return response.data;
+  },
+
+  /** GET /scoring/department/:id/overview - Section A & B for HOD department scoring. */
+  getDepartmentOverview: async (
+    departmentId: string,
+    period?: ScorePeriod,
+  ): Promise<DepartmentExecutionOverview> => {
+    const response = await axiosClient.get<DepartmentExecutionOverview>(
+      `/scoring/department/${departmentId}/overview`,
+      { params: period },
+    );
     return response.data;
   },
 
@@ -132,5 +298,29 @@ export const scoringApi = {
       params: period,
     });
     return response.data;
+  },
+
+  /**
+   * Export matching scores to Excel for EA, PA, MD and HOD in a single go.
+   * File name returned follows Scores_YYYY-MM-DD.xlsx.
+   */
+  exportScores: async (params?: ManagementScoresParams): Promise<void> => {
+    const response = await axiosClient.get('/scoring/export', {
+      params: params ? { ...params, page: undefined, limit: undefined } : undefined,
+      responseType: 'blob',
+    });
+
+    const disposition = String(response.headers?.['content-disposition'] ?? '');
+    const serverName = /filename="([^"]+)"/.exec(disposition)?.[1];
+
+    const url = URL.createObjectURL(response.data as Blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const now = new Date();
+    const defaultName = `Scores_${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.xlsx`;
+    link.download = serverName ?? defaultName;
+    link.click();
+    URL.revokeObjectURL(url);
   },
 };

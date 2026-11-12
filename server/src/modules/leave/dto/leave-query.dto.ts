@@ -10,7 +10,7 @@ import {
 } from 'class-validator';
 import { leave_status_enum } from '@prisma/client';
 
-/** Filters for `/leave/applications/mine` and `/leave/applications/pending`. */
+/** Filters for `/leave/applications/mine`, `/leave/applications/pending` and `/leave/others/applications`. */
 export class LeaveApplicationFilterDto {
   @IsOptional()
   @IsEnum(leave_status_enum)
@@ -19,6 +19,34 @@ export class LeaveApplicationFilterDto {
   @IsOptional()
   @IsUUID()
   leave_type_id?: string;
+
+  @IsOptional()
+  @IsUUID()
+  department_id?: string;
+
+  @IsOptional()
+  @IsUUID()
+  user_id?: string;
+
+  /** Free-text search by name, email, username or personnel number */
+  @IsOptional()
+  @Type(() => String)
+  q?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(2000)
+  @Max(2100)
+  year?: number;
+
+  @IsOptional()
+  @IsDateString()
+  start_date?: string;
+
+  @IsOptional()
+  @IsDateString()
+  end_date?: string;
 
   @IsOptional()
   @Type(() => Number)
@@ -48,7 +76,7 @@ export class LeaveCalendarQueryDto {
   to?: string;
 }
 
-/** Filters for the HR balance grid. */
+/** Filters for the HR and Administrative balance grid. */
 export class LeaveBalanceFilterDto {
   @IsOptional()
   @IsUUID()
@@ -58,13 +86,34 @@ export class LeaveBalanceFilterDto {
   @IsUUID()
   leave_type_id?: string;
 
-  /** Financial year, named by its starting calendar year. Defaults to current. */
+  @IsOptional()
+  @IsUUID()
+  department_id?: string;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(2000)
   @Max(2100)
   year?: number;
+
+  /** Free-text search by name, email, username or personnel number */
+  @IsOptional()
+  @Type(() => String)
+  q?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  limit?: number = 50;
 }
 
 /** Period for the payroll report and its export. Defaults to the current month. */

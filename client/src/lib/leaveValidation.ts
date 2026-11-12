@@ -30,6 +30,7 @@ export type ApplyLeaveFormData = z.infer<typeof applyLeaveSchema>;
 export const leaveTypeSchema = z
   .object({
     name: z.string().trim().min(1, 'Name is required').max(60),
+    description: z.string().trim().max(255).optional(),
     annual_entitlement: z.coerce
       .number()
       .min(0, 'Entitlement cannot be negative')
@@ -53,13 +54,15 @@ export type LeaveTypeFormData = z.infer<typeof leaveTypeSchema>;
 
 /**
  * A balance correction. Every field optional: HR edits one column at a time and
- * the server sets what it is given.
+ * the server sets what it is given. Supports fractional values up to 2 decimal places.
  */
 export const leaveBalanceSchema = z
   .object({
-    entitled: z.coerce.number().min(0).max(365).optional(),
-    used: z.coerce.number().min(0).max(365).optional(),
-    carried_over: z.coerce.number().min(0).max(365).optional(),
+    entitled: z.coerce.number().min(0).max(999).optional(),
+    used: z.coerce.number().min(0).max(999).optional(),
+    carried_over: z.coerce.number().min(0).max(999).optional(),
+    compensated_to_key_date: z.coerce.number().min(0).max(999).optional(),
+    remarks: z.string().max(500).optional(),
   })
   .refine((d) => Object.values(d).some((v) => v !== undefined), {
     message: 'Change at least one value',

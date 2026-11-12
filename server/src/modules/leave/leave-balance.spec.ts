@@ -73,6 +73,27 @@ describe('remainingDays', () => {
       remainingDays({ entitled: 12, used: 3.5, carried_over: 2 }),
     ).toBe(10.5);
   });
+
+  it('handles fractional leave balances and entitlements with 2 decimal places precision', () => {
+    expect(
+      remainingDays({ entitled: 11.5, used: 2.25, carried_over: 0 }),
+    ).toBe(9.25);
+
+    expect(
+      remainingDays({ entitled: 8.63, used: 1.25, carried_over: 2.5 }),
+    ).toBe(9.88);
+  });
+
+  it('does not automatically mix compensated_to_key_date into remaining days', () => {
+    expect(
+      remainingDays({
+        entitled: 10,
+        used: 2,
+        carried_over: 1,
+        compensated_to_key_date: 5,
+      }),
+    ).toBe(9);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -258,5 +279,24 @@ describe('HR cancellation credits the balance exactly once', () => {
 
     expect(state.credits).toBe(1);
     expect(state.balance.used).toBe(0);
+  });
+});
+
+describe('role-based leave visibility', () => {
+  it('forbids an ordinary EMPLOYEE from querying others applications', async () => {
+    const employeeUser: JwtPayload = {
+      sub: 'emp-1',
+      username: 'emp1',
+      role: role_enum.EMPLOYEE,
+      departmentId: 'dept-1',
+      departmentIds: ['dept-1'],
+      canAccessCareerHR: false,
+    };
+    const { client } = makeDouble(pendingApplication, 0);
+    const service = makeService(client);
+
+    await expect(service.findOthers(employeeUser, {})).rejects.toThrow(
+      "Employees are not authorized to view others' leaves",
+    );
   });
 });

@@ -7,6 +7,7 @@ export interface UserSummary {
   email: string;
   role: string;
   department_id: string | null;
+  personnel_number?: string | null;
 }
 
 /**
@@ -36,6 +37,7 @@ export async function lookupUsers(
       email: true,
       role: true,
       department_id: true,
+      personnel_number: true,
     },
   });
 

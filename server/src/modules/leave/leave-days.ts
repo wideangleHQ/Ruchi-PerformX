@@ -107,17 +107,21 @@ type DecimalLike = number | string | { toString(): string };
 
 /**
  * Days left on a balance row: entitlement plus what carried over, less what has
- * been used. The one arithmetic every screen in the module repeats, so it is
- * written once and tested rather than inlined five times.
+ * been used.
+ *
+ * Rounds to 2 decimal places to avoid floating-point arithmetic jitter.
+ * Note: `compensated_to_key_date` is tracked separately as audit/adjustment
+ * information and is not conflated with carried_over unless explicitly resolved.
  */
 export function remainingDays(balance: {
   entitled: DecimalLike;
   used: DecimalLike;
   carried_over: DecimalLike;
+  compensated_to_key_date?: DecimalLike;
 }): number {
-  return (
-    Number(balance.entitled) +
-    Number(balance.carried_over) -
-    Number(balance.used)
-  );
+  const entitled = Number(balance.entitled) || 0;
+  const carried = Number(balance.carried_over) || 0;
+  const used = Number(balance.used) || 0;
+  const raw = entitled + carried - used;
+  return Math.round(raw * 100) / 100;
 }

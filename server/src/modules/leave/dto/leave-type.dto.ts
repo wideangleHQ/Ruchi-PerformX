@@ -2,6 +2,7 @@ import {
   IsBoolean,
   IsInt,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
   Max,
@@ -15,9 +16,14 @@ export class CreateLeaveTypeDto {
   @MaxLength(50)
   name!: string;
 
-  /** Days granted per financial year. Zero is legitimate for unpaid types. */
   @IsOptional()
-  @IsInt()
+  @IsString()
+  @MaxLength(255)
+  description?: string;
+
+  /** Days granted per financial year. Fractional values allowed. */
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   @Max(365)
   annual_entitlement?: number;
@@ -31,7 +37,7 @@ export class CreateLeaveTypeDto {
   carry_forward?: boolean;
 
   @IsOptional()
-  @IsInt()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   @Max(365)
   max_carry_forward?: number;
@@ -58,7 +64,12 @@ export class UpdateLeaveTypeDto {
   name?: string;
 
   @IsOptional()
-  @IsInt()
+  @IsString()
+  @MaxLength(255)
+  description?: string;
+
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   @Max(365)
   annual_entitlement?: number;
@@ -72,7 +83,7 @@ export class UpdateLeaveTypeDto {
   carry_forward?: boolean;
 
   @IsOptional()
-  @IsInt()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   @Max(365)
   max_carry_forward?: number;

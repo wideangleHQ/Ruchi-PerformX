@@ -1,6 +1,7 @@
 // src/modules/scoring/scoring.service.ts
 
-import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import * as ExcelJS from 'exceljs';
 import { Prisma } from '@prisma/client';
 import {
   action_status_enum,
@@ -10,6 +11,24 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DepartmentScope } from '../../common/types/department-scope.type';
+import { KpiService } from '../kpi/kpi.service';
+import {
+  calculateEmployeeAtScore,
+  calculateHodAtScore,
+  getWorkingDaysInMonth,
+  round2,
+  type AtScoreResult,
+  type DepartmentExecutionMetrics,
+  type LeadershipMetrics,
+  type ProjectMetrics,
+  type SelfActionMetrics,
+  type TaskMetrics,
+} from './at-scoring';
+import { ManagementScoresQueryDto } from './dto/score-query.dto';
+import {
+  isRestrictedFromDigitalMarketing,
+  isDigitalMarketingDepartment,
+} from '../../common/helpers/department-restriction.helper';
 import {
   aggregateByPeriod,
   buildScoreTrend,
@@ -99,7 +118,10 @@ const POINTS = {
 export class ScoringService {
   private readonly logger = new Logger(ScoringService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly kpiService?: KpiService,
+  ) {}
 
   async calculateEmployeeScore(userId: string, month: number, year: number): Promise<number> {
     return (await this.scoreComponents(userId, month, year)).score;
@@ -398,7 +420,16 @@ export class ScoringService {
    *
    * @throws ForbiddenException when the department is outside the scope.
    */
-  assertDepartmentVisible(scope: DepartmentScope, departmentId: string): void {
+  async assertDepartmentVisible(scope: DepartmentScope, departmentId: string, callerRole?: string): Promise<void> {
+    if (isRestrictedFromDigitalMarketing(callerRole)) {
+      const dept = await this.prisma.departments.findUnique({
+        where: { id: departmentId },
+        select: { name: true },
+      });
+      if (isDigitalMarketingDepartment(dept?.name)) {
+        throw new ForbiddenException('Outside your department scope');
+      }
+    }
     if (scope.unrestricted) return;
     if (scope.departmentIds.includes(departmentId)) return;
 
@@ -427,12 +458,579 @@ export class ScoringService {
     };
   }
 
-  /** Top 10 by stored points for a month. Unbounded points, not a percentage. */
-  async getLeaderboard(month: number, year: number) {
-    return this.prisma.performance_scores.findMany({
+  /**
+   * Complete AT Score calculation for Employee, EA, PA, or HOD.
+   * Returns normalized 0-100 score and subcomponent breakdown.
+   */
+  async calculateStandardAtScore(userId: string, month: number, year: number): Promise<AtScoreResult> {
+    const start = new Date(Date.UTC(year, month - 1, 1));
+    const end = new Date(Date.UTC(year, month, 1));
+    const now = new Date();
+
+    const user = await this.prisma.users.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true, department_id: true },
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const workingDays = getWorkingDaysInMonth(year, month);
+
+    const [selfActionsInPeriod, completedSelfActions, assignedTasks, completedTasks, overdueTasks, memberships, ledProjects, checklistItems] = await Promise.all([
+      this.prisma.self_actions.findMany({
+        where: {
+          created_by_id: userId,
+          deleted_at: null,
+          created_at: { lt: end },
+          OR: [
+            { completed_at: { gte: start, lt: end } },
+            { status: { not: 'COMPLETED' } },
+          ],
+        },
+        select: { id: true, completed_at: true, status: true },
+      }),
+      this.prisma.self_actions.findMany({
+        where: {
+          created_by_id: userId,
+          deleted_at: null,
+          status: 'COMPLETED',
+          completed_at: { gte: start, lt: end },
+        },
+        select: { id: true, completed_at: true },
+      }),
+      this.prisma.tasks.findMany({
+        where: {
+          assigned_to_id: userId,
+          deleted_at: null,
+          due_date: { gte: start, lt: end },
+        },
+        select: { id: true, due_date: true, completed_at: true, reviewed_at: true, status: true },
+      }),
+      this.prisma.tasks.findMany({
+        where: {
+          assigned_to_id: userId,
+          deleted_at: null,
+          completed_at: { gte: start, lt: end },
+        },
+        select: { id: true, due_date: true, completed_at: true, reviewed_at: true, status: true },
+      }),
+      this.prisma.tasks.findMany({
+        where: {
+          assigned_to_id: userId,
+          status: {
+            notIn: [
+              task_status_enum.COMPLETED,
+              task_status_enum.REVIEWED,
+              task_status_enum.CLOSED,
+              task_status_enum.REJECTED,
+            ],
+          },
+          due_date: { lt: now, gte: start },
+        },
+        select: { id: true, due_date: true },
+      }),
+      this.prisma.project_members.findMany({
+        where: { user_id: userId },
+        select: { project_id: true },
+      }),
+      this.prisma.projects.findMany({
+        where: {
+          OR: [{ lead_id: userId }, { co_lead_id: userId }],
+          deleted_at: null,
+        },
+        select: { id: true, health: true },
+      }),
+      this.prisma.project_checklist_items.findMany({
+        where: { assigned_to_id: userId },
+        select: { id: true, is_done: true, completed_at: true, due_date: true },
+      }),
+    ]);
+
+    // Self actions metrics
+    const activeDaysSet = new Set<string>();
+    for (const sa of completedSelfActions) {
+      if (sa.completed_at) {
+        activeDaysSet.add(sa.completed_at.toISOString().slice(0, 10));
+      }
+    }
+
+    const selfActionMetrics: SelfActionMetrics = {
+      total: Math.max(selfActionsInPeriod.length, completedSelfActions.length),
+      completed: completedSelfActions.length,
+      activeDays: activeDaysSet.size,
+      workingDays,
+      onTimeCompleted: completedSelfActions.length,
+      reviewedAccepted: completedSelfActions.length,
+      totalReviewed: completedSelfActions.length,
+    };
+
+    // Task metrics
+    let onTime = 0;
+    let late1to2 = 0;
+    let late3to5 = 0;
+    let lateOver5 = 0;
+    let reviewedAccepted = 0;
+    let reviewedRework = 0;
+    let totalReviewed = 0;
+
+    for (const t of completedTasks) {
+      if (t.completed_at && t.due_date) {
+        const diffMs = t.completed_at.getTime() - t.due_date.getTime();
+        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        if (diffDays <= 0) onTime++;
+        else if (diffDays <= 2) late1to2++;
+        else if (diffDays <= 5) late3to5++;
+        else lateOver5++;
+      } else {
+        onTime++;
+      }
+
+      if (t.reviewed_at) {
+        totalReviewed++;
+        if (t.status === 'REVIEWED' || t.status === 'CLOSED') {
+          reviewedAccepted++;
+        } else {
+          reviewedRework++;
+        }
+      }
+    }
+
+    const taskMetrics: TaskMetrics = {
+      total: Math.max(assignedTasks.length, completedTasks.length),
+      completed: completedTasks.length,
+      onTimeCompleted: onTime,
+      late1to2Days: late1to2,
+      late3to5Days: late3to5,
+      lateOver5Days: lateOver5,
+      reviewedAccepted,
+      reviewedRework,
+      totalReviewed,
+      overdueCount: overdueTasks.length,
+      escalatedCount: overdueTasks.filter((t) => {
+        const d = Math.floor((now.getTime() - new Date(t.due_date).getTime()) / (1000 * 60 * 60 * 24));
+        return d >= 5;
+      }).length,
+    };
+
+    // Project metrics
+    const hasProjects = memberships.length > 0 || ledProjects.length > 0 || checklistItems.length > 0;
+    const completedChecklist = checklistItems.filter(
+      (c) => c.is_done && c.completed_at && c.completed_at >= start && c.completed_at < end,
+    );
+    const onTimeChecklist = completedChecklist.filter(
+      (c) => !c.due_date || (c.completed_at && c.completed_at <= c.due_date),
+    );
+
+    const projectMetrics: ProjectMetrics = {
+      hasProjects,
+      totalItems: checklistItems.length,
+      completedItems: completedChecklist.length,
+      onTimeItems: onTimeChecklist.length,
+      qualityScore: 90,
+      outcomeScore: 85,
+    };
+
+    const personalAt = calculateEmployeeAtScore(selfActionMetrics, taskMetrics, projectMetrics);
+
+    if (user.role === role_enum.HOD) {
+      const hodDepts = await this.prisma.hod_departments.findMany({
+        where: { hod_id: userId },
+        select: { department_id: true },
+      });
+      const deptIds = hodDepts.map((d) => d.department_id);
+      if (user.department_id && !deptIds.includes(user.department_id)) {
+        deptIds.push(user.department_id);
+      }
+
+      const [deptTasks, deptCompletedTasks, deptOverdueTasks, reviewedByHod, requestsHandled] = await Promise.all([
+        this.prisma.tasks.findMany({
+          where: { department_id: { in: deptIds }, deleted_at: null, due_date: { gte: start, lt: end } },
+          select: { id: true, due_date: true },
+        }),
+        this.prisma.tasks.findMany({
+          where: { department_id: { in: deptIds }, deleted_at: null, completed_at: { gte: start, lt: end } },
+          select: { id: true, due_date: true, completed_at: true },
+        }),
+        this.prisma.tasks.count({
+          where: {
+            department_id: { in: deptIds },
+            deleted_at: null,
+            due_date: { lt: now, gte: start },
+            status: { notIn: [task_status_enum.COMPLETED, task_status_enum.REVIEWED, task_status_enum.CLOSED, task_status_enum.REJECTED] },
+          },
+        }),
+        this.prisma.tasks.findMany({
+          where: { department_id: { in: deptIds }, reviewed_at: { gte: start, lt: end } },
+          select: { completed_at: true, reviewed_at: true },
+        }),
+        this.prisma.task_requests.count({
+          where: { reviewed_by_id: userId, reviewed_at: { gte: start, lt: end } },
+        }),
+      ]);
+
+      const deptOnTime = deptCompletedTasks.filter((t) => t.completed_at && t.due_date && t.completed_at <= t.due_date).length;
+
+      let totalReviewHours = 0;
+      let reviewCount = 0;
+      for (const r of reviewedByHod) {
+        if (r.completed_at && r.reviewed_at) {
+          const hours = (r.reviewed_at.getTime() - r.completed_at.getTime()) / (1000 * 60 * 60);
+          if (hours >= 0) {
+            totalReviewHours += hours;
+            reviewCount++;
+          }
+        }
+      }
+
+      const deptMetrics: DepartmentExecutionMetrics = {
+        totalTasks: Math.max(deptTasks.length, deptCompletedTasks.length),
+        completedTasks: deptCompletedTasks.length,
+        onTimeTasks: deptOnTime,
+        pendingTasks: Math.max(0, deptTasks.length - deptCompletedTasks.length),
+        overdueTasks: deptOverdueTasks,
+      };
+
+      const leadershipMetrics: LeadershipMetrics = {
+        avgReviewHours: reviewCount > 0 ? totalReviewHours / reviewCount : null,
+        requestsHandled,
+        totalRequests: Math.max(requestsHandled, 1),
+      };
+
+      return calculateHodAtScore(personalAt, deptMetrics, projectMetrics, leadershipMetrics);
+    }
+
+    return personalAt;
+  }
+
+  /**
+   * Detailed AT score and PS score breakdown for an employee.
+   */
+  async getDetailedScoreProfile(userId: string, month: number, year: number, caller?: any) {
+    const user = await this.prisma.users.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        full_name: true,
+        role: true,
+        department_id: true,
+        departments: { select: { id: true, name: true } },
+      },
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (caller?.role && isRestrictedFromDigitalMarketing(caller.role)) {
+      if (isDigitalMarketingDepartment(user.departments?.name)) {
+        throw new ForbiddenException('Outside your department scope');
+      }
+    }
+
+    const [atScore, psScore] = await Promise.all([
+      this.calculateStandardAtScore(userId, month, year),
+      this.kpiService
+        ? this.kpiService.psScoreFor(userId, { month, year }, caller || { sub: userId, role: user.role })
+        : { ps_score: 0, counted_weight: 0, declared_weight: 0, kpis: [] },
+    ]);
+
+    return {
+      user: {
+        id: user.id,
+        fullName: user.full_name,
+        role: user.role,
+        department: user.departments?.name ?? 'Unknown',
+        departmentId: user.department_id,
+      },
+      period: { month, year },
+      atScore,
+      psScore,
+    };
+  }
+
+  /**
+   * Centralized Management Scores Overview for EA, PA, MD and HODs.
+   */
+  async getManagementScoresOverview(query: ManagementScoresQueryDto, scope: DepartmentScope, caller: any) {
+    const now = new Date();
+    const month = query.month ?? now.getMonth() + 1;
+    const year = query.year ?? now.getFullYear();
+
+    const userWhere: Prisma.usersWhereInput = {
+      is_active: true,
+      deleted_at: null,
+      role: { not: role_enum.ADMIN },
+    };
+
+    if (!scope.unrestricted) {
+      userWhere.department_id = { in: scope.departmentIds };
+    }
+
+    if (query.department_id) {
+      userWhere.department_id = query.department_id;
+    }
+
+    if (caller?.role && isRestrictedFromDigitalMarketing(caller.role)) {
+      const dmDepts = await this.prisma.departments.findMany({
+        where: { name: { contains: 'Digital Marketing', mode: 'insensitive' } },
+        select: { id: true },
+      });
+      const dmIds = dmDepts.map((d) => d.id);
+      if (dmIds.length > 0) {
+        if (query.department_id && dmIds.includes(query.department_id)) {
+          throw new ForbiddenException('Outside your department scope');
+        }
+        userWhere.department_id = { notIn: dmIds };
+      }
+    }
+
+    if (query.role) {
+      userWhere.role = query.role as role_enum;
+    }
+
+    const q = query.q?.trim();
+    if (q) {
+      userWhere.OR = [
+        { full_name: { contains: q, mode: 'insensitive' } },
+        { username: { contains: q, mode: 'insensitive' } },
+        { email: { contains: q, mode: 'insensitive' } },
+      ];
+    }
+
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+
+    const [allUsersInScope, total, departments] = await Promise.all([
+      this.prisma.users.findMany({
+        where: userWhere,
+        select: {
+          id: true,
+          full_name: true,
+          role: true,
+          department_id: true,
+          departments: { select: { id: true, name: true } },
+        },
+        orderBy: [{ departments: { name: 'asc' } }, { full_name: 'asc' }],
+      }),
+      this.prisma.users.count({ where: userWhere }),
+      this.prisma.departments.findMany({
+        where: scope.unrestricted ? {} : { id: { in: scope.departmentIds } },
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' },
+      }),
+    ]);
+
+    const isEaPaMd = caller?.role ? isRestrictedFromDigitalMarketing(caller.role) : false;
+
+    // Compute AT scores for all users in scope so global sorting by AT score works correctly
+    const scoredUsers = await Promise.all(
+      allUsersInScope.map(async (u) => {
+        const atResult = await this.calculateStandardAtScore(u.id, month, year);
+        return {
+          user: u,
+          atResult,
+        };
+      }),
+    );
+
+    let filteredScoredUsers = scoredUsers;
+    if (query.minAt !== undefined) {
+      filteredScoredUsers = filteredScoredUsers.filter((s) => s.atResult.score >= query.minAt!);
+    }
+    if (query.maxAt !== undefined) {
+      filteredScoredUsers = filteredScoredUsers.filter((s) => s.atResult.score <= query.maxAt!);
+    }
+
+    if (isEaPaMd) {
+      // Sort in descending order as per the AT Score for EA, PA, and MD
+      filteredScoredUsers.sort((a, b) => b.atResult.score - a.atResult.score);
+    }
+
+    const paginatedScoredUsers = filteredScoredUsers.slice((page - 1) * limit, page * limit);
+
+    // Compute or fetch PS scores for users on this page
+    const items = await Promise.all(
+      paginatedScoredUsers.map(async ({ user: u, atResult }) => {
+        let psResult = { ps_score: 0, counted_weight: 0, declared_weight: 0 };
+        if (this.kpiService) {
+          try {
+            psResult = await this.kpiService.psScoreFor(u.id, { month, year }, caller);
+          } catch {
+            // Safe fallback
+          }
+        }
+        return {
+          id: u.id,
+          fullName: u.full_name,
+          role: u.role,
+          department: u.departments?.name ?? 'General',
+          departmentId: u.department_id,
+          atScore: atResult.score,
+          psScore: psResult.ps_score,
+          atStatus: atResult.status,
+          isNormalized: atResult.isNormalized,
+          period: `${month}/${year}`,
+        };
+      }),
+    );
+
+    // Filter by min/max PS if specified
+    const filteredItems = items.filter((item) => {
+      if (query.minPs !== undefined && item.psScore < query.minPs) return false;
+      if (query.maxPs !== undefined && item.psScore > query.maxPs) return false;
+      return true;
+    });
+
+    const totalEmployees = allUsersInScope.length;
+    let sumAt = 0;
+    let completedCount = 0;
+
+    for (const s of scoredUsers) {
+      sumAt += s.atResult.score;
+      if (s.atResult.score > 0) completedCount++;
+    }
+
+    let sumPs = 0;
+    for (const item of items) {
+      sumPs += item.psScore;
+    }
+
+    const avgAtScore = totalEmployees > 0 ? Math.round((sumAt / totalEmployees) * 10) / 10 : 0;
+    const avgPsScore = items.length > 0 ? Math.round((sumPs / items.length) * 10) / 10 : 0;
+
+    return {
+      summary: {
+        totalEmployees,
+        avgAtScore,
+        avgPsScore,
+        completedCalculations: completedCount,
+        pendingCalculations: Math.max(0, totalEmployees - completedCount),
+      },
+      items: filteredItems,
+      departments: departments.filter((d) => {
+        if (caller?.role && isRestrictedFromDigitalMarketing(caller.role)) {
+          return !isDigitalMarketingDepartment(d.name);
+        }
+        return true;
+      }),
+      pagination: {
+        page,
+        limit,
+        total: filteredScoredUsers.length,
+        totalPages: Math.max(1, Math.ceil(filteredScoredUsers.length / limit)),
+      },
+    };
+  }
+
+  /**
+   * Section A & B for HOD Department Scoring View.
+   */
+  async getDepartmentExecutionOverview(departmentId: string, month: number, year: number, caller: any) {
+    const start = new Date(Date.UTC(year, month - 1, 1));
+    const end = new Date(Date.UTC(year, month, 1));
+    const now = new Date();
+
+    const dept = await this.prisma.departments.findUnique({
+      where: { id: departmentId },
+      select: { id: true, name: true },
+    });
+    if (!dept) throw new NotFoundException('Department not found');
+
+    if (caller?.role && isRestrictedFromDigitalMarketing(caller.role)) {
+      if (isDigitalMarketingDepartment(dept.name)) {
+        throw new ForbiddenException('Outside your department scope');
+      }
+    }
+
+    const [users, deptTasks, deptCompletedTasks, deptOverdueTasks] = await Promise.all([
+      this.prisma.users.findMany({
+        where: { department_id: departmentId, is_active: true, deleted_at: null },
+        select: { id: true, full_name: true, role: true },
+        orderBy: { full_name: 'asc' },
+      }),
+      this.prisma.tasks.findMany({
+        where: { department_id: departmentId, deleted_at: null, due_date: { gte: start, lt: end } },
+        select: { id: true, due_date: true },
+      }),
+      this.prisma.tasks.findMany({
+        where: { department_id: departmentId, deleted_at: null, completed_at: { gte: start, lt: end } },
+        select: { id: true, due_date: true, completed_at: true },
+      }),
+      this.prisma.tasks.count({
+        where: {
+          department_id: departmentId,
+          deleted_at: null,
+          due_date: { lt: now, gte: start },
+          status: { notIn: [task_status_enum.COMPLETED, task_status_enum.REVIEWED, task_status_enum.CLOSED, task_status_enum.REJECTED] },
+        },
+      }),
+    ]);
+
+    const totalTasks = Math.max(deptTasks.length, deptCompletedTasks.length);
+    const completedCount = deptCompletedTasks.length;
+    const onTimeCount = deptCompletedTasks.filter((t) => t.completed_at && t.due_date && t.completed_at <= t.due_date).length;
+
+    const completionRate = totalTasks > 0 ? (completedCount / totalTasks) * 100 : 100;
+    const onTimeRate = completedCount > 0 ? (onTimeCount / completedCount) * 100 : 100;
+    const overdueRate = totalTasks > 0 ? (deptOverdueTasks / totalTasks) * 100 : 0;
+    const healthRate = Math.max(0, 100 - overdueRate);
+
+    const departmentAtExecutionScore = Math.round(
+      completionRate * 0.50 +
+      onTimeRate * 0.30 +
+      healthRate * 0.20
+    );
+
+    // Employee scores for section B
+    const employeeScores = await Promise.all(
+      users.map(async (u) => {
+        const atResult = await this.calculateStandardAtScore(u.id, month, year);
+        let psResult = { ps_score: 0 };
+        if (this.kpiService) {
+          try {
+            psResult = await this.kpiService.psScoreFor(u.id, { month, year }, caller);
+          } catch {
+            // Safe fallback
+          }
+        }
+        return {
+          id: u.id,
+          fullName: u.full_name,
+          role: u.role,
+          atScore: atResult.score,
+          psScore: psResult.ps_score,
+          period: `${month}/${year}`,
+        };
+      }),
+    );
+
+    if (caller?.role && isRestrictedFromDigitalMarketing(caller.role)) {
+      // Sort descending by AT score for EA, PA, MD
+      employeeScores.sort((a, b) => b.atScore - a.atScore);
+    }
+
+    return {
+      department: {
+        id: dept.id,
+        name: dept.name,
+        totalActiveEmployees: users.length,
+        departmentAtExecutionScore,
+        departmentPsScore: null,
+        completedTasks: completedCount,
+        pendingTasks: Math.max(0, totalTasks - completedCount),
+        overdueTasks: deptOverdueTasks,
+        period: `${month}/${year}`,
+      },
+      employees: employeeScores,
+    };
+  }
+
+  /** Top 10 by stored points for a month. */
+  async getLeaderboard(month: number, year: number, callerRole?: string) {
+    const rows = await this.prisma.performance_scores.findMany({
       where: { month, year },
       orderBy: { final_score: 'desc' },
-      take: 10,
+      take: 20,
       select: {
         final_score: true,
         users: {
@@ -445,5 +1043,202 @@ export class ScoringService {
         },
       },
     });
+
+    if (isRestrictedFromDigitalMarketing(callerRole)) {
+      return rows
+        .filter((r) => !isDigitalMarketingDepartment(r.users.departments?.name))
+        .slice(0, 10);
+    }
+
+    return rows.slice(0, 10);
+  }
+
+  /**
+   * Export scores to Excel for EA, PA, MD, HOD, and controllers.
+   * Exports all scoped records matching filters in a single file named Scores_YYYY-MM-DD.xlsx.
+   */
+  async exportScoresToExcel(query: ManagementScoresQueryDto, scope: DepartmentScope, caller: any) {
+    const now = new Date();
+    const month = query.month ?? now.getMonth() + 1;
+    const year = query.year ?? now.getFullYear();
+
+    const userWhere: Prisma.usersWhereInput = {
+      is_active: true,
+      deleted_at: null,
+      role: { not: role_enum.ADMIN },
+    };
+
+    if (!scope.unrestricted) {
+      userWhere.department_id = { in: scope.departmentIds };
+    }
+
+    if (query.department_id) {
+      userWhere.department_id = query.department_id;
+    }
+
+    const isEaPaMd = caller?.role ? isRestrictedFromDigitalMarketing(caller.role) : false;
+
+    if (isEaPaMd) {
+      const dmDepts = await this.prisma.departments.findMany({
+        where: { name: { contains: 'Digital Marketing', mode: 'insensitive' } },
+        select: { id: true },
+      });
+      const dmIds = dmDepts.map((d) => d.id);
+      if (dmIds.length > 0) {
+        if (query.department_id && dmIds.includes(query.department_id)) {
+          throw new ForbiddenException('Outside your department scope');
+        }
+        userWhere.department_id = { notIn: dmIds };
+      }
+    }
+
+    if (query.role) {
+      userWhere.role = query.role as role_enum;
+    }
+
+    const q = query.q?.trim();
+    if (q) {
+      userWhere.OR = [
+        { full_name: { contains: q, mode: 'insensitive' } },
+        { username: { contains: q, mode: 'insensitive' } },
+        { email: { contains: q, mode: 'insensitive' } },
+      ];
+    }
+
+    const users = await this.prisma.users.findMany({
+      where: userWhere,
+      select: {
+        id: true,
+        full_name: true,
+        username: true,
+        email: true,
+        role: true,
+        department_id: true,
+        departments: { select: { id: true, name: true } },
+      },
+      orderBy: [{ departments: { name: 'asc' } }, { full_name: 'asc' }],
+    });
+
+    if (!users.length) {
+      throw new NotFoundException('No employee records found for the selected filters.');
+    }
+
+    // Compute AT and PS scores for all users
+    const evaluatedRows = await Promise.all(
+      users.map(async (u) => {
+        const atResult = await this.calculateStandardAtScore(u.id, month, year);
+        let psResult = { ps_score: 0, counted_weight: 0, declared_weight: 0, kpis: [] as any[] };
+        if (this.kpiService) {
+          try {
+            psResult = (await this.kpiService.psScoreFor(u.id, { month, year }, caller)) as any;
+          } catch {
+            // fallback
+          }
+        }
+        return {
+          user: u,
+          atResult,
+          psResult,
+        };
+      }),
+    );
+
+    let filtered = evaluatedRows;
+    if (query.minAt !== undefined) {
+      filtered = filtered.filter((r) => r.atResult.score >= query.minAt!);
+    }
+    if (query.maxAt !== undefined) {
+      filtered = filtered.filter((r) => r.atResult.score <= query.maxAt!);
+    }
+    if (query.minPs !== undefined) {
+      filtered = filtered.filter((r) => r.psResult.ps_score >= query.minPs!);
+    }
+    if (query.maxPs !== undefined) {
+      filtered = filtered.filter((r) => r.psResult.ps_score <= query.maxPs!);
+    }
+
+    // Descending order as per the AT Score for EA, PA, and MD
+    if (isEaPaMd) {
+      filtered.sort((a, b) => b.atResult.score - a.atResult.score);
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'RUCHI PerformX';
+    workbook.created = now;
+
+    const sheet = workbook.addWorksheet('Scores');
+    sheet.columns = [
+      { header: 'Employee Name', key: 'name', width: 26 },
+      { header: 'Username / Email', key: 'identifier', width: 28 },
+      { header: 'Department', key: 'department', width: 24 },
+      { header: 'Role / Designation', key: 'role', width: 22 },
+      { header: 'Period', key: 'period', width: 14 },
+      { header: 'AT Score (Execution)', key: 'atScore', width: 22 },
+      { header: 'PS Score (KPI Outcome)', key: 'psScore', width: 24 },
+      { header: 'Self Actions Score', key: 'selfActionsScore', width: 20 },
+      { header: 'Assigned Tasks Score', key: 'assignedTasksScore', width: 22 },
+      { header: 'Projects Score', key: 'projectScore', width: 18 },
+      { header: 'KPIs Evaluated', key: 'kpiCount', width: 16 },
+      { header: 'Score Normalization', key: 'isNormalized', width: 20 },
+    ];
+
+    // Style Header Row (PerformX brand green)
+    const headerRow = sheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF15803D' }, // Green-700
+    };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+    headerRow.height = 24;
+
+    for (const r of filtered) {
+      const u = r.user;
+      const comps = r.atResult.components;
+      const selfActionScore = comps.selfAction ? round2(comps.selfAction.score) : 0;
+      const assignedTaskScore = comps.assignedTask ? round2(comps.assignedTask.score) : 0;
+      const projectScore = comps.project ? round2(comps.project.score) : 0;
+
+      const sanitize = (val: unknown) => {
+        if (val == null) return '';
+        const str = String(val);
+        return /^[=+\-@\t\r]/.test(str) ? `'${str}` : str;
+      };
+
+      const row = sheet.addRow({
+        name: sanitize(u.full_name),
+        identifier: sanitize(u.email || u.username),
+        department: sanitize(u.departments?.name ?? 'General'),
+        role: sanitize(u.role),
+        period: `${month}/${year}`,
+        atScore: r.atResult.score,
+        psScore: r.psResult.ps_score,
+        selfActionsScore: selfActionScore,
+        assignedTasksScore: assignedTaskScore,
+        projectScore: projectScore,
+        kpiCount: r.psResult.kpis?.length ?? 0,
+        isNormalized: r.atResult.isNormalized ? 'Yes (Project normalized)' : 'Standard (100%)',
+      });
+
+      row.alignment = { vertical: 'middle' };
+      row.getCell('atScore').alignment = { horizontal: 'right' };
+      row.getCell('psScore').alignment = { horizontal: 'right' };
+      row.getCell('selfActionsScore').alignment = { horizontal: 'right' };
+      row.getCell('assignedTasksScore').alignment = { horizontal: 'right' };
+      row.getCell('projectScore').alignment = { horizontal: 'right' };
+      row.getCell('kpiCount').alignment = { horizontal: 'center' };
+      row.getCell('period').alignment = { horizontal: 'center' };
+    }
+
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const dateStamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    const filename = `Scores_${dateStamp}.xlsx`;
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return {
+      buffer: Buffer.from(buffer),
+      filename,
+    };
   }
 }

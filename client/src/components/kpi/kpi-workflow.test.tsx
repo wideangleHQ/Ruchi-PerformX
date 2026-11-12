@@ -65,10 +65,10 @@ describe('KpiClient tabs and approval', () => {
     await waitFor(() => expect(listCalls().some((c) => paramsOf(c).view === 'others')).toBe(true));
   });
 
-  it('opens the score workspace from the third tab', async () => {
+  it('does not render the score tab while scoring features are hidden', async () => {
     renderWithQuery(<KpiClient />);
-    await userEvent.click(await screen.findByRole('button', { name: 'View score' }));
-    expect(await screen.findByText('score workspace')).toBeInTheDocument();
+    await screen.findByText('Pending call volume');
+    expect(screen.queryByRole('button', { name: 'View score' })).not.toBeInTheDocument();
   });
 
   it('shows no tabs to an employee and sends no view filter', async () => {

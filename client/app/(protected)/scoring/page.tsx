@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { ReactNode } from 'react';
+import { redirect } from 'next/navigation';
 import { AlertTriangle, ClipboardCheck, ClipboardList, Info, Sigma, TrendingUp } from 'lucide-react';
 import { useMyScore, useMyScoreTrend } from '@/hooks/useAnalytics';
 import type { ScoreTrendPoint } from '@/api/scoring';
@@ -152,7 +153,13 @@ function CompositionTable({ trend }: { trend: ScoreTrendPoint[] }) {
   );
 }
 
+const SHOW_SCORING = false;
+
 export default function ScoringPage() {
+  if (!SHOW_SCORING) {
+    redirect('/dashboard');
+  }
+
   const now = new Date();
   const [period, setPeriod] = useState({
     month: now.getMonth() + 1,

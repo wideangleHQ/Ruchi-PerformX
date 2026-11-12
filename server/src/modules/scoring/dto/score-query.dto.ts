@@ -26,3 +26,43 @@ export class ScoreQueryDto {
   @Max(2100)
   year?: number;
 }
+
+export class ManagementScoresQueryDto extends ScoreQueryDto {
+  @IsOptional()
+  department_id?: string;
+
+  @IsOptional()
+  role?: string;
+
+  @IsOptional()
+  q?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 20;
+
+  @IsOptional()
+  @Type(() => Number)
+  minAt?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  maxAt?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  minPs?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  maxPs?: number;
+}

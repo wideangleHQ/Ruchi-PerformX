@@ -210,7 +210,13 @@ function RankingTable({ hods }: { hods: HodScoreRecord[] }) {
   );
 }
 
+const SHOW_SCORING = false;
+
 export default function HodScorePage() {
+  if (!SHOW_SCORING) {
+    redirect('/dashboard');
+  }
+
   const { user, isLoading: authLoading } = useAuth();
   const now = new Date();
   const [period, setPeriod] = useState({
