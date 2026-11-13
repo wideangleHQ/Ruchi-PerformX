@@ -43,6 +43,7 @@ import {
   countLeaveDays,
   financialYearOf,
   FINANCIAL_YEAR_START_MONTH,
+  LEAVE_FINANCIAL_YEAR,
   MIN_LEAVE_DAYS,
   monthRange,
   parseDateOnly,
@@ -552,7 +553,7 @@ export class LeaveService {
    * from existing database records. Does not fabricate or insert missing balances.
    */
   async myBalance(user: JwtPayload, yearParam?: number) {
-    const year = yearParam ?? financialYearOf(new Date());
+    const year = yearParam ?? LEAVE_FINANCIAL_YEAR;
 
     const rows = await this.prisma.leave_balances.findMany({
       where: {
@@ -603,7 +604,7 @@ export class LeaveService {
    * Supports search by name, username, email, and personnel_number.
    */
   async listBalances(filter: LeaveBalanceFilterDto, caller?: JwtPayload) {
-    const year = filter.year ?? financialYearOf(new Date());
+    const year = filter.year ?? LEAVE_FINANCIAL_YEAR;
     const page = filter.page ?? 1;
     const limit = filter.limit ?? 50;
 
@@ -808,7 +809,7 @@ export class LeaveService {
 
   /** Get audit trail of leave balance adjustments */
   async getAdjustments(userId: string, year?: number) {
-    const targetYear = year ?? financialYearOf(new Date());
+    const targetYear = year ?? LEAVE_FINANCIAL_YEAR;
     const adjustments = await this.prisma.leave_balance_adjustments.findMany({
       where: {
         user_id: userId,
@@ -828,7 +829,7 @@ export class LeaveService {
 
   /** Detailed leave balance summary for an individual employee */
   async getEmployeeLeaveSummary(userId: string, year?: number, caller?: JwtPayload) {
-    const targetYear = year ?? financialYearOf(new Date());
+    const targetYear = year ?? LEAVE_FINANCIAL_YEAR;
     const user = await this.prisma.users.findUnique({
       where: { id: userId },
       select: {

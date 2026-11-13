@@ -21,6 +21,9 @@
  */
 export const WEEKLY_OFF_DAYS: ReadonlySet<number> = new Set([0]);
 
+/** The standard financial year for leave allocations and balances (FY 2026-27). */
+export const LEAVE_FINANCIAL_YEAR = 2026;
+
 /** The financial year starts 1 April, so month index 3. See decisions.md. */
 export const FINANCIAL_YEAR_START_MONTH = 3;
 

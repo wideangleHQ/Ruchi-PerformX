@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ApplyLeavePayload, LeaveStatus, LeaveTypePayload, leaveApi } from '@/api/leave';
+import { ApplyLeavePayload, LEAVE_FINANCIAL_YEAR, LeaveStatus, LeaveTypePayload, leaveApi } from '@/api/leave';
 
 export const useLeaveTypes = () =>
   useQuery({ queryKey: ['leave', 'types'], queryFn: () => leaveApi.getTypes() });
 
-export const useLeaveBalance = (year?: number) =>
+export const useLeaveBalance = (year: number = LEAVE_FINANCIAL_YEAR) =>
   useQuery({ queryKey: ['leave', 'balance', year], queryFn: () => leaveApi.getMyBalance(year) });
 
 export const useMyLeaveApplications = (filters?: { status?: LeaveStatus; year?: number }) =>
@@ -119,7 +119,11 @@ export const useSearchLeaveEmployees = (query: string, enabled = true) =>
     staleTime: 1000 * 30,
   });
 
-export const useEmployeeLeaveSummary = (userId: string | null, year?: number, enabled = true) =>
+export const useEmployeeLeaveSummary = (
+  userId: string | null,
+  year: number = LEAVE_FINANCIAL_YEAR,
+  enabled = true,
+) =>
   useQuery({
     queryKey: ['leave', 'summary', userId, year],
     queryFn: () => (userId ? leaveApi.getEmployeeSummary(userId, year) : Promise.reject('No user')),

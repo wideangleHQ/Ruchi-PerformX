@@ -170,13 +170,13 @@ export function EmployeeLeaveProfile({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Tab Navigation */}
-      <div className="flex border-b border-slate-200">
+      <div className="flex border-b border-slate-200 -mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto">
         <button
           type="button"
           onClick={() => setActiveTab('overview')}
-          className={`px-5 py-3 text-sm font-semibold border-b-2 transition ${
+          className={`px-3 sm:px-5 py-2 sm:py-3 text-xs sm:text-sm font-semibold border-b-2 transition whitespace-nowrap ${
             activeTab === 'overview'
               ? 'border-green-700 text-green-700'
               : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -187,7 +187,7 @@ export function EmployeeLeaveProfile({
         <button
           type="button"
           onClick={() => setActiveTab('applications')}
-          className={`px-5 py-3 text-sm font-semibold border-b-2 transition ${
+          className={`px-3 sm:px-5 py-2 sm:py-3 text-xs sm:text-sm font-semibold border-b-2 transition whitespace-nowrap ${
             activeTab === 'applications'
               ? 'border-green-700 text-green-700'
               : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -198,7 +198,7 @@ export function EmployeeLeaveProfile({
         <button
           type="button"
           onClick={() => setActiveTab('balances')}
-          className={`px-5 py-3 text-sm font-semibold border-b-2 transition ${
+          className={`px-3 sm:px-5 py-2 sm:py-3 text-xs sm:text-sm font-semibold border-b-2 transition whitespace-nowrap ${
             activeTab === 'balances'
               ? 'border-green-700 text-green-700'
               : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -209,7 +209,7 @@ export function EmployeeLeaveProfile({
         <button
           type="button"
           onClick={() => setActiveTab('history')}
-          className={`px-5 py-3 text-sm font-semibold border-b-2 transition ${
+          className={`px-3 sm:px-5 py-2 sm:py-3 text-xs sm:text-sm font-semibold border-b-2 transition whitespace-nowrap ${
             activeTab === 'history'
               ? 'border-green-700 text-green-700'
               : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -226,7 +226,7 @@ export function EmployeeLeaveProfile({
             <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center">
               <p className="font-semibold text-slate-700">No leave balance records found</p>
               <p className="mt-1 text-xs text-slate-500">
-                No active leave allocations for FY {summary.year}–{summary.year + 1}.
+                No active leave allocations for FY {summary.year}–{String(summary.year + 1).slice(-2)}.
               </p>
             </div>
           ) : (
@@ -241,15 +241,15 @@ export function EmployeeLeaveProfile({
                 return (
                   <div
                     key={b.id}
-                    className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 transition hover:border-green-200"
+                    className="flex flex-col justify-between rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 transition hover:border-green-200"
                   >
                     <div>
                       <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                         {name}
                       </span>
 
-                      <div className="mt-3 flex items-baseline gap-2">
-                        <span className="text-3xl font-extrabold tracking-tight text-slate-900">
+                      <div className="mt-2 sm:mt-3 flex items-baseline gap-2">
+                        <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
                           {rem}
                         </span>
                         <span className="text-xs font-medium text-slate-500">days remaining</span>
@@ -283,14 +283,14 @@ export function EmployeeLeaveProfile({
               })}
 
               {/* Total Balance Card */}
-              <div className="flex flex-col justify-between rounded-2xl border border-green-300 bg-gradient-to-br from-green-50 to-white p-5">
+              <div className="flex flex-col justify-between rounded-xl sm:rounded-2xl border border-green-300 bg-gradient-to-br from-green-50 to-white p-4 sm:p-5">
                 <div>
                   <span className="text-xs font-bold uppercase tracking-wider text-green-900">
                     Total Leave Summary
                   </span>
 
-                  <div className="mt-3 flex items-baseline gap-2">
-                    <span className="text-3xl font-black tracking-tight text-green-800">
+                  <div className="mt-2 sm:mt-3 flex items-baseline gap-2">
+                    <span className="text-2xl sm:text-3xl font-black tracking-tight text-green-800">
                       {Math.round(totalRemaining * 100) / 100}
                     </span>
                     <span className="text-xs font-semibold text-green-700">total remaining</span>
@@ -317,7 +317,7 @@ export function EmployeeLeaveProfile({
               <div>
                 <h3 className="text-base font-bold text-slate-900">Recent Leave Applications</h3>
                 <p className="text-xs text-slate-500">
-                  Latest submissions for FY {summary.year}–{summary.year + 1}.
+                  Latest submissions for FY {summary.year}–{String(summary.year + 1).slice(-2)}.
                 </p>
               </div>
 
@@ -391,11 +391,11 @@ export function EmployeeLeaveProfile({
 
       {/* ============================== TAB 2: LEAVE APPLICATIONS ============================== */}
       {activeTab === 'applications' && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 space-y-4">
+        <div className="rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 space-y-3 sm:space-y-4">
           <div className="flex flex-col gap-4 border-b border-slate-100 pb-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
-                <h3 className="text-base font-bold text-slate-900">Leave Applications Record</h3>
+                <h3 className="text-sm sm:text-base font-bold text-slate-900">Leave Applications Record</h3>
                 <p className="text-xs text-slate-500">
                   History of applied, approved, rejected, and cancelled leaves.
                 </p>
@@ -404,13 +404,13 @@ export function EmployeeLeaveProfile({
               <div className="w-full sm:w-64">
                 <Input
                   type="text"
-                  placeholder="Search by reason or type..."
+                  placeholder="Search..."
                   value={appSearch}
                   onChange={(e) => {
                     setAppSearch(e.target.value);
                     setPage(1);
                   }}
-                  className="h-9 rounded-xl text-xs border-slate-200"
+                  className="h-8 sm:h-9 rounded-xl text-xs border-slate-200"
                 />
               </div>
             </div>
@@ -422,7 +422,7 @@ export function EmployeeLeaveProfile({
                   setStatusFilter(e.target.value as LeaveStatus | '');
                   setPage(1);
                 }}
-                className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-700"
+                className="h-8 sm:h-9 rounded-xl border border-slate-200 bg-white px-2 sm:px-3 text-xs text-slate-700"
               >
                 <option value="">All Statuses</option>
                 <option value="PENDING">Pending</option>
@@ -437,9 +437,9 @@ export function EmployeeLeaveProfile({
                   setTypeFilter(e.target.value);
                   setPage(1);
                 }}
-                className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-700"
+                className="h-8 sm:h-9 rounded-xl border border-slate-200 bg-white px-2 sm:px-3 text-xs text-slate-700"
               >
-                <option value="">All Leave Types</option>
+                <option value="">All Types</option>
                 {types.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name}
@@ -448,7 +448,7 @@ export function EmployeeLeaveProfile({
               </select>
 
               <div className="flex items-center gap-1 text-xs text-slate-500">
-                <span>From:</span>
+                <span className="hidden sm:inline">From:</span>
                 <input
                   type="date"
                   value={fromDateFilter}
@@ -456,12 +456,12 @@ export function EmployeeLeaveProfile({
                     setFromDateFilter(e.target.value);
                     setPage(1);
                   }}
-                  className="h-9 rounded-xl border border-slate-200 bg-white px-2 text-xs text-slate-700"
+                  className="h-8 sm:h-9 rounded-xl border border-slate-200 bg-white px-2 text-xs text-slate-700"
                 />
               </div>
 
               <div className="flex items-center gap-1 text-xs text-slate-500">
-                <span>To:</span>
+                <span className="hidden sm:inline">To:</span>
                 <input
                   type="date"
                   value={toDateFilter}
@@ -469,7 +469,7 @@ export function EmployeeLeaveProfile({
                     setToDateFilter(e.target.value);
                     setPage(1);
                   }}
-                  className="h-9 rounded-xl border border-slate-200 bg-white px-2 text-xs text-slate-700"
+                  className="h-8 sm:h-9 rounded-xl border border-slate-200 bg-white px-2 text-xs text-slate-700"
                 />
               </div>
 
@@ -479,23 +479,23 @@ export function EmployeeLeaveProfile({
                   variant="ghost"
                   size="sm"
                   onClick={resetFilters}
-                  className="h-9 rounded-xl text-xs"
+                  className="h-8 sm:h-9 rounded-xl text-xs"
                 >
-                  Clear Filters
+                  Clear
                 </Button>
               )}
             </div>
           </div>
 
           {filteredApplications.length === 0 ? (
-            <div className="py-12 text-center">
-              <p className="font-semibold text-slate-700">No applications match your filters.</p>
+            <div className="py-10 sm:py-12 text-center">
+              <p className="text-sm font-semibold text-slate-700">No applications match your filters.</p>
               <p className="mt-1 text-xs text-slate-500">Try adjusting your filters.</p>
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto rounded-xl border border-slate-100">
-                <table className="min-w-full text-left text-xs">
+              <div className="overflow-x-auto rounded-xl border border-slate-100 -mx-4 sm:mx-0">
+                <table className="min-w-full text-left text-xs min-w-[800px]">
                   <thead className="bg-slate-50">
                     <tr>
                       <th className="px-4 py-3 text-xs font-semibold text-slate-600">Leave Type</th>
@@ -639,10 +639,10 @@ export function EmployeeLeaveProfile({
 
       {/* ============================== TAB 3: LEAVE BALANCES ============================== */}
       {activeTab === 'balances' && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 space-y-5">
+        <div className="rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 space-y-4 sm:space-y-5">
           <div className="border-b border-slate-100 pb-3">
             <h3 className="text-base font-bold text-slate-900">
-              Leave Balances (FY {summary.year}–{summary.year + 1})
+              Leave Balances & Quota Breakdown (FY {summary.year}–{String(summary.year + 1).slice(-2)})
             </h3>
             <p className="text-xs text-slate-500">
               Detailed leave entitlements, usage, and remaining balance.
@@ -714,22 +714,22 @@ export function EmployeeLeaveProfile({
 
       {/* ============================== TAB 4: LEAVE HISTORY ============================== */}
       {activeTab === 'history' && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 space-y-4">
+        <div className="rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 space-y-3 sm:space-y-4">
           <div className="border-b border-slate-100 pb-3">
-            <h3 className="text-base font-bold text-slate-900">Leave History</h3>
+            <h3 className="text-sm sm:text-base font-bold text-slate-900">Leave History</h3>
             <p className="text-xs text-slate-500">
               Chronological log of adjustments, applications, and approvals.
             </p>
           </div>
 
           {chronologicalHistory.length === 0 ? (
-            <div className="py-12 text-center text-sm text-slate-500">
+            <div className="py-10 sm:py-12 text-center text-xs sm:text-sm text-slate-500">
               No historical leave events found.
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {chronologicalHistory.map((item) => (
-                <div key={item.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4 transition hover:bg-white">
+                <div key={item.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3 sm:p-4 transition hover:bg-white">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-bold text-slate-900">{item.title}</span>

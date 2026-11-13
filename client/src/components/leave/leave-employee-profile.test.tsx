@@ -194,19 +194,15 @@ describe('EmployeeProfileHeader', () => {
     expect(screen.getByText('Switch Employee')).toBeInTheDocument();
   });
 
-  it('triggers year change callback when selecting a different financial year', async () => {
-    const onYearChange = vi.fn();
+  it('displays the fixed FY 2026–27 financial year badge without dropdown switching', () => {
     render(
       <EmployeeProfileHeader
         user={mockSummary.user}
-        selectedYear={2026}
-        onYearChange={onYearChange}
       />,
     );
 
-    const select = screen.getByRole('combobox');
-    await userEvent.selectOptions(select, '2025');
-    expect(onYearChange).toHaveBeenCalledWith(2025);
+    expect(screen.getByText('FY 2026–27')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
   });
 });
 
@@ -260,8 +256,8 @@ describe('EmployeeLeaveProfile Tabs & Features', () => {
     await userEvent.click(balancesTab);
 
     expect(screen.getByText(/Leave Balances & Quota Breakdown/i)).toBeInTheDocument();
-    expect(screen.getAllByText('Paid Leave').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Carry-forward enabled').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Paid').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Carry-forward').length).toBeGreaterThan(0);
     expect(screen.getByText('Proof required')).toBeInTheDocument();
   });
 
@@ -272,8 +268,8 @@ describe('EmployeeLeaveProfile Tabs & Features', () => {
     const historyTab = screen.getByRole('button', { name: /Leave History/i });
     await userEvent.click(historyTab);
 
-    expect(screen.getByText('Chronological Leave History')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Leave History' })).toBeInTheDocument();
     expect(screen.getByText(/FY2026 Opening quota allocation/i)).toBeInTheDocument();
-    expect(screen.getByText('Leave Application Submitted: Casual Leave')).toBeInTheDocument();
+    expect(screen.getByText('Leave Application: Casual Leave')).toBeInTheDocument();
   });
 });

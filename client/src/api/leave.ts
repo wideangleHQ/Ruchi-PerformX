@@ -1,6 +1,8 @@
 import axiosClient from './client';
 import type { Holiday } from './holidays';
 
+export const LEAVE_FINANCIAL_YEAR = 2026;
+
 export type LeaveStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 
 /** Day counts are `Decimal(5,1)` on the server and arrive as strings over JSON. */
@@ -202,7 +204,8 @@ export const leaveApi = {
   getTypes: () => getList<LeaveType>('/leave/types'),
 
   /** Own balance for the requested year, one row per active leave type. */
-  getMyBalance: (year?: number) => getList<LeaveBalance>('/leave/balance', { year }),
+  getMyBalance: (year?: number) =>
+    getList<LeaveBalance>('/leave/balance', { year: year ?? LEAVE_FINANCIAL_YEAR }),
 
   getMyApplications: (params?: { status?: LeaveStatus; year?: number }) =>
     getList<LeaveApplication>('/leave/applications/mine', params),
@@ -314,7 +317,7 @@ export const leaveApi = {
     q?: string;
     page?: number;
     limit?: number;
-  }) => getList<LeaveBalanceRow>('/leave/balances', params),
+  }) => getList<LeaveBalanceRow>('/leave/balances', { year: LEAVE_FINANCIAL_YEAR, ...params }),
 
   /**
    * Manual correction or adjustment of one row. Sets the columns outright.
@@ -359,7 +362,7 @@ export const leaveApi = {
   /** Get individual employee full leave summary */
   getEmployeeSummary: async (userId: string, year?: number): Promise<EmployeeLeaveSummary> => {
     const response = await axiosClient.get<EmployeeLeaveSummary>(`/leave/summary/${userId}`, {
-      params: { year },
+      params: { year: year ?? LEAVE_FINANCIAL_YEAR },
     });
     return response.data;
   },
